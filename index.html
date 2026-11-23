@@ -1,0 +1,817 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#0b0b0c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tiksound">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<title>Tiksound – tes sons TikTok en playlist</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{color-scheme:dark;--bg:#0b0b0c;--card:#151517;--tx:#ececee;--mut:#86868f;--ac:#dcdce0;--ac2:#6c6c76;--br:#26262a;--on:#0b0b0c}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--tx);font:400 16px/1.55 "DM Sans",system-ui,sans-serif;padding-bottom:110px}
+h1,h2,h3,.logo{font-family:"Bricolage Grotesque",system-ui,sans-serif;line-height:1.05}
+a{color:inherit}
+button,select,input{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--ac);outline-offset:2px}
+header{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--br);padding-top:env(safe-area-inset-top,0px)}
+.bar{max-width:920px;margin:auto;display:flex;align-items:center;justify-content:space-between;padding:12px 20px;gap:12px}
+.logo{font-weight:800;font-size:22px;text-decoration:none}
+nav{display:flex;gap:4px;flex-wrap:wrap}
+nav a{text-decoration:none;padding:6px 12px;border-radius:99px;color:var(--mut)}
+nav a.on{background:var(--ac);color:var(--on);font-weight:500}
+main{max-width:920px;margin:auto;padding:36px 20px}
+section[hidden]{display:none}
+h1{font-size:clamp(40px,9vw,84px);font-weight:800;letter-spacing:-.03em;max-width:12ch}
+h2{font-size:clamp(28px,5vw,40px);font-weight:800;letter-spacing:-.02em;margin-bottom:18px}
+.lead{color:var(--mut);max-width:48ch;margin:18px 0 26px;font-size:18px}
+.eq{display:flex;align-items:flex-end;gap:6px;height:90px;margin:0 0 28px}
+.eq i{flex:1;max-width:14px;border-radius:6px;background:var(--ac);height:30%;animation:eq 1.1s ease-in-out infinite alternate}
+.eq i:nth-child(3n){background:var(--ac2)}
+@keyframes eq{to{height:100%}}
+@media(prefers-reduced-motion:reduce){.eq i{animation:none}.eq i:nth-child(odd){height:70%}}
+.paste{display:flex;gap:10px;flex-wrap:wrap}
+.paste input{flex:1 1 260px;padding:15px 18px;border-radius:14px;border:2px solid var(--br);background:var(--card)}
+.btn{border:0;border-radius:14px;padding:15px 22px;font-weight:500;cursor:pointer;background:var(--ac);color:var(--on)}
+.btn.alt{background:transparent;border:2px solid var(--br);color:var(--tx)}
+.btn.sm{padding:9px 16px;font-size:14px}
+.btn:disabled{opacity:.6}
+.steps{display:grid;gap:22px;margin-top:52px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+.steps h3{font-size:22px;margin-bottom:6px}.steps p{color:var(--mut)}
+.row{display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid var(--br)}
+.row.cur .t{color:var(--ac)}
+.cv{width:52px;height:52px;border-radius:10px;flex:none;object-fit:cover;background:linear-gradient(135deg,var(--ac),var(--ac2));display:grid;place-items:center;font:800 22px "Bricolage Grotesque";color:var(--on)}
+.m{flex:1;min-width:0}.t{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.a{color:var(--mut);font-size:14px}
+.ib{background:none;border:2px solid var(--br);border-radius:99px;min-width:42px;height:42px;cursor:pointer;padding:0 12px;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.ib.p{background:var(--ac);border-color:var(--ac);color:var(--on)}
+select.ib{max-width:120px}
+.empty{color:var(--mut);padding:26px 0}
+.note{background:var(--card);border:1px dashed var(--br);border-radius:14px;padding:16px 18px;margin-top:22px;color:var(--mut)}
+.note b{color:var(--tx)}
+.top{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:18px}
+.top input{padding:12px 16px;border-radius:12px;border:2px solid var(--br);background:var(--card);flex:1 1 200px}
+.pls{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(170px,1fr))}
+.mos{display:grid;grid-template-columns:1fr 1fr;aspect-ratio:1;border-radius:12px;overflow:hidden;gap:2px;margin-bottom:12px;background:var(--br)}
+.mos img,.mos i{width:100%;height:100%;object-fit:cover;background:#1d1d21;display:grid;place-items:center;font:800 24px "Bricolage Grotesque";color:var(--ac2);font-style:normal}
+.grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+.empty{grid-column:1/-1}
+.tc{background:var(--card);border-radius:16px;padding:10px;transition:transform .2s,box-shadow .2s}
+.tc:hover{transform:translateY(-3px);box-shadow:0 12px 30px #000a}
+.tc.cur{box-shadow:0 0 0 2px var(--ac)}
+.art{position:relative;display:grid;place-items:center;width:100%;aspect-ratio:1;border:0;padding:0;border-radius:12px;overflow:hidden;cursor:pointer;background:linear-gradient(135deg,#34343b,#1a1a1e)}
+.art img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.art b{font:800 56px "Bricolage Grotesque";color:var(--ac2)}
+.ov{position:absolute;inset:0;background:#000a;display:grid;place-items:center;opacity:0;transition:opacity .2s}
+.tc:hover .ov,.tc.cur .ov{opacity:1}
+.pi{display:grid;place-items:center;width:48px;height:48px}
+.eqm{position:absolute;left:0;right:0;bottom:10px;display:none;justify-content:center;align-items:flex-end;gap:3px;height:26px}
+.tc.pl .eqm{display:flex}
+.eqm i{width:4px;height:5px;background:var(--ac);border-radius:2px;animation:bar .8s ease-in-out infinite alternate}
+.eqm i:nth-child(2n){animation-duration:.55s}.eqm i:nth-child(3){animation-delay:.25s}
+@keyframes bar{to{height:26px}}
+.act{display:flex;gap:6px;margin-top:10px}.act select{flex:1;min-width:0}
+.cv.spin{border-radius:50%;animation:sp 6s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+section{animation:in .35s ease}
+@keyframes in{from{opacity:0;transform:translateY(8px)}}
+@media(prefers-reduced-motion:reduce){.cv.spin,.eqm i,section{animation:none}.eqm i{height:18px}}
+.pc{background:var(--card);border-radius:16px;padding:18px;text-align:left;border:0;cursor:pointer}
+.pc h3{font-size:22px}.pc span{color:var(--mut);font-size:14px}
+code{background:var(--card);padding:2px 6px;border-radius:6px;font-size:14px}
+ol{padding-left:20px;color:var(--mut)}ol li{margin-bottom:8px}
+
+/* ── Player bar ─────────────────────────────────────────────────────────── */
+#pl{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--br);padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));z-index:6}
+#pl .in{max-width:920px;margin:auto;display:flex;align-items:center;gap:12px}
+#pl input[type=range]{width:100%;accent-color:var(--ac);margin-top:4px}
+/* SVG icon buttons */
+.pi-btn{background:none;border:2px solid var(--br);border-radius:50%;width:42px;height:42px;cursor:pointer;display:grid;place-items:center;flex:none}
+.pi-btn.p{background:var(--ac);border-color:var(--ac)}
+.pi-btn svg{display:block}
+.pi-btn.p svg{color:var(--on)}
+
+#toast{position:fixed;left:50%;bottom:120px;transform:translate(-50%,20px);background:var(--tx);color:var(--bg);padding:10px 18px;border-radius:99px;opacity:0;pointer-events:none;transition:.25s;z-index:9;max-width:90vw}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+[hidden]{display:none!important}
+.don{display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:99px;border:2px solid var(--br);text-decoration:none;font-size:14px;transition:.2s}
+.don:hover{border-color:var(--ac);background:var(--card)}.don svg{color:#e0707d}
+.bar{flex-wrap:wrap}
+
+/* ── Bottom sheets ────────────────────────────────────────────────────── */
+.ov2{position:fixed;inset:0;z-index:20;display:flex;align-items:flex-end;justify-content:center}
+.bd{position:absolute;inset:0;background:#000b;animation:fd .2s}
+.sheet{position:relative;width:100%;max-width:520px;background:var(--card);border-radius:28px 28px 0 0;padding:12px 20px calc(24px + env(safe-area-inset-bottom,0px));max-height:82vh;overflow:auto;animation:up .28s cubic-bezier(.2,.9,.3,1)}
+@keyframes up{from{transform:translateY(100%)}}@keyframes fd{from{opacity:0}}
+.grab{width:44px;height:5px;border-radius:9px;background:var(--br);margin:0 auto 16px}
+.sheet h3{font-size:24px;margin-bottom:14px}
+.sr{display:flex;align-items:center;gap:14px;width:100%;text-align:left;background:var(--bg);border:2px solid transparent;border-radius:20px;padding:10px;margin-bottom:10px;cursor:pointer;transition:.15s}
+.sr:hover{border-color:var(--br)}.sr.on{border-color:var(--ac)}
+.sr .mos{width:52px;margin:0;border-radius:12px;flex:none}.sr .mos i{font-size:14px}
+.sr small{display:block;color:var(--mut)}
+.ck{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:var(--br);font-weight:700}
+.sr.on .ck{background:var(--ac);color:var(--on)}
+.nw{display:flex;gap:10px;margin-top:6px}
+.nw input{flex:1;min-width:0;padding:13px 18px;border-radius:99px;border:2px solid var(--br);background:var(--bg)}
+.nw .btn{border-radius:99px}
+
+/* ── Auth modal ───────────────────────────────────────────────────────── */
+#auth-modal{position:fixed;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;background:#000b}
+#auth-modal .box{background:var(--card);border-radius:24px;padding:32px;width:100%;max-width:380px;animation:in .3s ease}
+#auth-modal h2{font-size:28px;margin-bottom:20px}
+.fld{display:flex;flex-direction:column;gap:12px;margin-bottom:16px}
+.fld input{padding:14px 18px;border-radius:14px;border:2px solid var(--br);background:var(--bg)}
+.fld input:focus{border-color:var(--ac)}
+.fld-err{color:#e07070;font-size:14px;min-height:20px}
+.auth-sw{text-align:center;color:var(--mut);font-size:14px;margin-top:14px}
+.auth-sw button{background:none;border:0;color:var(--tx);font-weight:500;cursor:pointer;padding:0 4px;text-decoration:underline}
+
+/* ── Profil public ─────────────────────────────────────────────────────── */
+.pub-av{width:72px;height:72px;border-radius:50%;display:grid;place-items:center;font:800 32px "Bricolage Grotesque";color:var(--on);flex:none}
+.pub-header{display:flex;align-items:center;gap:18px;margin-bottom:28px}
+.pub-header h2{margin:0;font-size:clamp(22px,5vw,34px)}
+.pub-pl-grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(170px,1fr))}
+/* track list in public playlist view */
+.pub-row{display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid var(--br);cursor:pointer}
+.pub-row:hover .t{color:var(--ac)}
+
+/* ── Discover ─────────────────────────────────────────────────────────── */
+.user-card{background:var(--card);border-radius:16px;padding:18px;display:flex;align-items:center;gap:14px;cursor:pointer;border:2px solid transparent;transition:.15s}
+.user-card:hover{border-color:var(--br)}
+.users-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));margin-top:18px}
+.search-bar{display:flex;gap:10px;margin-bottom:22px}
+.search-bar input{flex:1;padding:13px 18px;border-radius:14px;border:2px solid var(--br);background:var(--card)}
+
+/* ── Profil (mon compte) ──────────────────────────────────────────────── */
+.prof{display:flex;gap:20px;align-items:center;margin-bottom:22px;flex-wrap:wrap}
+.av{width:84px;height:84px;border-radius:50%;display:grid;place-items:center;font:800 38px "Bricolage Grotesque";color:var(--on)}
+.prof input{padding:12px 18px;border-radius:99px;border:2px solid var(--br);background:var(--card);margin-bottom:10px;width:100%;max-width:260px}
+.swr{display:flex;gap:8px}.sw{width:28px;height:28px;border-radius:50%;border:2px solid transparent;cursor:pointer}.sw.on{border-color:var(--tx)}
+.vol{display:flex;align-items:center;gap:8px;flex:0 0 140px}.vol input{accent-color:var(--ac);flex:1;min-width:0}.vol button{background:none;border:0;cursor:pointer;display:grid;padding:4px}
+.bg{position:absolute;left:8px;top:8px;background:#000c;font-size:12px;padding:3px 9px;border-radius:99px;z-index:1}
+.act{flex-wrap:wrap}.act .ib{flex:1 1 auto}
+#pl .in{flex-wrap:wrap}
+@media(max-width:640px){.vol{flex:1 0 100%;order:5}.don span{display:none}}
+*{-webkit-tap-highlight-color:transparent}
+button,nav a{touch-action:manipulation;-webkit-user-select:none;user-select:none}
+body{overscroll-behavior-y:none}
+.ic{display:none}
+@media(max-width:640px){
+  nav{position:fixed;left:0;right:0;bottom:0;z-index:7;background:var(--card);border-top:1px solid var(--br);justify-content:space-around;gap:0;flex-wrap:nowrap;padding:6px 4px calc(6px + env(safe-area-inset-bottom,0px))}
+  nav a,nav a.on{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;padding:6px 0;background:none;color:var(--mut);font-weight:400}
+  nav a.on{color:var(--tx);font-weight:500}
+  .ic{display:block}
+  .bar{padding:10px 16px}main{padding:18px 16px}
+  body{padding-bottom:170px}
+  #pl{left:10px;right:10px;bottom:calc(66px + env(safe-area-inset-bottom,0px));border:1px solid var(--br);border-radius:20px;padding:10px 14px}
+  #toast{bottom:190px}
+  .steps{display:none}.eq{height:56px;margin-bottom:18px}
+  h1{font-size:44px}.lead{font-size:16px;margin:12px 0 18px}
+  .tc:hover{transform:none;box-shadow:none}
+  .sheet{padding-bottom:calc(30px + env(safe-area-inset-bottom,0px))}
+}
+</style>
+</head>
+<body>
+<header><div class="bar"><a class="logo" href="#accueil">Tiksound</a>
+<nav>
+  <a href="#accueil"><svg class="ic" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8v9a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1z"/></svg><span>Accueil</span></a>
+  <a href="#ajouter"><svg class="ic" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg><span>Ajouter</span></a>
+  <a href="#bibliotheque"><svg class="ic" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg><span>Mes sons</span></a>
+  <a href="#playlists"><svg class="ic" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span>Playlists</span></a>
+  <a href="#decouvrir"><svg class="ic" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg><span>Explorer</span></a>
+  <a href="#profil"><svg class="ic" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></svg><span>Profil</span></a>
+</nav>
+<a class="don" id="don" href="#" target="_blank" rel="noopener" onclick="return donate(event)"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-8-5.2-8-11a4.5 4.5 0 018-2.8A4.5 4.5 0 0120 10c0 5.8-8 11-8 11z"/></svg><span>Faire un don</span></a>
+</div></header>
+
+<main>
+<!-- Accueil -->
+<section data-v="accueil">
+  <div class="eq" aria-hidden="true"></div>
+  <h1>Les sons TikTok, sans la vidéo.</h1>
+  <p class="lead">Colle un lien TikTok, garde uniquement le son, et écoute-le en playlist, écran éteint, sans consommer de données.</p>
+  <div class="paste"><input id="u1" placeholder="https://vm.tiktok.com/…" inputmode="url" aria-label="Lien TikTok"><button class="btn" onclick="convert('u1')">Convertir en son</button></div>
+  <div class="steps">
+    <div><h3>Colle le lien</h3><p>Depuis TikTok, touche « Partager » puis « Copier le lien ».</p></div>
+    <div><h3>Garde le son</h3><p>Le site extrait l'audio et l'ajoute à ta bibliothèque.</p></div>
+    <div><h3>Écoute en playlist</h3><p>Range tes sons dans des playlists et lance-les à la suite.</p></div>
+  </div>
+  <div id="recent"></div>
+</section>
+
+<!-- Ajouter -->
+<section data-v="ajouter" hidden>
+  <h2>Ajouter un son</h2>
+  <div class="paste"><input id="u2" placeholder="Colle ton lien TikTok ici" inputmode="url" aria-label="Lien TikTok"><button class="btn alt" onclick="pasteIt()">Coller</button><button class="btn" id="go" onclick="convert('u2')">Convertir en son</button></div>
+  <div class="note" id="demo" hidden><b>Service momentanément indisponible.</b> Réessaie dans un instant. <button class="btn alt" style="padding:8px 14px;margin-top:8px" onclick="ping()">Réessayer</button></div>
+</section>
+
+<!-- Bibliothèque -->
+<section data-v="bibliotheque" hidden>
+  <h2>Mes sons <span id="cnt" style="color:var(--mut);font-weight:500"></span></h2>
+  <div class="top"><input id="sq" oninput="render()" placeholder="Rechercher un son" aria-label="Rechercher"><button class="btn" onclick="playAll(0)">Tout lire</button><button class="btn alt" onclick="playAll(1)">Aléatoire</button></div>
+  <div id="lib" class="grid"></div>
+</section>
+
+<!-- Playlists -->
+<section data-v="playlists" hidden>
+  <div id="plsv"></div>
+</section>
+
+<!-- Découvrir -->
+<section data-v="decouvrir" hidden>
+  <h2>Explorer</h2>
+  <div class="search-bar">
+    <input id="dq" placeholder="Rechercher un utilisateur…" oninput="searchUsers()" aria-label="Rechercher un utilisateur">
+    <button class="btn alt sm" onclick="searchUsers()">Chercher</button>
+  </div>
+  <div id="discover-results"></div>
+</section>
+
+<!-- Profil public (vue autre user) -->
+<section data-v="user-profile" hidden>
+  <div id="pub-view"></div>
+</section>
+
+<!-- Mon profil -->
+<section data-v="profil" hidden>
+  <h2>Mon profil</h2>
+  <div id="profil-content"></div>
+</section>
+</main>
+
+<!-- Player bar -->
+<div id="pl" hidden><div class="in">
+  <div class="cv" id="pc">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>
+  </div>
+  <div class="m">
+    <div class="t" id="pt">—</div>
+    <div class="a" id="pa"></div>
+    <input type="range" id="sk" min="0" max="100" value="0" aria-label="Position">
+    <div class="a" id="tm" style="font-size:12px"></div>
+  </div>
+  <!-- Prev -->
+  <button class="pi-btn" id="btn-prev" onclick="step(-1)" aria-label="Précédent">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>
+  </button>
+  <!-- Play/Pause -->
+  <button class="pi-btn p" id="btn-pp" onclick="togglePlay()" aria-label="Lecture / Pause">
+    <svg id="ico-play" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+    <svg id="ico-pause" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" hidden><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+  </button>
+  <!-- Next -->
+  <button class="pi-btn" id="btn-next" onclick="step(1)" aria-label="Suivant">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zm2.5-6 5.5 3.9V8.1zM16 6h2v12h-2z"/></svg>
+  </button>
+  <!-- Volume -->
+  <div class="vol">
+    <button id="vm" aria-label="Couper le son">
+      <svg id="ico-vol" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 4V5L7 9H3z"/><path d="M16 8a5 5 0 010 8" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round"/></svg>
+      <svg id="ico-mute" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" hidden><path d="M3 9v6h4l5 4V5L7 9H3z"/><line x1="23" y1="9" x2="17" y2="15" stroke="currentColor" stroke-width="2"/><line x1="17" y1="9" x2="23" y2="15" stroke="currentColor" stroke-width="2"/></svg>
+    </button>
+    <input type="range" id="vl" min="0" max="100" aria-label="Volume">
+  </div>
+</div></div>
+
+<audio id="au" preload="none"></audio>
+
+<!-- Sheet : ajouter à playlist -->
+<div id="sh" class="ov2" hidden><div class="bd" onclick="closeSheet()"></div><div class="sheet"><div class="grab"></div><h3>Ajouter à une playlist</h3><div id="shl"></div><div class="nw"><input id="shn" maxlength="40" placeholder="Nouvelle playlist" aria-label="Nom de la playlist" onkeydown="if(event.key==='Enter')shNew()"><button class="btn" onclick="shNew()">Créer</button></div></div></div>
+
+<!-- Sheet : renommer -->
+<div id="rn" class="ov2" hidden><div class="bd" onclick="$('#rn').hidden=true"></div><div class="sheet"><div class="grab"></div><h3>Renommer le son</h3><div class="nw"><input id="rni" maxlength="80" aria-label="Titre" onkeydown="if(event.key==='Enter')saveRename()"><button class="btn" onclick="saveRename()">Enregistrer</button></div></div></div>
+
+<!-- Sheet : import playlist partagée -->
+<div id="im" class="ov2" hidden><div class="bd" onclick="$('#im').hidden=true"></div><div class="sheet"><div class="grab"></div><h3 id="imt"></h3><p class="a" id="imp" style="margin-bottom:18px"></p><div class="nw"><button class="btn alt" onclick="$('#im').hidden=true">Annuler</button><button class="btn" style="flex:1" onclick="acceptImp()">Ajouter à mon profil</button></div></div></div>
+
+<!-- Auth modal -->
+<div id="auth-modal" hidden>
+  <div class="box">
+    <h2 id="auth-title">Connexion</h2>
+    <div class="fld">
+      <input id="a-email" type="email" placeholder="Email" autocomplete="email">
+      <input id="a-user" type="text" placeholder="Pseudo (3–24 car.)" autocomplete="username" style="display:none">
+      <input id="a-pw" type="password" placeholder="Mot de passe" autocomplete="current-password">
+      <div class="fld-err" id="auth-err"></div>
+      <button class="btn" onclick="submitAuth()">Continuer</button>
+      <button class="btn alt" onclick="closeAuth()">Annuler</button>
+    </div>
+    <div class="auth-sw" id="auth-sw">
+      Pas encore de compte ? <button onclick="toggleAuthMode()">Créer un compte</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" role="status"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+//  Constants & state
+// ═══════════════════════════════════════════════════════════════════════════
+const API_URL = "";
+const PAYPAL  = "https://paypal.me/LinaHai69";
+const COL     = ["#8d8d97","#8fa3c9","#c99a9a","#93c7a6","#c9bd93"];
+
+let ONLINE = false, DOWN = false;
+let ME = null; // {id, username, color, email} or null
+
+// Local state (IndexedDB + localStorage)
+let S = {tracks:[], pls:[]};
+try { S = JSON.parse(localStorage.getItem("tiksound") || "") || S } catch(e) {}
+S.prof = S.prof || {name:"", color:0};
+
+// Player state
+let q = [], qi = -1, openPl = null;
+const au = $("#au");
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Utilities
+// ═══════════════════════════════════════════════════════════════════════════
+function $(s) { return document.querySelector(s); }
+const esc = s => String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const save = () => { try { localStorage.setItem("tiksound", JSON.stringify(S)) } catch(e) {} };
+const idb  = () => new Promise((ok,ko) => { const r=indexedDB.open("tiksound",1); r.onupgradeneeded=()=>r.result.createObjectStore("a"); r.onsuccess=()=>ok(r.result); r.onerror=()=>ko(r.error) });
+const dbop = (m,...a) => idb().then(d => new Promise((ok,ko) => { const r=d.transaction("a",m==="get"?"readonly":"readwrite").objectStore("a")[m](...a); r.onsuccess=()=>ok(r.result); r.onerror=()=>ko(r.error) }));
+const fm   = x => Math.floor(x/60)+":"+String(Math.floor(x%60)).padStart(2,"0");
+function toast(m) { const t=$("#toast"); t.textContent=m; t.classList.add("on"); clearTimeout(toast.h); toast.h=setTimeout(()=>t.classList.remove("on"),2800); }
+function ping() { return fetch(API_URL+"/api/health").then(r=>{ONLINE=r.ok;DOWN=!ONLINE;route();return ONLINE}).catch(()=>{ONLINE=false;DOWN=true;route();return false}); }
+ping();
+
+// EQ bars
+document.querySelector(".eq").innerHTML = Array.from({length:26},(_,i)=>`<i style="animation-delay:${(i*.13%1.1).toFixed(2)}s;animation-duration:${(.7+i*.37%.9).toFixed(2)}s"></i>`).join("");
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Auth
+// ═══════════════════════════════════════════════════════════════════════════
+let authMode = "login"; // "login" | "register"
+
+async function checkMe() {
+  try {
+    const r = await fetch(API_URL+"/api/auth/me");
+    if (r.ok) { ME = await r.json(); }
+    else { ME = null; }
+  } catch(e) { ME = null; }
+}
+
+function openAuth() {
+  authMode = "login";
+  applyAuthMode();
+  $("#auth-modal").hidden = false;
+  setTimeout(() => $("#a-email").focus(), 80);
+}
+function closeAuth() { $("#auth-modal").hidden = true; $("#auth-err").textContent = ""; }
+function toggleAuthMode() {
+  authMode = authMode === "login" ? "register" : "login";
+  applyAuthMode();
+}
+function applyAuthMode() {
+  const reg = authMode === "register";
+  $("#auth-title").textContent = reg ? "Créer un compte" : "Connexion";
+  $("#a-user").style.display   = reg ? "" : "none";
+  $("#auth-sw").innerHTML = reg
+    ? `Déjà un compte ? <button onclick="toggleAuthMode()">Se connecter</button>`
+    : `Pas encore de compte ? <button onclick="toggleAuthMode()">Créer un compte</button>`;
+  $("#a-pw").autocomplete = reg ? "new-password" : "current-password";
+  $("#auth-err").textContent = "";
+}
+async function submitAuth() {
+  const email = $("#a-email").value.trim();
+  const pw    = $("#a-pw").value;
+  const body  = authMode === "register"
+    ? { email, username: $("#a-user").value.trim(), password: pw }
+    : { email, password: pw };
+  const r = await fetch(API_URL+"/api/auth/"+(authMode==="register"?"register":"login"), {
+    method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body), credentials:"include"
+  });
+  const d = await r.json();
+  if (!r.ok) { $("#auth-err").textContent = d.error || "Erreur"; return; }
+  ME = d;
+  closeAuth();
+  render();
+  toast("Bienvenue, "+ME.username+" 👋");
+}
+async function logout() {
+  await fetch(API_URL+"/api/auth/logout", {method:"POST", credentials:"include"});
+  ME = null;
+  render();
+  toast("Déconnecté");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Audio extraction
+// ═══════════════════════════════════════════════════════════════════════════
+async function grab(url, id) {
+  const r  = await fetch(API_URL+"/api/extract",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url})});
+  const d  = await r.json();
+  if (!r.ok) throw new Error(d.error || "Conversion impossible");
+  const ab = await (await fetch(API_URL+d.audio_url)).blob();
+  await dbop("put", ab, id);
+  return d;
+}
+async function convert(id) {
+  const m   = $("#"+id).value.match(/https?:\/\/\S*tiktok\.com\S*/i);
+  const url = (m?m[0]:"").split("?")[0].replace(/[.,)]+$/,"");
+  if (!url) return toast("Colle un lien TikTok valide");
+  const ex = S.tracks.find(t=>t.url===url);
+  if (ex&&ex.local) return toast("Ce son est déjà dans ta bibliothèque");
+  if (!ONLINE) { toast("Un instant, on prépare le service…"); if (!await ping()) return toast("Service momentanément indisponible. Réessaie dans un instant."); }
+  if (ex&&ex.pending) { dl(ex.id); return; }
+  const b = $("#go"); b.disabled=true; b.textContent="Conversion…";
+  try {
+    const tid="t"+Date.now(), d=await grab(url, tid);
+    S.tracks.unshift({id:tid,title:d.title,author:d.author,cover:d.cover,url:d.url||url,local:true});
+    save();
+    $("#"+id).value="";
+    toast("Son ajouté");
+    location.hash="bibliotheque";
+  } catch(e) { toast(e.message); }
+  b.disabled=false; b.textContent="Convertir en son";
+}
+async function dl(id) {
+  const t = S.tracks.find(x=>x.id===id); if (!t||!t.url) return;
+  if (!ONLINE&&!await ping()) return toast("Service momentanément indisponible. Réessaie dans un instant.");
+  toast("Téléchargement de « "+t.title+" »…");
+  try {
+    const d = await grab(t.url,t.id);
+    Object.assign(t,{title:t.title||d.title,author:d.author||t.author,cover:d.cover||"",local:true,pending:false});
+    save(); render(); toast("Prêt à écouter");
+  } catch(e) { toast(e.message); }
+}
+async function dlAll(ids) { for (const id of ids) { const t=S.tracks.find(x=>x.id===id); if(t&&t.pending) await dl(id); } }
+async function pasteIt() { try { $("#u2").value=await navigator.clipboard.readText(); } catch(e) { toast("Colle le lien à la main"); } }
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Player
+// ═══════════════════════════════════════════════════════════════════════════
+function svgPlay()  { return `<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`; }
+function svgPause() { return `<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`; }
+
+function updatePlayerIcons() {
+  const playing = !au.paused;
+  $("#ico-play").hidden  =  playing;
+  $("#ico-pause").hidden = !playing;
+  if ($("#pc")) $("#pc").classList.toggle("spin", playing);
+}
+
+function play(ids, i) {
+  q=ids; qi=i;
+  const t=S.tracks.find(x=>x.id===q[qi]); if (!t) return;
+  if (!t.local) return toast(t.pending?"Télécharge d'abord ce son":"Mode démo : pas de fichier audio");
+  dbop("get", t.id).then(b => {
+    if (!b) return toast("Fichier audio introuvable");
+    URL.revokeObjectURL(au.src);
+    au.src = URL.createObjectURL(b);
+    au.play().catch(()=>toast("Lecture bloquée, touche ▶"));
+  });
+  $("#pl").hidden = false;
+  $("#pt").textContent = t.title;
+  $("#pa").textContent = t.author;
+  // cover
+  const pc = $("#pc");
+  if (t.cover) {
+    pc.innerHTML = `<img src="${esc(t.cover)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">`;
+  } else {
+    pc.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>`;
+  }
+  if ("mediaSession" in navigator) {
+    navigator.mediaSession.metadata = new MediaMetadata({title:t.title,artist:t.author,artwork:t.cover?[{src:t.cover}]:[]});
+    navigator.mediaSession.setActionHandler("nexttrack",()=>step(1));
+    navigator.mediaSession.setActionHandler("previoustrack",()=>step(-1));
+    navigator.mediaSession.setActionHandler("play", ()=>au.play());
+    navigator.mediaSession.setActionHandler("pause",()=>au.pause());
+  }
+  render();
+}
+const step = d => { if (q.length) play(q,(qi+d+q.length)%q.length); };
+function togglePlay() { au.paused ? au.play() : au.pause(); }
+
+au.onplay = au.onpause = () => { updatePlayerIcons(); render(); };
+au.onended = () => step(1);
+au.ontimeupdate = () => {
+  if (au.duration) $("#sk").value = au.currentTime/au.duration*100;
+  $("#tm").textContent = fm(au.currentTime)+" / "+fm(au.duration||0);
+};
+$("#sk").oninput = e => { if (au.duration) au.currentTime = e.target.value/100*au.duration; };
+
+// Volume
+(function(){
+  let v=.5;
+  try { v=parseFloat(localStorage.getItem("tkvol")); if(isNaN(v)) v=.5; } catch(e){ v=.5; }
+  au.volume=v; $("#vl").value=v*100;
+  $("#vl").oninput=e=>{au.volume=e.target.value/100;try{localStorage.setItem("tkvol",au.volume)}catch(x){}};
+  $("#vm").onclick=()=>{
+    au.muted=!au.muted;
+    $("#ico-vol").hidden  =  au.muted;
+    $("#ico-mute").hidden = !au.muted;
+  };
+})();
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Render helpers
+// ═══════════════════════════════════════════════════════════════════════════
+const cover = t => t.cover
+  ? `<img class="cv" src="${esc(t.cover)}" alt="">`
+  : `<div class="cv">${esc((t.title||"♪")[0])}</div>`;
+
+function row(t, list, i, extra) {
+  return `<div class="row ${q[qi]===t.id?"cur":""}">${cover(t)}<div class="m"><div class="t">${esc(t.title)}</div><div class="a">${esc(t.author)}</div></div>${extra}<button class="ib p" onclick='play(${JSON.stringify(list)},${i})' aria-label="Lire">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+  </button></div>`;
+}
+
+function card(t, list, i, extra) {
+  const c=q[qi]===t.id, pl=c&&!au.paused;
+  const playIcon = pl
+    ? `<svg class="pi" width="34" height="34" viewBox="0 0 24 24" fill="white"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`
+    : `<svg class="pi" width="34" height="34" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>`;
+  return `<div class="tc ${c?"cur":""} ${pl?"pl":""}">
+    <button class="art" onclick='play(${JSON.stringify(list)},${i})' aria-label="Lire ${esc(t.title)}">
+      ${t.local?"":`<span class="bg">${t.pending?"À télécharger":"Démo"}</span>`}
+      ${t.cover?`<img src="${esc(t.cover)}" alt="">`:`<b>${esc((t.title||"♪")[0])}</b>`}
+      <span class="ov">${playIcon}</span>
+      <span class="eqm"><i></i><i></i><i></i><i></i><i></i></span>
+    </button>
+    <div class="t" style="margin-top:10px">${esc(t.title)}</div>
+    <div class="a">${esc(t.author)}</div>
+    ${extra?`<div class="act">${extra}</div>`:""}
+  </div>`;
+}
+
+const mos = p => `<div class="mos">${[0,1,2,3].map(k=>{const t=S.tracks.find(x=>x.id===p.ids[k]);return t&&t.cover?`<img src="${esc(t.cover)}" alt="">`:`<i>${t?esc((t.title||"♪")[0]):""}</i>`;}).join("")}</div>`;
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Render sections
+// ═══════════════════════════════════════════════════════════════════════════
+function playAll(r) {
+  const ids=S.tracks.filter(t=>t.local).map(t=>t.id);
+  if (!ids.length) return toast("Aucun son à lire");
+  if (r) ids.sort(()=>Math.random()-.5);
+  play(ids,0);
+}
+
+function render() {
+  renderProf();
+  const ids=S.tracks.map(x=>x.id);
+  const sq=($("#sq").value||"").toLowerCase();
+  const fl=S.tracks.filter(t=>(t.title+" "+t.author).toLowerCase().includes(sq));
+  $("#cnt").textContent = S.tracks.length?"("+S.tracks.length+")":"";
+  $("#lib").innerHTML = fl.length
+    ? fl.map(t=>card(t,ids,ids.indexOf(t.id),
+        `${t.pending?`<button class="ib p" onclick="dl('${t.id}')">Télécharger</button>`:""}`+
+        `<button class="ib" onclick="openSheet('${t.id}')">+ Playlist</button>`+
+        `<button class="ib" onclick="openRename('${t.id}')" aria-label="Renommer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>`+
+        `<button class="ib" onclick="delTrack('${t.id}')" aria-label="Supprimer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg></button>`
+      )).join("")
+    : `<p class="empty">${S.tracks.length?"Aucun résultat.":'Aucun son pour l\'instant. <a href="#ajouter">Ajoute ton premier lien TikTok.</a>'}</p>`;
+  $("#recent").innerHTML = S.tracks.length
+    ? `<h2 style="margin:56px 0 18px">Récemment ajoutés</h2><div class="grid">${S.tracks.slice(0,6).map(t=>card(t,ids,ids.indexOf(t.id),"")).join("")}</div>`
+    : "";
+  renderPlaylists();
+}
+
+function renderPlaylists() {
+  const v = $("#plsv");
+  const pl = S.pls.find(p=>p.id===openPl);
+  if (pl) {
+    const ts = pl.ids.map(id=>S.tracks.find(t=>t.id===id)).filter(Boolean);
+    v.innerHTML = `<div class="top"><button class="ib" onclick="openPl=null;render()">← Playlists</button><h2 style="margin:0;flex:1">${esc(pl.name)}${pl.from?` <small style="color:var(--mut);font-size:16px;font-weight:500">par ${esc(pl.from)}</small>`:""}</h2>`+
+      `<button class="btn" onclick='play(${JSON.stringify(ts.map(t=>t.id))},0)' ${ts.length?"":"disabled"}>Tout lire</button>`+
+      `<button class="btn alt" onclick="sharePl('${pl.id}')">Partager</button>`+
+      (ts.some(t=>t.pending)?`<button class="btn alt" onclick='dlAll(${JSON.stringify(ts.map(t=>t.id))})'>Tout télécharger</button>`:"") +
+      `<button class="btn alt" onclick="delPl('${pl.id}')">Supprimer</button></div>` +
+      (ts.length
+        ? ts.map((t,i)=>row(t,ts.map(x=>x.id),i,
+            `${t.pending?`<button class="ib p" onclick="dl('${t.id}')">Télécharger</button>`:""}`+
+            `<button class="ib" onclick="rmFrom('${pl.id}','${t.id}')" aria-label="Retirer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>`
+          )).join("")
+        : `<p class="empty">Playlist vide. Ajoute des sons depuis <a href="#bibliotheque">Mes sons</a>.</p>`);
+  } else {
+    v.innerHTML = `<h2>Playlists</h2><div class="top"><input id="npn" placeholder="Nom de la playlist" aria-label="Nom"><button class="btn" onclick="newPl()">Créer</button></div>` +
+      (S.pls.length
+        ? `<div class="pls">${S.pls.map(p=>`<button class="pc" onclick="openPl='${p.id}';render()">${mos(p)}<h3>${esc(p.name)}</h3><span>${p.ids.length} son${p.ids.length>1?"s":""}${p.from?", par "+esc(p.from):""}</span></button>`).join("")}</div>`
+        : `<p class="empty">Crée ta première playlist.</p>`);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Profil (mon compte)
+// ═══════════════════════════════════════════════════════════════════════════
+function renderProf() {
+  const el = $("#profil-content"); if (!el) return;
+  if (!ME) {
+    el.innerHTML = `<p class="lead" style="margin-bottom:24px">Connecte-toi pour accéder à ton profil et partager tes playlists.</p>
+      <button class="btn" onclick="openAuth()">Se connecter / Créer un compte</button>`;
+    return;
+  }
+  const avCol = COL[ME.color]||COL[0];
+  el.innerHTML = `
+    <div class="prof">
+      <div class="av" id="av" style="background:${avCol}">${(ME.username||"?")[0].toUpperCase()}</div>
+      <div>
+        <div style="font:800 24px 'Bricolage Grotesque'">${esc(ME.username)}</div>
+        <div class="a" style="margin-bottom:12px">${esc(ME.email)}</div>
+        <div class="swr" id="sw">${COL.map((c,i)=>`<button class="sw ${i==ME.color?"on":""}" style="background:${c}" onclick="setColor(${i})" aria-label="Couleur ${i+1}"></button>`).join("")}</div>
+      </div>
+    </div>
+    <p class="a" style="margin-bottom:30px">${S.tracks.length} son${S.tracks.length>1?"s":""}, ${S.pls.length} playlist${S.pls.length>1?"s":""}</p>
+    <button class="btn alt sm" onclick="logout()" style="margin-bottom:30px">Se déconnecter</button>
+    <h2 style="font-size:26px">Playlists reçues</h2>
+    <div id="shared">${renderShared()}</div>
+    <div class="note">Ton profil, tes sons et tes playlists sont enregistrés sur cet appareil. Usage personnel uniquement : les sons restent soumis aux droits d'auteur et aux conditions d'utilisation de TikTok.</div>`;
+}
+function renderShared() {
+  const sh = S.pls.filter(x=>x.from);
+  return sh.length
+    ? `<div class="pls">${sh.map(x=>`<button class="pc" onclick="openPl='${x.id}';location.hash='playlists'">${mos(x)}<h3>${esc(x.name)}</h3><span>par ${esc(x.from)}</span></button>`).join("")}</div>`
+    : `<p class="empty">Les playlists reçues par lien apparaîtront ici.</p>`;
+}
+async function setColor(i) {
+  if (!ME) return;
+  ME.color = i;
+  await fetch(API_URL+"/api/auth/me", {method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({color:i}),credentials:"include"});
+  renderProf();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Discover / search users
+// ═══════════════════════════════════════════════════════════════════════════
+let searchTimer = null;
+function searchUsers() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(_doSearch, 300);
+}
+async function _doSearch() {
+  const q = ($("#dq")?$("#dq").value||"":"").trim();
+  const el = $("#discover-results"); if (!el) return;
+  if (q.length < 2) { el.innerHTML = `<p class="empty">Tape au moins 2 lettres pour chercher.</p>`; return; }
+  el.innerHTML = `<p class="empty">Recherche…</p>`;
+  try {
+    const r = await fetch(API_URL+"/api/users/search?q="+encodeURIComponent(q));
+    const d = await r.json();
+    if (!d.users.length) { el.innerHTML=`<p class="empty">Aucun utilisateur trouvé pour « ${esc(q)} ».</p>`; return; }
+    el.innerHTML = `<div class="users-grid">${d.users.map(u=>`
+      <button class="user-card" onclick="viewUser('${esc(u.username)}')">
+        <div class="pub-av" style="background:${COL[u.color]||COL[0]};width:48px;height:48px;font-size:20px">${u.username[0].toUpperCase()}</div>
+        <div><div style="font-weight:500">${esc(u.username)}</div></div>
+      </button>`).join("")}</div>`;
+  } catch(e) { el.innerHTML=`<p class="empty">Erreur de connexion.</p>`; }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Public profile view
+// ═══════════════════════════════════════════════════════════════════════════
+let pubData = null, pubOpenPl = null;
+
+async function viewUser(username) {
+  location.hash = "user-profile";
+  const el = $("#pub-view"); if (!el) return;
+  el.innerHTML = `<p class="empty">Chargement…</p>`;
+  try {
+    const r = await fetch(API_URL+"/api/users/"+encodeURIComponent(username));
+    if (!r.ok) { el.innerHTML=`<p class="empty">Utilisateur introuvable.</p>`; return; }
+    pubData = await r.json();
+    pubOpenPl = null;
+    renderPubView();
+  } catch(e) { el.innerHTML=`<p class="empty">Erreur de connexion.</p>`; }
+}
+
+function renderPubView() {
+  const el = $("#pub-view"); if (!el||!pubData) return;
+  if (pubOpenPl !== null) {
+    // playlist detail view
+    const pl = pubData.playlists.find(p=>p.id===pubOpenPl);
+    if (!pl) { pubOpenPl=null; renderPubView(); return; }
+    const tracks = pl.tracks || [];
+    el.innerHTML = `
+      <button class="ib" style="margin-bottom:20px" onclick="pubOpenPl=null;renderPubView()">← Retour</button>
+      <h2>${esc(pl.name)}</h2>
+      <p class="a" style="margin-bottom:16px">Playlist de <b>${esc(pubData.username)}</b> · ${tracks.length} son${tracks.length>1?"s":""}</p>
+      ${tracks.length
+        ? tracks.map((t,i)=>`
+          <div class="pub-row" onclick="playPublicTrack(${JSON.stringify(pl.tracks)},${i})">
+            ${t.cover?`<img class="cv" src="${esc(t.cover)}" alt="">`:`<div class="cv">${esc((t.title||"♪")[0])}</div>`}
+            <div class="m"><div class="t">${esc(t.title)}</div><div class="a">${esc(t.author)}</div></div>
+            <span style="color:var(--mut)"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></span>
+          </div>`).join("")
+        : `<p class="empty">Playlist vide.</p>`}`;
+  } else {
+    // user profile overview
+    const plCount = pubData.playlists.length;
+    el.innerHTML = `
+      <div class="pub-header">
+        <div class="pub-av" style="background:${COL[pubData.color]||COL[0]}">${pubData.username[0].toUpperCase()}</div>
+        <div><h2>${esc(pubData.username)}</h2><p class="a">${plCount} playlist${plCount!==1?"s":""}</p></div>
+      </div>
+      ${plCount
+        ? `<div class="pub-pl-grid">${pubData.playlists.map(pl=>{
+            const tracks = pl.tracks||[];
+            const fake = {ids: tracks.map((_,k)=>k)};
+            const mosHtml = `<div class="mos">${[0,1,2,3].map(k=>{
+              const t=tracks[k];
+              return t&&t.cover?`<img src="${esc(t.cover)}" alt="">`:`<i>${t?esc((t.title||"♪")[0]):""}</i>`;
+            }).join("")}</div>`;
+            return `<button class="pc" onclick="pubOpenPl='${pl.id}';renderPubView()">${mosHtml}<h3>${esc(pl.name)}</h3><span>${tracks.length} son${tracks.length!==1?"s":""}</span></button>`;
+          }).join("")}</div>`
+        : `<p class="empty">Cet utilisateur n'a pas encore de playlists publiques.</p>`}`;
+  }
+}
+
+// Play a public playlist track (streams from TikTok URL — no local audio)
+function playPublicTrack(tracks, startIdx) {
+  toast("Les sons publics ne sont pas stockés localement — ajoute-les depuis Ajouter.");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Playlist actions (local)
+// ═══════════════════════════════════════════════════════════════════════════
+function newPl()  { const n=($("#npn").value||"").trim(); if(!n)return toast("Donne un nom"); S.pls.push({id:"p"+Date.now(),name:n,ids:[]}); save(); render(); }
+function delPl(id){ S.pls=S.pls.filter(p=>p.id!==id); openPl=null; save(); render(); }
+function addTo(tid,pid){ if(!pid)return; const p=S.pls.find(x=>x.id===pid); if(p.ids.includes(tid))return toast("Déjà dans la playlist"); p.ids.push(tid); save(); toast("Ajouté à « "+p.name+" »"); }
+function rmFrom(pid,tid){ const p=S.pls.find(x=>x.id===pid); p.ids=p.ids.filter(i=>i!==tid); save(); render(); }
+function delTrack(id){ dbop("delete",id).catch(()=>{}); S.tracks=S.tracks.filter(t=>t.id!==id); S.pls.forEach(p=>p.ids=p.ids.filter(i=>i!==id)); save(); render(); }
+
+// Sheet
+let shT=null;
+function openSheet(id){ shT=id; $("#sh").hidden=false; renderSheet(); }
+function closeSheet(){ $("#sh").hidden=true; }
+function renderSheet(){
+  $("#shl").innerHTML = S.pls.length
+    ? S.pls.map(p=>{const on=p.ids.includes(shT);return `<button class="sr ${on?"on":""}" onclick="togglePl('${p.id}')">${mos(p)}<span class="m"><b>${esc(p.name)}</b><small>${p.ids.length} son${p.ids.length>1?"s":""}</small></span><span class="ck">${on?"✓":"+"}</span></button>`;}).join("")
+    : `<p class="a" style="margin-bottom:14px">Tu n'as pas encore de playlist. Crée la première ci-dessous.</p>`;
+}
+function togglePl(pid){ const p=S.pls.find(x=>x.id===pid); p.ids=p.ids.includes(shT)?p.ids.filter(i=>i!==shT):[...p.ids,shT]; save(); renderSheet(); render(); }
+function shNew(){ const n=($("#shn").value||"").trim(); if(!n)return toast("Donne un nom"); S.pls.push({id:"p"+Date.now(),name:n,ids:[shT]}); $("#shn").value=""; save(); renderSheet(); render(); toast("Playlist créée"); }
+
+// Share link
+function sharePl(pid){
+  const p=S.pls.find(x=>x.id===pid);
+  const it=p.ids.map(id=>S.tracks.find(t=>t.id===id)).filter(t=>t&&t.url);
+  if(!it.length)return toast("Aucun son partageable (ajoute-les à nouveau avec leur lien TikTok)");
+  const j=JSON.stringify({n:p.name,b:ME?ME.username:(S.prof.name||""),t:it.map(t=>[t.url,t.title,t.author])});
+  const link=location.origin+location.pathname+"?p="+encodeURIComponent(btoa(unescape(encodeURIComponent(j))));
+  if(navigator.share) navigator.share({title:p.name,url:link}).catch(()=>{});
+  else navigator.clipboard.writeText(link).then(()=>toast("Lien copié"),()=>prompt("Copie ce lien :",link));
+  if(it.length<p.ids.length) setTimeout(()=>toast((p.ids.length-it.length)+" son(s) ancien(s) non partagé(s)"),2000);
+}
+
+// Import shared playlist
+let imp=null;
+function checkImport(){
+  const m=new URLSearchParams(location.search).get("p"); if(!m)return;
+  try{
+    const j=JSON.parse(decodeURIComponent(escape(atob(m))));
+    const t=(j.t||[]).slice(0,100).map(a=>[String(a[0]).split("?")[0],String(a[1]).slice(0,120),String(a[2]).slice(0,60)]).filter(a=>/tiktok\.com/i.test(a[0]));
+    if(!t.length)throw 0;
+    imp={n:String(j.n||"Playlist").slice(0,40),b:String(j.b||"").slice(0,24),t};
+    $("#imt").textContent=imp.n; $("#imp").textContent=(imp.b?"Partagée par "+imp.b+" : ":"")+t.length+" son"+(t.length>1?"s":"")+". Les sons seront à télécharger sur ton appareil.";
+    $("#im").hidden=false;
+  }catch(e){toast("Lien de playlist invalide");}
+  history.replaceState(null,"",location.pathname+location.hash);
+}
+function acceptImp(){
+  const ids=imp.t.map(([url,title,author])=>{let t=S.tracks.find(x=>x.url===url);if(!t){t={id:"t"+Date.now()+Math.random().toString(36).slice(2,6),title,author,cover:"",url,local:false,pending:true};S.tracks.push(t)}return t.id});
+  S.pls.push({id:"p"+Date.now(),name:imp.n,ids,from:imp.b||"quelqu'un"});
+  save();$("#im").hidden=true;openPl=null;location.hash="playlists";render();toast("Playlist ajoutée à ton profil");
+}
+
+// Rename
+let rnT=null;
+function openRename(id){ rnT=id; $("#rni").value=S.tracks.find(x=>x.id===id).title; $("#rn").hidden=false; setTimeout(()=>$("#rni").select(),60); }
+function saveRename(){ const v=($("#rni").value||"").trim(); if(!v)return toast("Le titre ne peut pas être vide"); S.tracks.find(x=>x.id===rnT).title=v.slice(0,80); save(); $("#rn").hidden=true; render(); if(q[qi]===rnT)$("#pt").textContent=v; }
+
+// Donate
+function donUrl(){ return PAYPAL.includes("@")?"https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business="+encodeURIComponent(PAYPAL)+"&currency_code=EUR":PAYPAL; }
+function donate(e){ const u=donUrl(); if(!u){e.preventDefault();toast("Lien PayPal pas encore configuré");return false;} $("#don").href=u; return true; }
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Router
+// ═══════════════════════════════════════════════════════════════════════════
+function route(){
+  let v=location.hash.slice(1)||"accueil";
+  if(!document.querySelector(`[data-v="${v}"]`)) v="accueil";
+  document.querySelectorAll("[data-v]").forEach(e=>e.hidden=e.dataset.v!==v);
+  document.querySelectorAll("nav a").forEach(a=>a.classList.toggle("on",a.getAttribute("href")==="#"+v));
+  $("#demo").hidden=!DOWN;
+  render();
+  scrollTo(0,0);
+}
+addEventListener("hashchange", route);
+
+// Boot
+(async()=>{
+  await checkMe();
+  route();
+  checkImport();
+  if("serviceWorker"in navigator) navigator.serviceWorker.register("/sw.js").catch(()=>{});
+})();
+</script>
+</body>
+</html>
