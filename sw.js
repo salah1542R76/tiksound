@@ -1,11 +1,11 @@
-const C = "tk-v6";
+const C = "tk-v7";
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", e => e.waitUntil(
   caches.keys().then(ks => Promise.all(ks.filter(k => k !== C).map(k => caches.delete(k)))).then(() => self.clients.claim())
 ));
 self.addEventListener("fetch", e => {
   const r = e.request, u = new URL(r.url);
-  if (r.method !== "GET" || u.origin !== location.origin || u.pathname.startsWith("/api") || u.pathname.startsWith("/audio") || u.pathname.startsWith("/ads") || u.pathname.startsWith("/confidentialite")) return;
+  if (r.method !== "GET" || u.origin !== location.origin || u.pathname.startsWith("/api") || u.pathname.startsWith("/audio") || u.pathname.startsWith("/ads") || u.pathname.startsWith("/confidentialite") || u.pathname.startsWith("/conditions") || u.pathname.startsWith("/signalement")) return;
   const keep = res => { if (res.ok && res.headers.get("X-Tiksound")) { const cp = res.clone(); caches.open(C).then(c => c.put(r.mode === "navigate" ? "/" : r, cp)); } return res; };
   if (r.mode === "navigate") {
     // Réseau d'abord : la dernière version du site s'affiche toujours, le cache sert hors ligne

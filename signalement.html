@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Signaler un contenu · Tiksound</title>
+<style>body{font:16px/1.6 system-ui,sans-serif;max-width:640px;margin:0 auto;padding:32px 20px 60px;background:#0b0b0c;color:#ececee}h1{font-size:30px}a{color:#b9a4ff}
+label{display:block;margin-top:16px;font-size:14px;color:#b5b5bd}input,select,textarea{display:block;width:100%;box-sizing:border-box;margin-top:6px;padding:12px 14px;border-radius:12px;border:1px solid #333;background:#151517;color:#ececee;font:inherit}
+button{margin-top:20px;padding:14px 22px;border:0;border-radius:12px;background:#dcdce0;color:#0b0b0c;font:600 16px system-ui;cursor:pointer}#msg{margin-top:16px}.ok{color:#6fe3a4}.ko{color:#ff7a7a}.n{color:#8b8b95;font-size:14px}</style></head>
+<body>
+<p><a href="/">← Retour à Tiksound</a></p>
+<h1>Signaler un contenu</h1>
+<p>Tu es ayant droit (artiste, label, éditeur) ou tu as repéré un contenu qui pose problème ? Indique-le ici : il sera examiné et retiré si nécessaire.</p>
+<form id="f">
+  <label>Lien du contenu sur Tiksound (playlist, profil ou son)<input name="url" type="url" required placeholder="https://…"></label>
+  <label>Motif<select name="reason"><option value="copyright">Droits d'auteur</option><option value="other">Autre problème</option></select></label>
+  <label>Ton nom ou ta société<input name="name" maxlength="120"></label>
+  <label>Ton adresse e-mail (pour te répondre)<input name="email" type="email" required maxlength="120"></label>
+  <label>Détails<textarea name="details" rows="5" maxlength="2000" placeholder="Ce qui pose problème, et pour un droit d'auteur : l'œuvre concernée."></textarea></label>
+  <button>Envoyer le signalement</button>
+  <p id="msg" role="status"></p>
+</form>
+<p class="n">Tu peux aussi écrire à : {{CONTACT}}</p>
+<script>
+document.getElementById("f").onsubmit=async e=>{ e.preventDefault(); const m=document.getElementById("msg"), d=Object.fromEntries(new FormData(e.target));
+  try{ const r=await fetch("/api/report",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(d)}); const j=await r.json().catch(()=>({}));
+    if(r.ok){ e.target.reset(); m.className="ok"; m.textContent="Merci, ton signalement a bien été envoyé."; } else { m.className="ko"; m.textContent=j.error||"Envoi impossible, réessaie."; } }
+  catch(x){ m.className="ko"; m.textContent="Pas de connexion, réessaie."; } };
+</script>
+</body></html>

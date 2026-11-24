@@ -221,6 +221,9 @@ def init_db():
             user_id TEXT PRIMARY KEY, data TEXT NOT NULL, updated TEXT NOT NULL)""",
         """CREATE TABLE IF NOT EXISTS stripe_events (
             id TEXT PRIMARY KEY, type TEXT, created TEXT)""",
+        """CREATE TABLE IF NOT EXISTS reports (
+            id TEXT PRIMARY KEY, created TEXT, url TEXT NOT NULL, reason TEXT, name TEXT DEFAULT '',
+            email TEXT NOT NULL, details TEXT DEFAULT '', status TEXT DEFAULT 'new')""",
         """CREATE TABLE IF NOT EXISTS access_keys (
             id TEXT PRIMARY KEY, key_hash TEXT UNIQUE NOT NULL, label TEXT DEFAULT '', hint TEXT DEFAULT '',
             max_uses INTEGER DEFAULT 1, uses INTEGER DEFAULT 0, days INTEGER DEFAULT 0, created TEXT,
@@ -424,10 +427,14 @@ def username_problem(u, exclude_email=None, exclude_uid=None):
 
 HEX_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 IMG_RE = re.compile(r"^data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$")
-UI_KEYS = {"theme": ("dark", "oled", "nuit", "clair"), "bg": ("aurora", "cover", "mesh", "plain", "image"),
-           "cover": ("square", "vinyl"), "font": ("dm", "outfit", "space", "nunito", "syne", "mono")}
-UI_BOOL = ("grain", "motion")
-UI_NUM = {"blur": (0, 40), "radius": (4, 28), "bgo": (5, 100), "bgb": (0, 40)}
+UI_KEYS = {"theme": ("dark", "oled", "nuit", "clair", "sepia", "foret", "ocean", "contraste", "bordeaux", "pastel", "synth"),
+           "bg": ("aurora", "cover", "mesh", "plain", "image", "vagues", "etoiles", "degrade"),
+           "cover": ("square", "round", "vinyl"),
+           "font": ("dm", "outfit", "space", "nunito", "syne", "mono", "atkinson", "poppins", "lexend", "playfair", "caveat", "pixel"),
+           "card": ("glass", "flat", "line"), "npbg": ("cover", "accent", "plain")}
+UI_BOOL = ("grain", "motion", "autoAcc", "viz", "navl")
+UI_NUM = {"blur": (0, 40), "radius": (4, 28), "bgo": (5, 100), "bgb": (0, 40), "zoom": (85, 130)}
+UI_HOME = ("hello", "hero", "steps", "pins", "day", "resume", "recent", "top", "stats", "goal", "comm", "trend", "tip", "faq")
 
 def clean_ui(d):
     """Réglages d'apparence synchronisables (rien de lié à l'appareil : taille, tri, vues…)."""
@@ -447,6 +454,11 @@ def clean_ui(d):
             pass
     if isinstance(d.get("accent"), str) and HEX_RE.match(d["accent"]):
         out["accent"] = d["accent"].lower()
+    if isinstance(d.get("accent2"), str) and (d["accent2"] == "" or HEX_RE.match(d["accent2"])):
+        out["accent2"] = d["accent2"].lower()                   # vide = pas de dégradé
+    if isinstance(d.get("home"), dict):
+        home = {k: v for k, v in d["home"].items() if k in UI_HOME and isinstance(v, bool)}
+        if home: out["home"] = home
     return out
 
 def pic_url_ver(row, col="avatar_img"):
@@ -852,7 +864,15 @@ def feed():
               "(SELECT COUNT(*) FROM public_playlists p WHERE p.user_id=users.id AND p.tracks <> '[]') AS n "
               "FROM users ORDER BY COALESCE(created,'') DESC LIMIT 12")
     stats = q1("SELECT (SELECT COUNT(*) FROM users) AS u, (SELECT COUNT(*) FROM public_playlists WHERE tracks <> '[]') AS p")
-    return jsonify(top=[pl_summary(p, lk) for p in top], recent=[pl_summary(p, lk) for p in recent],
+    since = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(time.time() - 7 * 86400))
+    hot = q("SELECT * FROM (SELECT p.id,p.name,p.tracks,p.updated,p.user_id,u.username,u.color,u.avatar,"
+            "(CASE WHEN COALESCE(u.avatar_img,'')<>'' THEN COALESCE(NULLIF(u.imgv,''),'1') ELSE '' END) AS pic,"
+            "(SELECT COUNT(*) FROM playlist_likes l WHERE l.playlist_id=p.id) AS likes,"
+            "(SELECT COUNT(*) FROM playlist_likes l WHERE l.playlist_id=p.id AND l.created>=:s) AS week "
+            "FROM public_playlists p JOIN users u ON u.id=p.user_id WHERE p.tracks <> '[]') t "
+            "WHERE week > 0 ORDER BY week DESC, likes DESC LIMIT 8", s=since)
+    trend = [dict(pl_summary(p, lk), week=int(p.week or 0)) for p in hot]
+    return jsonify(top=[pl_summary(p, lk) for p in top], recent=[pl_summary(p, lk) for p in recent], trend=trend,
                    users=[{"id": r.id, "username": r.username, "color": r.color or 0, "avatar": r.avatar or "", "pic": r.pic or "",
                            "bio": r.bio or "", "playlists": int(r.n or 0)} for r in users],
                    stats={"users": int(stats.u or 0), "playlists": int(stats.p or 0)})
@@ -1455,9 +1475,52 @@ def redeem_key():
 
 
 # ── Extraction audio ─────────────────────────────────────────────────────────
+_index = {"m": None, "h": ""}
+
+def index_html():
+    path = os.path.join(app.root_path, "index.html")
+    m = os.path.getmtime(path)
+    if _index["m"] != m:
+        with open(path, encoding="utf-8") as f:
+            _index.update(m=m, h=f.read())
+    return _index["h"]
+
+def og_tags(title, desc, image="", url=""):
+    e = lambda s: _html.escape(str(s or ""), quote=True)
+    t = [f'<meta property="og:title" content="{e(title)}">', f'<meta property="og:description" content="{e(desc)}">',
+         '<meta property="og:type" content="website">', '<meta property="og:site_name" content="Tiksound">',
+         f'<meta name="twitter:card" content="{"summary_large_image" if image else "summary"}">']
+    if image: t.append(f'<meta property="og:image" content="{e(image)}">')
+    if url: t.append(f'<meta property="og:url" content="{e(url)}">')
+    return "\n".join(t)
+
+def preview_for(args):
+    """Aperçu d'un lien partagé (Messages, WhatsApp, Discord… ne lancent pas le JavaScript)."""
+    base = public_base()
+    pid, uname = str(args.get("pl") or "")[:64], str(args.get("u") or "")[:24]
+    if pid:
+        p = q1(PL_SELECT + "WHERE p.id=:id", id=pid)
+        if p:
+            tr = json.loads(p.tracks or "[]")
+            cov = next((t.get("cover") for t in tr if str(t.get("cover", "")).startswith("https://")), "")
+            return og_tags(f"{p.name} · Tiksound", f"Playlist de {len(tr)} son{'s' if len(tr) > 1 else ''} par @{p.username}. Écoute-la sur Tiksound.",
+                           cov, f"{base}/?pl={pid}")
+    if uname:
+        u = q1("SELECT username,bio,avatar_img,imgv FROM users WHERE lower(username)=:u", u=uname.lower())
+        if u:
+            img = f"{base}/api/img/{u.username}/a" if getattr(u, "avatar_img", "") else ""
+            return og_tags(f"@{u.username} sur Tiksound", u.bio or "Ses playlists de sons TikTok.", img, f"{base}/?u={u.username}")
+    return og_tags("Tiksound · les sons TikTok, sans la vidéo", "Colle un lien TikTok, garde uniquement le son et écoute-le en playlist, écran éteint.")
+
 @app.get("/")
 def accueil():
-    return send_from_directory(".", "index.html", max_age=0)
+    try: tags = preview_for(request.args)
+    except Exception:
+        log.exception("aperçu de lien"); tags = ""
+    r = make_response(index_html().replace("<!--og-->", tags, 1))
+    r.mimetype = "text/html"
+    r.headers["Cache-Control"] = "no-cache"
+    return r
 
 @app.get("/api/health")
 def health():
@@ -1503,6 +1566,73 @@ def confidentialite():
     r.mimetype = "text/html"
     r.headers["Cache-Control"] = "no-cache"
     return r
+
+def legal_page(name):
+    with open(os.path.join(app.root_path, name), encoding="utf-8") as f:
+        html = f.read()
+    mail = os.environ.get("CONTACT_EMAIL", "").strip()
+    contact = (f'<a href="mailto:{mail}">{mail}</a>' if CONTACT_RE.fullmatch(mail)
+               else "l'adresse de l'éditeur n'est pas encore renseignée.")
+    r = make_response(html.replace("{{CONTACT}}", contact))
+    r.mimetype = "text/html"
+    r.headers["Cache-Control"] = "no-cache"
+    return r
+
+@app.get("/conditions")
+def conditions():
+    return legal_page("conditions.html")
+
+@app.get("/signalement")
+def signalement():
+    return legal_page("signalement.html")
+
+URL_RE = re.compile(r"^https?://[^\s<>\"]{3,500}$")
+
+@app.post("/api/report")
+def report():
+    if limited("rep:" + ip(), 5, 3600):
+        return err("Trop de signalements envoyés, réessaie plus tard", 429)
+    d = body()
+    url, mail = str(d.get("url") or "").strip(), str(d.get("email") or "").strip()[:120]
+    if not URL_RE.match(url): return err("Indique le lien du contenu à signaler")
+    if not EMAIL_RE.match(mail): return err("Adresse e-mail invalide")
+    reason = d.get("reason") if d.get("reason") in ("copyright", "other") else "other"
+    rid = uuid.uuid4().hex
+    x("INSERT INTO reports (id,created,url,reason,name,email,details,status) VALUES (:i,:c,:u,:r,:n,:e,:d,'new')",
+      i=rid, c=now_iso(), u=url, r=reason, n=str(d.get("name") or "").strip()[:120], e=mail, d=str(d.get("details") or "").strip()[:2000])
+    log.warning("Nouveau signalement (%s) : %s", reason, url)
+    return jsonify(ok=True, id=rid), 201
+
+@app.get("/api/admin/reports")
+def admin_reports():
+    _, e = require_admin()
+    if e: return e
+    rows = q("SELECT * FROM reports ORDER BY created DESC LIMIT 100")
+    return jsonify(reports=[{"id": r.id, "created": r.created, "url": r.url, "reason": r.reason, "name": r.name or "",
+                             "email": r.email, "details": r.details or "", "status": r.status or "new"} for r in rows])
+
+@app.get("/api/admin/stats")
+def admin_stats():
+    _, e = require_admin()
+    if e: return e
+    now = int(time.time())
+    since = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(now - 7 * 86400))
+    r = q1("SELECT (SELECT COUNT(*) FROM users) AS u, (SELECT COUNT(*) FROM users WHERE COALESCE(created,'')>=:s) AS u7,"
+           "(SELECT COUNT(*) FROM users WHERE COALESCE(premium_until,0)>:n) AS paid,"
+           "(SELECT COUNT(*) FROM users WHERE COALESCE(gift_until,0)>:n) AS gift,"
+           "(SELECT COUNT(*) FROM public_playlists WHERE tracks <> '[]') AS pl, (SELECT COUNT(*) FROM posts) AS po,"
+           "(SELECT COUNT(*) FROM reports WHERE status='new') AS rep", s=since, n=now)
+    return jsonify(users=int(r.u or 0), users_7d=int(r.u7 or 0), premium_paid=int(r.paid or 0), premium_keys=int(r.gift or 0),
+                   playlists=int(r.pl or 0), posts=int(r.po or 0), reports_new=int(r.rep or 0))
+
+@app.post("/api/admin/reports/<rid>")
+def admin_report_status(rid):
+    _, e = require_admin()
+    if e: return e
+    st = body().get("status")
+    if st not in ("new", "done"): return err("Statut invalide")
+    x("UPDATE reports SET status=:s WHERE id=:i", s=st, i=rid)
+    return jsonify(ok=True)
 
 R2_OK = all(os.environ.get(k) for k in ("R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET", "R2_PUBLIC_URL"))
 _s3 = None
