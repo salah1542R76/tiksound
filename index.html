@@ -1179,6 +1179,13 @@ function setPrem(d){
 function clearPrem(){ delete S.prem; save(); updatePremUI(); }
 const premActive=()=>((ME?+ME.premium_exp:(S.prem&&+S.prem.exp))||0)*1000>Date.now();
 const isPrem=()=>!PAYWALL||premActive();
+// Hors ligne = Premium : sans abonnement, rien ne se lit quand l'appareil n'a plus de connexion
+// (ni les sons en ligne, ni ceux déjà sur l'appareil). Seul « le navigateur sait qu'il est hors ligne » compte :
+// un serveur en panne ou un Wi-Fi sans internet ne bloquent rien.
+const offlineLocked=()=>PAYWALL&&!isPrem()&&navigator.onLine===false;
+const offlineNotice=()=>toast("Hors ligne : l'écoute sans connexion est réservée à Premium",{type:"err"});
+function resumeAudio(){ if(offlineLocked()) return offlineNotice(); return au.play(); }   // ▶ du lecteur, de l'écran verrouillé et des touches média
+function pillSync(){ const p=$("#offline"); if(!p) return; p.textContent=PAYWALL&&!isPrem()?"Hors ligne · l'écoute sans connexion est réservée à Premium":"Hors ligne · tes sons restent disponibles"; p.hidden=navigator.onLine!==false; }
 const storeMode=()=>isPrem()?(S.ui.storage==="online"?"online":"local"):"online";
 function setPaywall(v){ v=!!v; const ch=v!==PAYWALL||S.paywall!==v; PAYWALL=v; S.paywall=v; if(ch){ save(); updatePremUI(); if(BOOTED) render(); } }
 function setStorage(sel){
@@ -1187,7 +1194,7 @@ function setStorage(sel){
 }
 function updatePremUI(){
   const b=$("#premb"); if(b){ b.hidden=!PAYWALL; b.classList.toggle("on",PAYWALL&&premActive()); }
-  adsenseSync();
+  adsenseSync(); pillSync();
   const t=$("#tip-store"); if(t) t.textContent=PAYWALL&&!isPrem()?"Avec la version gratuite, les nouveaux sons s'écoutent en ligne. Premium : sons sur ton appareil et mode hors ligne.":"Les sons sont stockés sur ton appareil : ils marchent hors ligne.";
 }
 const pBadge=()=>`<span class="pbadge" title="Premium">${I("star",12)}Premium</span>`;
@@ -1521,6 +1528,7 @@ function play(ids, i){
 function playL(key, i){ const ids=LISTS[key]; if(!ids) return; if(ids[i]===q[qi]&&au.src){ togglePlay(); return; } play(ids,i); }
 async function loadCur(){
   if(AD.on) return;                          // une pub tourne : le son visé (q/qi) se chargera juste après
+  if(offlineLocked()) return offlineNotice();
   let t=curT(); if(!t) return;
   if(adDue()){
     await runAd(adPick());
@@ -1559,7 +1567,7 @@ function step(d){
   if(d<0 && au.currentTime>3){ au.currentTime=0; return; }
   qi=(qi+d+q.length)%q.length; loadCur();
 }
-function togglePlay(){ if(AD.on) return; if(!au.src){ const id=S.lastId&&S.tracks.find(t=>t.id===S.lastId&&playable(t))?S.lastId:null; if(id) play([id],0); return; } au.paused?au.play():au.pause(); }
+function togglePlay(){ if(AD.on) return; if(!au.src){ const id=S.lastId&&S.tracks.find(t=>t.id===S.lastId&&playable(t))?S.lastId:null; if(id) play([id],0); return; } if(au.paused) resumeAudio(); else au.pause(); }
 function seekBy(s){ if(AD.on) return; if(au.duration) au.currentTime=Math.max(0,Math.min(au.duration,au.currentTime+s)); }
 function applyRate(){ const r=RATES[S.player.rate]||RATES["1"]; for(const k of ["preservesPitch","mozPreservesPitch","webkitPreservesPitch"]) try{au[k]=r[1]}catch(e){} au.defaultPlaybackRate=r[0]; au.playbackRate=r[0]; }
 function toggleShuffle(){ S.player.shuffle=!S.player.shuffle; save(); if(S.player.shuffle&&q.length>1){ const cur=q[qi]; q=[cur,...shuf(q.filter((_,k)=>k!==qi))]; qi=0; } toast(S.player.shuffle?"Lecture aléatoire activée":"Lecture aléatoire désactivée"); renderNP(); }
@@ -1573,7 +1581,7 @@ au.onplay = au.onpause = () => { updatePlaying(); if("mediaSession" in navigator
 au.onended = () => {
   if(AD.on){ if(AD.audio) endAd(true); return; }
   if(sleepEnd){ sleepEnd=false; renderNP(); toast("Bonne nuit"); return; }
-  if(S.player.repeat==="one"){ if(adDue()){ loadCur(); return; } adTick(); save(); au.currentTime=0; au.play(); return; }
+  if(S.player.repeat==="one"){ if(offlineLocked()){ offlineNotice(); updatePlaying(); return; } if(adDue()){ loadCur(); return; } adTick(); save(); au.currentTime=0; au.play(); return; }
   if(qi<q.length-1 || S.player.repeat==="all") step(1); else updatePlaying();
 };
 let lastTU=0, statSave=0;
@@ -1591,7 +1599,7 @@ let seeking=false;
 for(const id of ["#sk","#npsk"]){ const el=$(id); el.addEventListener("pointerdown",()=>seeking=true); el.addEventListener("pointerup",()=>seeking=false); el.addEventListener("change",()=>seeking=false); el.oninput=e=>{ if(!AD.on&&au.duration) au.currentTime=e.target.value/1000*au.duration; }; }
 if("mediaSession" in navigator){
   const ms=navigator.mediaSession, H=(a,f)=>{ try{ ms.setActionHandler(a,f); }catch(e){} };
-  H("play",()=>{ if(!AD.on) au.play(); }); H("pause",()=>{ if(!AD.on) au.pause(); }); H("nexttrack",()=>step(1)); H("previoustrack",()=>step(-1));
+  H("play",()=>{ if(!AD.on) resumeAudio(); }); H("pause",()=>{ if(!AD.on) au.pause(); }); H("nexttrack",()=>step(1)); H("previoustrack",()=>step(-1));
   H("seekbackward",d=>seekBy(-(d.seekOffset||10))); H("seekforward",d=>seekBy(d.seekOffset||10)); H("seekto",d=>{ if(!AD.on&&d.seekTime!=null) au.currentTime=d.seekTime; });
 }
 // Volume
@@ -2218,8 +2226,8 @@ let deferredInstall=null;
 addEventListener("beforeinstallprompt", e=>{ e.preventDefault(); deferredInstall=e; $("#inst").hidden=false; });
 function installApp(){ if(!deferredInstall) return; deferredInstall.prompt(); deferredInstall.userChoice.finally(()=>{ deferredInstall=null; $("#inst").hidden=true; }); }
 addEventListener("appinstalled", ()=>{ toast("Tiksound est installé",{type:"ok"}); $("#inst").hidden=true; });
-addEventListener("online", ()=>{ $("#offline").hidden=true; ping(); toast("De retour en ligne",{type:"ok"}); });
-addEventListener("offline", ()=>{ $("#offline").hidden=false; });
+addEventListener("online", ()=>{ pillSync(); ping(); toast("De retour en ligne",{type:"ok"}); });
+addEventListener("offline", ()=>{ pillSync(); if(offlineLocked()&&!AD.on&&!au.paused){ au.pause(); offlineNotice(); } });
 addEventListener("keydown", e=>{
   if(e.key==="Escape"){ closeTop(); return; }
   if(e.key==="Enter" && !$("#auth-modal").hidden && e.target.matches("#auth-box input")){ e.preventDefault(); submitAuth(); return; }
@@ -2260,7 +2268,7 @@ addEventListener("hashchange", route);
   $$("[data-i]").forEach(el=>el.insertAdjacentHTML("afterbegin",I(el.dataset.i,+el.dataset.s||20)));
   $$(".ov2").forEach(o=>dragClose(o.querySelector(".grab"),o.querySelector(".sheet"),()=>closeSh(o.id)));
   dragClose($("#npdrag"),$(".np-in"),closeNP);
-  if(!navigator.onLine) $("#offline").hidden=false;
+  pillSync();
 
   const sp=new URLSearchParams(location.search);
   const P_=sp.get("p"), PL_=sp.get("pl"), U_=sp.get("u"), shared=[sp.get("text"),sp.get("url"),sp.get("title")].filter(Boolean).join(" "), PREM_=sp.get("premium");
