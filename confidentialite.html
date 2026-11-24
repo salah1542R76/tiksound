@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="index,follow">
+<title>Politique de confidentialité · Tiksound</title>
+<style>
+:root{--bg:#0b0b0c;--fg:#ececf1;--mut:#a3a3ad;--line:#26262c;--card:#141417;--acc:#b9a4ff}
+@media (prefers-color-scheme:light){:root{--bg:#f4f5f9;--fg:#15151a;--mut:#585865;--line:#d9dbe4;--card:#fff;--acc:#5b3fd6}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:720px;margin:0 auto;padding:40px 20px 80px}
+a{color:var(--acc)}
+h1{font-size:30px;line-height:1.2;margin:8px 0 6px}
+h2{font-size:19px;margin:34px 0 8px}
+p,li{color:var(--fg)}
+.mut{color:var(--mut);font-size:14px}
+ul{padding-left:20px}
+li{margin:4px 0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 18px;margin:14px 0}
+.back{display:inline-block;margin-bottom:14px;text-decoration:none;font-weight:600}
+</style>
+</head>
+<body>
+<main>
+<a class="back" href="/">← Retour à Tiksound</a>
+<h1>Politique de confidentialité</h1>
+<p class="mut">Ce que Tiksound enregistre, pourquoi, et comment tu gardes la main.</p>
+
+<h2>Ce que Tiksound enregistre</h2>
+<ul>
+<li><b>Ton compte</b> : adresse e-mail, pseudo, mot de passe (jamais en clair : seule une empreinte est conservée), photo de profil, bannière, bio et statut.</li>
+<li><b>Ta bibliothèque</b> : tes sons, tes playlists, tes j'aime, tes publications et tes réglages d'apparence, pour les retrouver sur tous tes appareils.</li>
+<li><b>Tes sons en ligne</b> : les fichiers audio préparés pour l'écoute en ligne sont stockés chez un hébergeur de fichiers (Cloudflare R2).</li>
+<li><b>Ton abonnement Premium</b> : si tu t'abonnes, le paiement est géré par Stripe. Tiksound ne voit et ne garde jamais ton numéro de carte ; il conserve seulement un identifiant client Stripe et la date de fin de ton abonnement.</li>
+</ul>
+
+<h2>Où sont les données</h2>
+<p>Le site tourne chez Render, la base de données est chez Neon (PostgreSQL), les fichiers audio en ligne chez Cloudflare. Les e-mails de confirmation partent par un service d'envoi d'e-mails.</p>
+
+<h2>Publicités</h2>
+<div class="card">
+<p>Les comptes gratuits peuvent voir un bandeau publicitaire fourni par <b>Google AdSense</b>. Google et ses partenaires peuvent utiliser des cookies ou des identifiants pour afficher des annonces et mesurer leur efficacité. Dans l'Espace économique européen, au Royaume-Uni et en Suisse, les annonces personnalisées ne s'affichent qu'avec ton consentement, que tu peux modifier à tout moment depuis le message de consentement de Google.</p>
+<p>En savoir plus : <a href="https://policies.google.com/technologies/partner-sites" target="_blank" rel="noopener">comment Google utilise les données des sites qui utilisent ses services</a> · <a href="https://adssettings.google.com" target="_blank" rel="noopener">régler les annonces que Google te montre</a>.</p>
+<p>Avec Premium, ce bandeau n'est ni chargé ni affiché.</p>
+</div>
+
+<p><b>Tiksound ne vend pas tes données.</b></p>
+
+<h2>Tes droits</h2>
+<p>Tu peux voir et modifier tes informations depuis ton profil. Tu peux aussi supprimer ton compte depuis ton profil : tes playlists, publications, j'aime et ta bibliothèque synchronisée sont alors effacés, et ton abonnement éventuel est résilié. Pour accéder à tes données, les corriger ou t'opposer à leur traitement, écris à l'éditeur du site.</p>
+<p><b>Contact :</b> {{CONTACT}}</p>
+
+<p class="mut" style="margin-top:34px">Tiksound est un projet indépendant. Les sons proviennent de liens que les utilisateurs collent eux-mêmes ; chacun doit respecter les droits des créateurs.</p>
+</main>
+</body>
+</html>
