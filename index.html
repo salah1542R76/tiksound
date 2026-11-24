@@ -11,6 +11,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Tiksound">
 <link rel="apple-touch-icon" href="/icon-192.png">
+<script async src="https://js.stripe.com/dahlia/stripe.js"></script>
 <title>Tiksound – tes sons TikTok en playlist</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -531,6 +532,42 @@ button,a{-webkit-tap-highlight-color:transparent}
   .prof>div:last-child{width:100%}
   .prof .disp{font-size:24px!important;word-break:break-all}
 }
+/* Premium */
+.prem-btn.on{color:#ffc861}.prem-btn.on svg{fill:currentColor}
+.pbadge{display:inline-flex;align-items:center;gap:4px;padding:2px 9px;margin-left:8px;border-radius:99px;font-size:12px;font-weight:700;letter-spacing:.2px;vertical-align:middle;background:linear-gradient(135deg,#ffd27a,#ff9ec4);color:#2a1a00}
+.pbadge svg{fill:currentColor}
+.perks{list-style:none;margin:14px 0 18px;padding:0;display:grid;gap:10px}
+.perks li{display:flex;gap:10px;align-items:center}
+.perks li svg{color:var(--ok);flex:none}
+.prem-price{font-size:34px;font-weight:800;margin:4px 0 0;font-family:var(--fd)}
+.prem-state{display:flex;gap:10px;align-items:center;font-weight:600;margin:6px 0 16px}
+.prem-state svg{color:#ffc861;fill:currentColor;flex:none}
+.redeem{margin-top:18px;padding-top:16px;border-top:1px solid var(--br);display:flex;gap:8px;flex-wrap:wrap}
+.redeem input{flex:1 1 180px;min-width:0;padding:12px 14px;border-radius:14px;border:1px solid var(--br2);background:transparent;color:inherit;font-size:16px;text-transform:uppercase;letter-spacing:1px}
+.redeem .fld-err{flex-basis:100%}
+.keyform{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+.keyform input,.keyform select{padding:11px 13px;border-radius:14px;border:1px solid var(--br2);background:transparent;color:inherit;font-size:15px}
+.keyform input{flex:1 1 160px;min-width:0}
+.keycode{font:700 22px/1.3 ui-monospace,Menlo,Consolas,monospace;letter-spacing:2px;text-align:center;padding:18px;border-radius:var(--r);border:1px dashed var(--br2);margin:14px 0;user-select:all;word-break:break-all}
+.key-row .rv{opacity:.55}
+/* Publicités */
+#adbox{position:fixed;inset:0;z-index:26;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.72);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);animation:in .3s}
+.ad-card{width:min(440px,100%);padding:22px;border-radius:calc(var(--r) + 6px);text-align:center;display:grid;gap:12px;justify-items:center;box-shadow:var(--sh)}
+.ad-tag{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--mut);border:1px solid var(--br2);border-radius:99px;padding:2px 10px}
+.ad-img{width:100%;max-height:220px;object-fit:cover;border-radius:var(--r)}
+.ad-card h3{font-size:22px}.ad-card p{color:var(--mut)}
+.ad-bar{width:100%;height:5px;border-radius:99px;background:var(--br2);overflow:hidden}
+.ad-bar i{display:block;height:100%;width:0;background:var(--ac);transition:width .25s linear}
+.ad-foot{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.adb{grid-column:1/-1;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 16px;margin:10px 0;border:1px dashed var(--br2);border-radius:var(--r);background:var(--card)}
+.adb-img{width:56px;height:56px;border-radius:12px;object-fit:cover;flex:none}
+.adb-m{flex:1 1 160px;display:grid;gap:2px;min-width:0}.adb-m span{color:var(--mut);font-size:14px}
+/* Bandeau Google : replié (hauteur 0 mais largeur réelle, pour que Google puisse le mesurer) tant qu'aucune annonce n'est affichée */
+.gad{max-width:1080px;margin:0 auto;padding:0 20px;height:0;overflow:hidden}
+.gad.on{height:auto;overflow:visible;padding-top:10px}
+.gad-in{border:1px dashed var(--br2);border-radius:var(--r);background:var(--card);padding:8px 12px}
+.foot{max-width:1080px;margin:0 auto;padding:0 20px 24px;font-size:13px}.foot a{color:var(--mut)}
+.gad-h{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}
 </style>
 </head>
 <body class="nopl">
@@ -547,12 +584,14 @@ button,a{-webkit-tap-highlight-color:transparent}
     <a href="#profil"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></svg><span>Profil</span></a>
   </nav>
   <div class="hdr">
+    <button class="icon-btn ring prem-btn" id="premb" hidden onclick="openPremium()" aria-label="Premium" title="Premium" data-i="star"></button>
     <button class="icon-btn ring" id="inst" hidden onclick="installApp()" aria-label="Installer l'application" title="Installer l'app" data-i="dl"></button>
     <button class="icon-btn ring" onclick="openCustom()" aria-label="Personnaliser" title="Personnaliser" data-i="palette"></button>
     <a class="don" id="don" href="#" target="_blank" rel="noopener" onclick="return donate(event)"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-8-5.2-8-11a4.5 4.5 0 018-2.8A4.5 4.5 0 0120 10c0 5.8-8 11-8 11z"/></svg><span>Faire un don</span></a>
   </div>
 </div></header>
 <div class="off-pill glass" id="offline" hidden>Hors ligne · tes sons restent disponibles</div>
+<div id="adsense" class="gad" aria-label="Publicité"></div>
 
 <main>
 <!-- Accueil -->
@@ -560,12 +599,12 @@ button,a{-webkit-tap-highlight-color:transparent}
   <div class="hello" id="hello"></div>
   <div class="eq" aria-hidden="true"></div>
   <h1>Les sons TikTok, <span class="grad">sans la vidéo.</span></h1>
-  <p class="lead">Colle un lien TikTok, garde uniquement le son, et écoute-le en playlist, écran éteint, sans consommer de données.</p>
+  <p class="lead">Colle un lien TikTok, garde uniquement le son, et écoute-le en playlist, écran éteint.</p>
   <div class="paste"><input id="u1" placeholder="https://vm.tiktok.com/…" inputmode="url" aria-label="Lien TikTok" onkeydown="if(event.key==='Enter')convert('u1',this.nextElementSibling)"><button class="btn" onclick="convert('u1',this)">Convertir en son</button></div>
   <div class="quick" id="quick"></div>
   <div class="steps">
     <div class="gcard"><div class="num">1</div><h3>Colle le lien</h3><p>Depuis TikTok, touche « Partager » puis « Copier le lien ».</p></div>
-    <div class="gcard"><div class="num">2</div><h3>Garde le son</h3><p>Le site extrait l'audio et l'enregistre sur ton appareil.</p></div>
+    <div class="gcard"><div class="num">2</div><h3>Garde le son</h3><p>Le site extrait l'audio et le garde pour toi, prêt à écouter.</p></div>
     <div class="gcard"><div class="num">3</div><h3>Écoute en playlist</h3><p>Range tes sons, publie tes playlists et découvre celles des autres.</p></div>
   </div>
   <div id="home-dyn"></div>
@@ -581,7 +620,7 @@ button,a{-webkit-tap-highlight-color:transparent}
   <div class="prog-list" id="prog"></div>
   <div class="help">
     <div class="gcard"><h3><span data-i="phone"></span>Depuis TikTok</h3><ol><li>Ouvre la vidéo dont tu veux le son.</li><li>Touche <b>Partager</b> puis <b>Copier le lien</b>.</li><li>Reviens ici et touche <b>Coller</b>.</li></ol></div>
-    <div class="gcard"><h3><span data-i="spark"></span>Astuces</h3><ol><li>Tu peux coller jusqu'à 20 liens d'un coup.</li><li>Sur Android, installe l'app puis partage directement depuis TikTok vers <b>Tiksound</b>.</li><li>Les sons sont stockés sur ton appareil : ils marchent hors ligne.</li></ol></div>
+    <div class="gcard"><h3><span data-i="spark"></span>Astuces</h3><ol><li>Tu peux coller jusqu'à 20 liens d'un coup.</li><li>Sur Android, installe l'app puis partage directement depuis TikTok vers <b>Tiksound</b>.</li><li id="tip-store">Les sons sont stockés sur ton appareil : ils marchent hors ligne.</li></ol></div>
   </div>
   <div id="add-recent"></div>
   <div style="margin-top:22px;padding:18px;border-radius:20px;border:1px solid rgba(255,255,255,.12)">
@@ -626,8 +665,9 @@ button,a{-webkit-tap-highlight-color:transparent}
   <div id="profil-content"></div>
   <div style="margin-top:18px;padding:18px;border-radius:20px;border:1px solid rgba(255,255,255,.12)">
     <h3 style="margin:0 0 6px">Stockage des nouveaux sons</h3>
-    <p style="margin:0 0 12px;opacity:.7;font-size:14px">Sur l'appareil : le son est téléchargé et marche hors connexion. En ligne : le son reste sur le serveur et se lit en streaming, sans occuper la mémoire de ton téléphone (internet nécessaire).</p>
-    <select id="stor" onchange="S.ui.storage=this.value;save();toast(this.value==='online'?'Nouveaux sons : en ligne':'Nouveaux sons : sur l\'appareil')" style="padding:12px 14px;border-radius:14px;border:1px solid rgba(255,255,255,.18);background:transparent;color:inherit;font-size:16px"><option value="local">Sur l'appareil</option><option value="online">En ligne (streaming)</option></select>
+    <p id="stor-help" style="margin:0 0 12px;opacity:.7;font-size:14px">Sur l'appareil : le son est téléchargé et marche hors connexion. En ligne : le son reste sur le serveur et se lit en streaming, sans occuper la mémoire de ton téléphone (internet nécessaire).</p>
+    <select id="storsel" onchange="setStorage(this)" style="padding:12px 14px;border-radius:14px;border:1px solid rgba(255,255,255,.18);background:transparent;color:inherit;font-size:16px"><option value="local">Sur l'appareil</option><option value="online">En ligne (streaming)</option></select>
+    <p id="stor-lock" class="a" hidden style="margin:0;font-size:14px">Avec la version gratuite, les nouveaux sons s'écoutent en ligne (internet nécessaire). <button class="lnk" onclick="openPremium()">Passer Premium</button> pour les garder sur ton appareil et les écouter hors ligne.</p>
   </div>
   <div style="margin-top:14px;padding:18px;border-radius:20px;border:1px solid rgba(255,255,255,.12)">
     <h3 style="margin:0 0 6px">Synchronisation</h3>
@@ -636,6 +676,7 @@ button,a{-webkit-tap-highlight-color:transparent}
   </div>
 </section>
 </main>
+<footer class="foot"><a href="/confidentialite" target="_blank" rel="noopener">Confidentialité</a></footer>
 
 <!-- Barre de lecture -->
 <div id="pl" class="glass" hidden><div class="in">
@@ -703,6 +744,8 @@ button,a{-webkit-tap-highlight-color:transparent}
 
 <div id="dlp" class="glass" hidden><div class="hd"><b id="dlpt"></b><button class="chip" onclick="dlpCancel()">Annuler</button></div><div class="bar2"><i id="dlpb"></i></div><div class="ft"><span id="dlpn"></span><span id="dlpe"></span></div></div>
 
+<div id="adbox" hidden role="dialog" aria-modal="true" aria-label="Publicité"></div>
+
 <div id="toasts" role="status" aria-live="polite"></div>
 
 <script>
@@ -712,6 +755,23 @@ button,a{-webkit-tap-highlight-color:transparent}
 // ═══════════════════════════════════════════════════════════════════════════
 const API_URL = "";
 const PAYPAL  = "https://paypal.me/LinaHai69";
+
+// ─── Publicités (comptes gratuits, quand l'abonnement est actif sur le serveur) ───
+// Une pub entre deux sons tous les ADS_EVERY sons, plus des bandeaux dans l'appli. Liste vide = aucune pub.
+// Une pub : {type, title, text, img, audio, url, cta, seconds, slots}
+//   type   : "audio" (lue entre deux sons, écran éteint compris) | "image" | "text" (écran de `seconds` secondes, 8 par défaut)
+//   slots  : où elle peut apparaître : "track" (entre deux sons) et/ou "banner" (bandeaux).
+//            Par défaut : audio → track ; image et text → track + banner.
+//   img / audio : adresse https://… ou fichier du dossier ads/ du projet (ex : "ads/pub1.jpg", "ads/pub2.mp3").
+//   url    : lien du bouton (http ou https uniquement) ; cta : texte du bouton.
+// Pubs rémunérées Google AdSense : rien à écrire ici. Variables ADSENSE_CLIENT et ADSENSE_SLOT sur Render (voir guide-premium.html).
+//   Elles remplacent les bandeaux ci-dessus ; les pubs « entre deux sons » restent les tiennes (AdSense l'interdit à cet endroit).
+const ADS_EVERY = 5;
+const ADS = [
+  // {type:"image", title:"Ma marque", text:"Une phrase d'accroche", img:"ads/pub1.jpg", url:"https://exemple.com", cta:"Découvrir", seconds:8},
+  // {type:"audio", title:"Pub radio", text:"Écoute la suite", audio:"ads/pub2.mp3", url:"https://exemple.com", cta:"En savoir plus"},
+  // {type:"text",  title:"Tiksound reste gratuit", text:"Un petit don aide beaucoup.", url:"https://paypal.me/LinaHai69", cta:"Faire un don", slots:["banner"]},
+];
 const COL     = ["#8d8d97","#7f9bd6","#d68a8a","#6fbf8e","#c9b46a","#a98ad8","#e08cbc","#5fbcc4","#e39a5f","#94b85a"];
 const ACCENTS = [["Argent","#dcdce0"],["Lilas","#b9a4ff"],["Rose","#ff8fc7"],["Corail","#ff8a7a"],["Ambre","#ffc861"],["Menthe","#6fe3b4"],["Ciel","#7cc8ff"],["Citron","#e2f26b"]];
 const THEMES  = [["dark","Sombre","#0b0b0c","#26262c"],["oled","OLED","#000","#161616"],["nuit","Nuit","#070a17","#1d2550"],["clair","Clair","#eceef4","#ffffff"]];
@@ -789,6 +849,8 @@ S.player = Object.assign({shuffle:false, repeat:"all", rate:"1"}, S.player || {}
 S.prof   = S.prof || {name:"", color:0};
 
 let ONLINE = false, DOWN = false, ME = null;
+let PAYWALL = !!S.paywall, BOOTED = false, ADSENSE = null;
+const AD = {on:false, cur:null, res:null, timer:null, tick:null, audio:false, t0:0, secs:8, stop:false};   // pub en cours   // PAYWALL : pubs + abonnement actifs côté serveur (gardé pour le hors ligne)
 let q = [], qi = -1, openPl = null, POP = null;
 const LISTS = {}, COVERS = {};
 const au = document.getElementById("au");
@@ -840,7 +902,7 @@ async function api(path, opt={}) {
   return d;
 }
 function ping(manual) {
-  return fetch(API_URL+"/api/health").then(r=>{ONLINE=r.ok;DOWN=!ONLINE;$("#demo").hidden=!DOWN;if(manual)toast(ONLINE?"Service disponible":"Toujours indisponible",{type:ONLINE?"ok":"err"});return ONLINE})
+  return fetch(API_URL+"/api/health").then(async r=>{ if(r.ok){ try{ const j=await r.json(); setAdsense(j.adsense); setPaywall(!!j.paywall); }catch(e){} } ONLINE=r.ok;DOWN=!ONLINE;$("#demo").hidden=!DOWN;if(manual)toast(ONLINE?"Service disponible":"Toujours indisponible",{type:ONLINE?"ok":"err"});return ONLINE})
     .catch(()=>{ONLINE=false;DOWN=true;$("#demo").hidden=false;if(manual)toast("Toujours indisponible",{type:"err"});return false});
 }
 
@@ -1003,7 +1065,7 @@ function closeTop(){
 let AU={mode:"login", email:"", user:"", pw:"", purpose:"register", cdUntil:0, busy:false};
 let cdTimer=null, userTimer=null;
 
-async function checkMe(){ try { ME=await api("/api/auth/me"); applyServerUI(ME); } catch(e) { ME=null; } }
+async function checkMe(){ try { ME=await api("/api/auth/me"); setPrem(ME); applyServerUI(ME); } catch(e) { ME=null; if(e.status===401) clearPrem(); } }
 function openAuth(mode="login"){ AU.mode=mode; renderAuth(); $("#auth-modal").hidden=false; }
 function closeAuth(){ $("#auth-modal").hidden=true; clearInterval(cdTimer); }
 function setMode(m){ AU.mode=m; renderAuth(); }
@@ -1101,8 +1163,147 @@ async function resendCode(){
   try{ const d=await api("/api/auth/resend",{method:"POST",body:{email:AU.email.trim().toLowerCase(),purpose:AU.purpose}}); startCd(d.cooldown); toast("Nouveau code envoyé",{type:"ok"}); authErr(""); }
   catch(e){ if(e.data&&e.data.wait) startCd(e.data.wait); authErr(e.message); }
 }
-function setMe(d){ ME=Object.assign({},d,{color:d.color||0,bio:d.bio||"",avatar:d.avatar||""}); delete ME.ok; applyServerUI(ME); AU.pw=""; closeAuth(); FEED=null; render(); restorePublic(); syncAllPublic(); syncLibrary(); }
-async function logout(){ try{ await api("/api/auth/logout",{method:"POST"}); }catch(e){} ME=null; render(); toast("Déconnecté"); }
+function setMe(d){ ME=Object.assign({},d,{color:d.color||0,bio:d.bio||"",avatar:d.avatar||""}); delete ME.ok; setPrem(ME); applyServerUI(ME); AU.pw=""; closeAuth(); FEED=null; render(); restorePublic(); syncAllPublic(); syncLibrary(); }
+async function logout(){ try{ await api("/api/auth/logout",{method:"POST"}); }catch(e){} ME=null; KEYS=null; clearPrem(); render(); toast("Déconnecté"); }
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Premium : abonnement, clés d'accès
+//  Le serveur décide (premium_exp). Ici on ne garde qu'une échéance en cache pour le hors ligne.
+// ═══════════════════════════════════════════════════════════════════════════
+const PREM_KEYS=["premium","premium_until","premium_exp","premium_src","plan_status","cancel_at_end","is_admin"];
+function setPrem(d){
+  if(!d) return;
+  if(ME&&d!==ME) PREM_KEYS.forEach(k=>{ if(k in d) ME[k]=d[k]; });
+  S.prem={exp:+d.premium_exp||0}; save(); updatePremUI();
+}
+function clearPrem(){ delete S.prem; save(); updatePremUI(); }
+const premActive=()=>((ME?+ME.premium_exp:(S.prem&&+S.prem.exp))||0)*1000>Date.now();
+const isPrem=()=>!PAYWALL||premActive();
+const storeMode=()=>isPrem()?(S.ui.storage==="online"?"online":"local"):"online";
+function setPaywall(v){ v=!!v; const ch=v!==PAYWALL||S.paywall!==v; PAYWALL=v; S.paywall=v; if(ch){ save(); updatePremUI(); if(BOOTED) render(); } }
+function setStorage(sel){
+  if(!isPrem()){ sel.value="online"; return openPremium(); }
+  S.ui.storage=sel.value; save(); toast(sel.value==="online"?"Nouveaux sons : en ligne":"Nouveaux sons : sur l'appareil");
+}
+function updatePremUI(){
+  const b=$("#premb"); if(b){ b.hidden=!PAYWALL; b.classList.toggle("on",PAYWALL&&premActive()); }
+  adsenseSync();
+  const t=$("#tip-store"); if(t) t.textContent=PAYWALL&&!isPrem()?"Avec la version gratuite, les nouveaux sons s'écoutent en ligne. Premium : sons sur ton appareil et mode hors ligne.":"Les sons sont stockés sur ton appareil : ils marchent hors ligne.";
+}
+const pBadge=()=>`<span class="pbadge" title="Premium">${I("star",12)}Premium</span>`;
+const premDate=sec=>new Date(sec*1000).toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"});
+function premStatus(){
+  if(!ME||!premActive()) return "";
+  const src=ME.premium_src, exp=+ME.premium_exp||0;
+  if(src==="admin") return "Premium à vie (administrateur)";
+  if(src==="key") return exp>=4102444800?"Premium offert, à vie":"Premium offert jusqu'au "+premDate(exp);
+  return ME.cancel_at_end?"Abonnement résilié : Premium jusqu'au "+premDate(ME.premium_until||exp):"Abonnement actif : prochain paiement le "+premDate(ME.premium_until||exp);
+}
+let PRICE=null;
+async function loadPrice(){ if(PRICE) return PRICE; try{ const d=await api("/api/premium"); if(d.price) PRICE=d.price; }catch(e){} return PRICE; }
+function fmtPrice(p){
+  if(!p) return ""; const per={month:"mois",year:"an",week:"semaine",day:"jour"}[p.interval]||p.interval;
+  try{ return new Intl.NumberFormat("fr-FR",{style:"currency",currency:String(p.currency).toUpperCase()}).format(p.amount/100)+" / "+per; }
+  catch(e){ return (p.amount/100).toFixed(2).replace(".",",")+" "+p.currency+" / "+per; }
+}
+async function openPremium(){
+  openGen("Tiksound Premium",`<div class="skel" style="height:150px"></div>`);
+  const p=await loadPrice();
+  if(!$("#gen").hidden&&$("#gent").textContent==="Tiksound Premium") $("#genb").innerHTML=premHTML(p);
+}
+function premHTML(p){
+  const price=fmtPrice(p), head=price?`<div class="prem-price">${esc(price)}</div>`:"";
+  const perks=`<ul class="perks">${["Aucune pub, nulle part","Sons stockés sur ton appareil, écoute hors ligne","Enregistre tes sons en MP3","Tu soutiens Tiksound"].map(x=>`<li>${I("check",16)}<span>${x}</span></li>`).join("")}</ul>`;
+  if(!ME) return `${head}${perks}<button class="btn" style="width:100%" onclick="closeSh('gen');openAuth('register')">Créer un compte pour continuer</button>
+    <p class="a" style="margin-top:14px;text-align:center">Déjà un compte ? <button class="lnk" onclick="closeSh('gen');openAuth('login')">Se connecter</button><br>Tu as une clé d'accès ? Connecte-toi d'abord, puis entre-la ici.</p>`;
+  if(premActive()) return `<p class="prem-state">${I("star",18)}<span>${esc(premStatus())}</span></p>${ME.premium_src==="stripe"?`<button class="btn alt" style="width:100%" onclick="openPortal()">Gérer mon abonnement</button>`:""}${perks}`;
+  const bad=["past_due","unpaid"].includes(ME.plan_status);
+  const redeem=`<div class="redeem"><input id="rk" placeholder="J'ai une clé d'accès" autocomplete="off" autocapitalize="characters" spellcheck="false" onkeydown="if(event.key==='Enter')redeemKey()"><button class="btn alt" onclick="redeemKey()">Activer</button><div class="fld-err" id="rk-err"></div></div>`;
+  if(bad) return `${perks}<p class="note" style="margin:0 0 14px">Ton dernier paiement a été refusé. Mets à jour ta carte pour retrouver Premium.</p><button class="btn" style="width:100%" onclick="openPortal()">Mettre à jour mon paiement</button>${redeem}`;
+  return `${head}${perks}${ME.plan_status==="canceled"?`<p class="a" style="margin:0 0 12px">Ton abonnement est terminé.</p>`:""}<button class="btn" id="gopm" style="width:100%" onclick="goPremium()">Passer Premium${price?" · "+esc(price):""}</button>${redeem}`;
+}
+function goExternal(u){ if(!/^https:\/\//.test(u||"")) throw new Error("Adresse de paiement invalide"); location.href=u; }
+// Formulaire de paiement Stripe intégré (Checkout Studio, ui_mode "form"). La clé publique vient du serveur ; Stripe.js se charge dans le <head>, depuis js.stripe.com uniquement.
+const STRIPE_APPEARANCE={theme:"stripe",labels:"auto",inputs:"spaced",variables:{borderRadius:"4px",colorBackground:"#ffffff",colorDanger:"#df1b41",colorPrimary:"#0570de",colorSuccess:"#00c853",colorText:"#30313d",fontFamily:"default",fontSizeBase:"16px",spacingUnit:"4px"}};
+async function mountCheckout(publishableKey, secret){
+  $("#genb").innerHTML=`<button class="lnk" onclick="openPremium()" style="margin-bottom:10px">← Retour</button><div style="background:#fff;border-radius:12px;padding:12px"><div id="checkout-form"></div></div>`;
+  const stripe=Stripe(publishableKey);
+  const checkout=stripe.initCheckoutFormSdk({clientSecret:secret,appearance:STRIPE_APPEARANCE});
+  const form=checkout.createForm({layout:"expanded"});
+  form.mount("#checkout-form");
+  const loadActionsResult=await checkout.loadActions();
+  if(loadActionsResult.type==="success"){
+    form.on("confirm",async event=>{
+      try{ await loadActionsResult.actions.confirm({formConfirmEvent:event}); }
+      catch(error){ console.error("Payment confirmation error:",error); }
+    });
+  } else throw new Error((loadActionsResult.error&&loadActionsResult.error.message)||"Le formulaire de paiement ne s'est pas chargé");
+}
+async function goPremium(){
+  if(!ME){ closeSh("gen"); return openAuth("register"); }
+  const b=$("#gopm"), old=b?b.innerHTML:""; if(b){ b.disabled=true; b.innerHTML=`<span class="spin-i"></span>Chargement…`; }
+  try{
+    if(typeof Stripe==="undefined") throw new Error("Le paiement n'est pas disponible sans connexion. Réessaie dans un instant.");
+    const info=await api("/api/premium"); if(!info.publishable_key) throw new Error("Le paiement est momentanément indisponible");
+    const d=await api("/api/stripe/checkout",{method:"POST"});
+    await mountCheckout(info.publishable_key,d.client_secret);
+  }
+  catch(e){ if(e.data&&e.data.portal){ toast(e.message); return openPortal(); } toast(e.message,{type:"err"}); if(!$("#checkout-form")){ if(b){ b.disabled=false; b.innerHTML=old; } } else openPremium(); }
+}
+async function openPortal(){
+  try{ const d=await api("/api/stripe/portal",{method:"POST"}); goExternal(d.url); }
+  catch(e){ toast(e.message,{type:"err"}); }
+}
+async function redeemKey(){
+  const i=$("#rk"), er=$("#rk-err"), k=((i&&i.value)||"").trim();
+  if(!k){ if(er) er.textContent="Entre ta clé d'accès"; return; }
+  try{ const d=await api("/api/premium/redeem",{method:"POST",body:{key:k}}); setPrem(d); closeSh("gen"); render();
+    if(!d.already) confetti(); toast(d.already?"Cette clé est déjà activée sur ton compte":"Premium activé, merci !",{type:"ok",ms:4000}); }
+  catch(e){ if(er) er.textContent=e.message; }
+}
+function premBox(){
+  if(!PAYWALL) return "";
+  const on=premActive();
+  const txt=on?premStatus():(ME?"Aucune pub, sons sur ton appareil, écoute hors ligne, MP3.":"Supprime les pubs et garde tes sons hors ligne.");
+  return `<div class="box gcard"><h3>${I("star",20)}Premium${on?`<span class="pbadge">${I("star",12)}Actif</span>`:""}</h3><p class="a" style="margin-bottom:14px">${esc(txt)}</p><button class="btn ${on?"alt":""}" onclick="openPremium()">${on?"Voir mon Premium":"Découvrir Premium"}</button></div>`;
+}
+// Retour de Stripe (?premium=success|cancel) : le paiement est confirmé par le webhook, on attend qu'il arrive.
+async function handlePremiumReturn(kind){
+  if(kind==="cancel") return void toast("Paiement annulé : tu n'as pas été débité");
+  if(kind!=="success") return;
+  if(!ME) return void toast("Connecte-toi pour retrouver ton Premium",{type:"err"});
+  if(premActive()) return void toast("Premium actif, merci !",{type:"ok"});
+  const kill=toast("Paiement reçu, activation en cours…",{ms:31000}), t0=Date.now();
+  while(Date.now()-t0<30000){
+    try{ const d=await api("/api/auth/me"); setPrem(d); if(d.premium){ kill(); render(); confetti(); toast("Bienvenue dans Premium !",{type:"ok",ms:4500}); return; } }
+    catch(e){ if(e.status===401) break; }
+    await sleep(2000);
+  }
+  kill(); toast("Ton paiement est en cours de validation, ça peut prendre une minute. Rouvre l'appli ensuite.",{ms:7000});
+}
+// Clés d'accès (administrateur)
+let KEYS=null;
+function adminBox(){
+  return `<div class="box gcard"><h3>${I("star",20)}Clés d'accès</h3><p class="a">Offre le Premium à tes proches : crée une clé, envoie-la, ils la saisissent dans la fenêtre Premium. Une clé n'est affichée qu'une seule fois.</p>
+    <div class="keyform"><input id="kl" maxlength="60" placeholder="Pour qui ? (ex : Marie)" aria-label="Pour qui"><select id="ku" aria-label="Nombre de personnes"><option value="1">1 personne</option><option value="5">5 personnes</option><option value="0">Illimité</option></select><select id="kd" aria-label="Durée"><option value="0">À vie</option><option value="30">30 jours</option><option value="90">90 jours</option><option value="365">1 an</option></select><button class="btn" onclick="createKey()">Créer</button></div>
+    <div id="keys-list"></div></div>`;
+}
+function keysDraw(){
+  const el=$("#keys-list"); if(!el||!KEYS) return;
+  el.innerHTML=KEYS.length?KEYS.map(k=>`<div class="kv key-row"><span class="${k.revoked?"rv":""}"><b>${esc(k.label||"Sans nom")}</b> · …${esc(k.hint)} · ${k.uses}/${k.max_uses||"∞"} utilisation${k.uses>1?"s":""} · ${k.days?k.days+" jours":"à vie"}${k.revoked?" · révoquée":""}${k.users.length?`<br><span class="a">${esc(k.users.map(u=>"@"+u).join(", "))}</span>`:""}</span>${k.revoked?"":`<button class="btn alt sm" onclick="revokeKey(${js(k.id)})">Révoquer</button>`}</div>`).join(""):`<p class="a">Aucune clé pour l'instant.</p>`;
+}
+async function renderAdminKeys(){ try{ KEYS=(await api("/api/admin/keys")).keys; keysDraw(); }catch(e){ toast(e.message,{type:"err"}); } }
+async function createKey(){
+  try{ const d=await api("/api/admin/keys",{method:"POST",body:{label:$("#kl").value.trim(),uses:+$("#ku").value,days:+$("#kd").value}});
+    openGen("Clé créée",`<p class="sub">Copie-la maintenant : elle ne sera plus jamais affichée.</p><div class="keycode" id="newkey">${esc(d.key)}</div><div class="nw"><button class="btn" style="flex:1" onclick="copyTxt(${js(d.key)},'Clé copiée')">${I("copy",16)}Copier la clé</button></div>`);
+    $("#kl").value=""; renderAdminKeys(); }
+  catch(e){ toast(e.message,{type:"err"}); }
+}
+async function revokeKey(id){
+  if(!await askConfirm("Révoquer cette clé ?","Les personnes qui l'ont activée perdent leur Premium offert.","Révoquer",true)) return;
+  try{ await api("/api/admin/keys/"+encodeURIComponent(id),{method:"DELETE"}); toast("Clé révoquée",{type:"ok"}); renderAdminKeys(); }
+  catch(e){ toast(e.message,{type:"err"}); }
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  Extraction audio
@@ -1125,7 +1326,7 @@ async function importSpotify(){
 }
 async function grab(url, id){
   const tk=S.tracks.find(x=>x.id===id)||{};
-  const d=await api("/api/extract",{method:"POST",body:{url,title:tk.title,author:tk.author,duration:tk.duration||0,store:S.ui.storage==="online"?"online":"local"}});
+  const d=await api("/api/extract",{method:"POST",body:{url,title:tk.title,author:tk.author,duration:tk.duration||0,store:storeMode()}});
   if(!d.remote){
     const r=await fetch(API_URL+d.audio_url); if(!r.ok) throw new Error("Téléchargement du son impossible");
     await dbop("put", await r.blob(), id);
@@ -1220,7 +1421,96 @@ async function loadCovers(){ for(const t of S.tracks){ if(COVERS[t.id]) continue
 // ═══════════════════════════════════════════════════════════════════════════
 //  Lecteur
 // ═══════════════════════════════════════════════════════════════════════════
+// ── Publicités entre deux sons ──
+// Même élément <audio> que la musique : jamais deux sons en même temps, et ça marche écran éteint.
+const okHttp=u=>/^https?:\/\//i.test(String(u||""))?String(u):"";
+const okSrc=u=>/^(https?:\/\/|\/|ads\/)/i.test(String(u||""));
+const adSlots=a=>Array.isArray(a.slots)?a.slots:(a.type==="audio"?["track"]:["track","banner"]);
+const adCfg=slot=>(Array.isArray(ADS)?ADS:[]).filter(a=>a&&typeof a==="object"&&adSlots(a).includes(slot));
+const adOn=()=>PAYWALL&&!isPrem();
+const adDue=()=>adOn()&&navigator.onLine&&adCfg("track").length>0&&(S.adn||0)>=ADS_EVERY;
+function adTick(){ if(adOn()) S.adn=(S.adn||0)+1; }                       // un son démarre
+function adPick(){ const l=adCfg("track"), a=l[(S.adi||0)%l.length]; S.adi=(S.adi||0)+1; return a; }
+const adImg=(a,cls)=>okSrc(a.img)?`<img class="${cls}" src="${esc(a.img)}" alt="">`:"";
+const adLink=(a,cls)=>{ const u=okHttp(a.url); return u?`<a class="${cls}" href="${esc(u)}" target="_blank" rel="noopener sponsored">${esc(a.cta||"En savoir plus")}</a>`:""; };
+function runAd(a){
+  return new Promise(res=>{
+    AD.on=true; AD.cur=a; AD.res=res; AD.audio=false; AD.t0=Date.now();
+    try{ au.pause(); }catch(e){}
+    const withAudio=a.type==="audio"&&okSrc(a.audio);
+    AD.secs=Math.max(1,+a.seconds||(withAudio?180:8));
+    $("#adbox").innerHTML=`<div class="ad-card glass"><span class="ad-tag">Publicité</span>${adImg(a,"ad-img")}${a.title?`<h3>${esc(a.title)}</h3>`:""}${a.text?`<p>${esc(a.text)}</p>`:""}${adLink(a,"btn")}<div class="ad-bar"><i id="adbar"></i></div><div class="ad-foot"><span id="adt" class="a"></span><button class="btn alt sm" onclick="openPremium()">Sans pub avec Premium</button></div></div>`;
+    $("#adbox").hidden=false; adDraw(); AD.tick=setInterval(adDraw,250);
+    if(withAudio){
+      AD.audio=true;
+      if(au.src&&au.src.startsWith("blob:")) URL.revokeObjectURL(au.src);
+      au.src=a.audio; au.defaultPlaybackRate=1; au.playbackRate=1; lastTU=0;
+      try{ navigator.mediaSession.metadata=new MediaMetadata({title:a.title||"Publicité",artist:"Tiksound"}); }catch(e){}
+      au.play().catch(()=>endAd(false));
+      AD.timer=setTimeout(()=>endAd(false),(AD.secs+15)*1000);              // filet de sécurité : réseau bloqué, lecture refusée…
+    } else AD.timer=setTimeout(()=>endAd(true),AD.secs*1000);
+  });
+}
+function endAd(ok){
+  if(!AD.on) return;
+  clearTimeout(AD.timer); clearInterval(AD.tick);
+  const r=AD.res; AD.on=false; AD.cur=null; AD.res=null;
+  if(AD.audio){ AD.audio=false; try{ au.pause(); au.removeAttribute("src"); au.load(); }catch(e){} }
+  $("#adbox").hidden=true; S.adn=0; save(); updatePlaying();
+  if(r) r(!!ok);
+}
+function adDraw(){
+  if(!AD.on) return;
+  const bar=$("#adbar"), t=$("#adt"); if(!bar||!t) return;
+  let frac=0, left=0;
+  if(AD.audio){ if(au.duration){ frac=au.currentTime/au.duration; left=Math.ceil(au.duration-au.currentTime); } }
+  else { const e=(Date.now()-AD.t0)/1000; frac=e/AD.secs; left=Math.ceil(AD.secs-e); }
+  bar.style.width=Math.min(100,Math.max(0,frac*100))+"%";
+  t.textContent=AD.audio&&!au.duration?"Chargement de la pub…":"Ton son démarre dans "+Math.max(0,left)+" s";
+}
+au.addEventListener("error",()=>{ if(AD.on&&AD.audio) endAd(false); });      // fichier de pub introuvable : la musique reprend
+// ── Bandeau Google AdSense : UN seul bandeau fixe, hors de la zone redessinée → une seule demande de pub par visite ──
+// Jamais pour Premium (le script n'est même pas téléchargé), jamais dans l'écran entre deux sons (AdSense l'interdit).
+const GAD={script:null,obs:null};
+const adsenseCfg=()=>!!(ADSENSE&&ADSENSE.client&&ADSENSE.slot);
+function setAdsense(v){
+  ADSENSE=v&&typeof v==="object"&&/^ca-pub-\d{10,20}$/.test(v.client||"")&&/^\d{6,20}$/.test(v.slot||"")?{client:v.client,slot:v.slot}:null;
+  if(BOOTED) adsenseSync();
+}
+function gadOff(box){
+  if(GAD.obs){ GAD.obs.disconnect(); GAD.obs=null; }
+  box.classList.remove("on"); box.innerHTML="";
+}
+function adsenseSync(){
+  const box=$("#adsense"); if(!box) return;
+  if(!(adsenseCfg()&&BOOTED&&adOn()&&navigator.onLine)){ gadOff(box); return; }
+  if(box.querySelector("ins")) return;                                     // déjà en place
+  box.innerHTML=`<div class="gad-in"><div class="gad-h"><span class="ad-tag">Publicité</span><button class="lnk" onclick="openPremium()">Retirer les pubs</button></div><ins class="adsbygoogle" style="display:block" data-ad-client="${esc(ADSENSE.client)}" data-ad-slot="${esc(ADSENSE.slot)}" data-ad-format="auto" data-full-width-responsive="true"></ins></div>`;
+  const ins=box.querySelector("ins");
+  GAD.obs=new MutationObserver(()=>box.classList.toggle("on",ins.getAttribute("data-ad-status")==="filled"));
+  GAD.obs.observe(ins,{attributes:true,attributeFilter:["data-ad-status"]});
+  if(!GAD.script){
+    const sc=document.createElement("script");
+    sc.async=true; sc.crossOrigin="anonymous";
+    sc.src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client="+encodeURIComponent(ADSENSE.client);
+    sc.onerror=()=>{ sc.remove(); GAD.script=null; try{ window.adsbygoogle.length=0; }catch(e){} gadOff($("#adsense")); };
+    GAD.script=sc; document.head.appendChild(sc);
+  }
+  try{ (window.adsbygoogle=window.adsbygoogle||[]).push({}); }catch(e){}
+}                                                                           // retour en ligne : le gestionnaire « online » relance ping() → setAdsense() → adsenseSync()
+function adSlot(slot,i){
+  if(!adOn()||(slot==="banner"&&adsenseCfg())) return "";                   // si AdSense est branché, il remplace les bandeaux maison
+  const l=adCfg(slot); if(!l.length) return "";
+  const a=l[(i||0)%l.length];
+  return `<div class="adb"><span class="ad-tag">Pub</span>${adImg(a,"adb-img")}<div class="adb-m">${a.title?`<b>${esc(a.title)}</b>`:""}${a.text?`<span>${esc(a.text)}</span>`:""}</div>${adLink(a,"btn sm")}<button class="lnk" onclick="openPremium()">Retirer les pubs</button></div>`;
+}
+function withAds(items,every=12){      // intercale un bandeau en haut puis tous les `every` éléments
+  if(!adSlot("banner")) return items.join("");
+  let o=adSlot("banner",0), n=0; items.forEach((x,i)=>{ if(i&&i%every===0) o+=adSlot("banner",++n); o+=x; }); return o;
+}
+
 const curT = () => S.tracks.find(x=>x.id===q[qi]);
+const playable = t => !!(t && (t.local || t.remote));      // lisible tout de suite : sur l'appareil OU en ligne
 function shuf(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
 function play(ids, i){
   if(!ids||!ids.length) return;
@@ -1230,7 +1520,13 @@ function play(ids, i){
 }
 function playL(key, i){ const ids=LISTS[key]; if(!ids) return; if(ids[i]===q[qi]&&au.src){ togglePlay(); return; } play(ids,i); }
 async function loadCur(){
-  const t=curT(); if(!t) return;
+  if(AD.on) return;                          // une pub tourne : le son visé (q/qi) se chargera juste après
+  let t=curT(); if(!t) return;
+  if(adDue()){
+    await runAd(adPick());
+    if(AD.stop){ AD.stop=false; return; }    // minuterie de sommeil écoulée pendant la pub : on ne lance rien
+    t=curT(); if(!t) return;                 // relu : on a pu viser un autre son pendant la pub
+  }
   if(!t.local&&!t.remote){
     if(t.pending&&t.url){ toast("Téléchargement de « "+t.title+" »…"); if(!await dl(t.id,true)) return; }
     else return toast("Pas de fichier audio pour ce son",{type:"err"});
@@ -1244,6 +1540,7 @@ async function loadCur(){
   }
   applyRate(); lastTU=0;
   au.play().catch(()=>toast("Lecture bloquée, touche ▶"));
+  adTick();
   t.plays=(t.plays||0)+1; t.last=Date.now(); S.lastId=t.id; markDay(); save();
   showPlayer(t); render(); if(!$("#np").hidden) renderNP();
 }
@@ -1258,12 +1555,12 @@ function showPlayer(t){
   if("mediaSession" in navigator){ try{ navigator.mediaSession.metadata=new MediaMetadata({title:t.title,artist:t.author||"Tiksound",album:"Tiksound",artwork:src?[{src,sizes:"512x512"}]:[]}); }catch(e){} }
 }
 function step(d){
-  if(!q.length) return;
+  if(AD.on||!q.length) return;
   if(d<0 && au.currentTime>3){ au.currentTime=0; return; }
   qi=(qi+d+q.length)%q.length; loadCur();
 }
-function togglePlay(){ if(!au.src){ const id=S.lastId&&S.tracks.find(t=>t.id===S.lastId&&t.local)?S.lastId:null; if(id) play([id],0); return; } au.paused?au.play():au.pause(); }
-function seekBy(s){ if(au.duration) au.currentTime=Math.max(0,Math.min(au.duration,au.currentTime+s)); }
+function togglePlay(){ if(AD.on) return; if(!au.src){ const id=S.lastId&&S.tracks.find(t=>t.id===S.lastId&&playable(t))?S.lastId:null; if(id) play([id],0); return; } au.paused?au.play():au.pause(); }
+function seekBy(s){ if(AD.on) return; if(au.duration) au.currentTime=Math.max(0,Math.min(au.duration,au.currentTime+s)); }
 function applyRate(){ const r=RATES[S.player.rate]||RATES["1"]; for(const k of ["preservesPitch","mozPreservesPitch","webkitPreservesPitch"]) try{au[k]=r[1]}catch(e){} au.defaultPlaybackRate=r[0]; au.playbackRate=r[0]; }
 function toggleShuffle(){ S.player.shuffle=!S.player.shuffle; save(); if(S.player.shuffle&&q.length>1){ const cur=q[qi]; q=[cur,...shuf(q.filter((_,k)=>k!==qi))]; qi=0; } toast(S.player.shuffle?"Lecture aléatoire activée":"Lecture aléatoire désactivée"); renderNP(); }
 function cycleRepeat(){ const o=["all","one","off"]; S.player.repeat=o[(o.indexOf(S.player.repeat)+1)%3]; save(); toast({all:"Répéter la file",one:"Répéter ce son",off:"Répétition désactivée"}[S.player.repeat]); renderNP(); }
@@ -1274,12 +1571,14 @@ function updatePlaying(){
 }
 au.onplay = au.onpause = () => { updatePlaying(); if("mediaSession" in navigator) navigator.mediaSession.playbackState=au.paused?"paused":"playing"; };
 au.onended = () => {
+  if(AD.on){ if(AD.audio) endAd(true); return; }
   if(sleepEnd){ sleepEnd=false; renderNP(); toast("Bonne nuit"); return; }
-  if(S.player.repeat==="one"){ au.currentTime=0; au.play(); return; }
+  if(S.player.repeat==="one"){ if(adDue()){ loadCur(); return; } adTick(); save(); au.currentTime=0; au.play(); return; }
   if(qi<q.length-1 || S.player.repeat==="all") step(1); else updatePlaying();
 };
 let lastTU=0, statSave=0;
 au.ontimeupdate = () => {
+  if(AD.on){ adDraw(); return; }              // pas de statistiques d'écoute ni de barre de progression pendant une pub
   const ct=au.currentTime, d=ct-lastTU; lastTU=ct;
   if(!au.paused && d>0 && d<1.5){ S.stats.sec+=d; if(Date.now()-statSave>15000){ statSave=Date.now(); save(); } }
   const dur=au.duration||0, p=dur?ct/dur*1000:0;
@@ -1289,11 +1588,11 @@ au.ontimeupdate = () => {
   if("mediaSession" in navigator && dur && navigator.mediaSession.setPositionState){ try{ navigator.mediaSession.setPositionState({duration:dur,playbackRate:au.playbackRate,position:Math.min(ct,dur)}); }catch(e){} }
 };
 let seeking=false;
-for(const id of ["#sk","#npsk"]){ const el=$(id); el.addEventListener("pointerdown",()=>seeking=true); el.addEventListener("pointerup",()=>seeking=false); el.addEventListener("change",()=>seeking=false); el.oninput=e=>{ if(au.duration) au.currentTime=e.target.value/1000*au.duration; }; }
+for(const id of ["#sk","#npsk"]){ const el=$(id); el.addEventListener("pointerdown",()=>seeking=true); el.addEventListener("pointerup",()=>seeking=false); el.addEventListener("change",()=>seeking=false); el.oninput=e=>{ if(!AD.on&&au.duration) au.currentTime=e.target.value/1000*au.duration; }; }
 if("mediaSession" in navigator){
   const ms=navigator.mediaSession, H=(a,f)=>{ try{ ms.setActionHandler(a,f); }catch(e){} };
-  H("play",()=>au.play()); H("pause",()=>au.pause()); H("nexttrack",()=>step(1)); H("previoustrack",()=>step(-1));
-  H("seekbackward",d=>seekBy(-(d.seekOffset||10))); H("seekforward",d=>seekBy(d.seekOffset||10)); H("seekto",d=>{ if(d.seekTime!=null) au.currentTime=d.seekTime; });
+  H("play",()=>{ if(!AD.on) au.play(); }); H("pause",()=>{ if(!AD.on) au.pause(); }); H("nexttrack",()=>step(1)); H("previoustrack",()=>step(-1));
+  H("seekbackward",d=>seekBy(-(d.seekOffset||10))); H("seekforward",d=>seekBy(d.seekOffset||10)); H("seekto",d=>{ if(!AD.on&&d.seekTime!=null) au.currentTime=d.seekTime; });
 }
 // Volume
 (function(){
@@ -1314,7 +1613,7 @@ function setSleep(min){
   else toast("Minuterie désactivée");
   renderNP();
 }
-function fadeOut(){ const v0=au.volume; let k=0; const it=setInterval(()=>{ k++; au.volume=Math.max(0,v0*(1-k/25)); if(k>=25){ clearInterval(it); au.pause(); au.volume=v0; clearSleep(); renderNP(); toast("Bonne nuit"); } },160); }
+function fadeOut(){ if(AD.on){ AD.stop=true; endAd(false); clearSleep(); renderNP(); toast("Bonne nuit"); return; } const v0=au.volume; let k=0; const it=setInterval(()=>{ k++; au.volume=Math.max(0,v0*(1-k/25)); if(k>=25){ clearInterval(it); au.pause(); au.volume=v0; clearSleep(); renderNP(); toast("Bonne nuit"); } },160); }
 function sleepLabel(){ if(sleepEnd) return "Fin du son"; if(sleepAt){ const m=Math.max(1,Math.ceil((sleepAt-Date.now())/60000)); return m+" min"; } return "Minuterie"; }
 function pickSleep(){ const on=sleepAt||sleepEnd; showOptions("Minuterie de sommeil",[
   {l:"15 minutes",i:"clock",fn:()=>setSleep(15)},{l:"30 minutes",i:"clock",fn:()=>setSleep(30)},{l:"45 minutes",i:"clock",fn:()=>setSleep(45)},{l:"1 heure",i:"clock",fn:()=>setSleep(60)},
@@ -1363,8 +1662,8 @@ function trackMenu(id){
     {l:t.postId?"Retirer ma publication":"Publier ce son",i:"globe",fn:()=>publishTrack(id)},
     {l:t.fav?"Retirer des favoris":"Ajouter aux favoris",i:"heart",fn:()=>toggleFav(id)},
     {l:"Renommer",i:"edit",fn:()=>renameTrack(id)},
-    t.pending&&{l:"Télécharger sur l'appareil",i:"dl",fn:()=>dl(id)},
-    t.local&&{l:"Enregistrer le fichier MP3",i:"dl",fn:()=>saveMp3(id)},
+    t.pending&&{l:storeMode()==="local"?"Télécharger sur l'appareil":"Préparer pour l'écoute",i:"dl",fn:()=>dl(id)},
+    t.local&&isPrem()&&{l:"Enregistrer le fichier MP3",i:"dl",fn:()=>saveMp3(id)},
     t.url&&{l:"Copier le lien TikTok",i:"copy",fn:()=>copyTxt(t.url,"Lien copié")},
     t.url&&{l:"Ouvrir sur TikTok",i:"ext",fn:()=>window.open(t.url,"_blank","noopener")},
     {l:"Supprimer",i:"trash",danger:true,fn:()=>delTrack(id)}
@@ -1442,8 +1741,8 @@ function render(){
 }
 document.addEventListener("visibilitychange",()=>document.documentElement.classList.toggle("bghid",document.hidden));
 function greet(){ const h=new Date().getHours(); return h<5?["","Bonne nuit"]:h<12?["","Bonjour"]:h<18?["","Bon après-midi"]:["","Bonsoir"]; }
-function playAll(r){ let ids=libList().filter(t=>t.local).map(t=>t.id); if(!ids.length) ids=S.tracks.filter(t=>t.local).map(t=>t.id); if(!ids.length) return toast("Aucun son à lire"); const sh=S.player.shuffle; if(r){ shuf(ids); S.player.shuffle=false; } play(ids,0); S.player.shuffle=sh; }
-function surprise(){ const l=S.tracks.filter(t=>t.local); if(!l.length) return toast("Ajoute d'abord des sons"); play(shuf(l.map(t=>t.id)),0); toast("Surprise !"); }
+function playAll(r){ let ids=libList().filter(playable).map(t=>t.id); if(!ids.length) ids=S.tracks.filter(playable).map(t=>t.id); if(!ids.length) return toast("Aucun son à lire"); const sh=S.player.shuffle; if(r){ shuf(ids); S.player.shuffle=false; } play(ids,0); S.player.shuffle=sh; }
+function surprise(){ const l=S.tracks.filter(playable); if(!l.length) return toast("Ajoute d'abord des sons"); play(shuf(l.map(t=>t.id)),0); toast("Surprise !"); }
 
 function renderHome(){
   const [ico,g]=greet(), has=S.tracks.length, st=streak();
@@ -1451,7 +1750,7 @@ function renderHome(){
   $('section[data-v="accueil"]').classList.toggle("has",!!has);
   const favN=S.tracks.filter(t=>t.fav).length;
   $("#quick").innerHTML=has?`<button class="chip" onclick="playAll(0)">${I("play",14)}Tout lire</button><button class="chip" onclick="playAll(1)">${I("shuffle",14)}Aléatoire</button>${favN?`<button class="chip" onclick="openPl='smart:fav';location.hash='playlists';render()">${I("heart",14)}Favoris <b>${favN}</b></button>`:""}<button class="chip" onclick="surprise()">Surprends-moi</button>`:"";
-  let h="";
+  let h=adSlot("banner",0);
   const last=S.lastId&&S.tracks.find(t=>t.id===S.lastId);
   if(last&&q[qi]!==last.id) h+=`<div class="resume gcard" onclick="play(['${last.id}'],0)">${cover(last)}<div class="m"><span class="eyebrow">Reprendre</span><div class="t" style="font-size:18px">${esc(last.title)}</div><div class="a ell">${esc(last.author||"")}</div></div><span class="pi-btn p">${I("play",20)}</span></div>`;
   if(has){
@@ -1489,9 +1788,9 @@ function renderLib(){
   if(S.ui.filter==="pending"&&!pend) S.ui.filter="all";
   $("#filters").innerHTML=S.tracks.length?[["all","Tous",S.tracks.length],["fav","Favoris",fav],["local","Hors ligne",S.tracks.filter(t=>t.local).length],pend&&["pending","À télécharger",pend]].filter(Boolean).map(([k,l,n])=>`<button class="chip ${S.ui.filter===k?"on":""}" onclick="S.ui.filter='${k}';save();renderLib()">${l} <b>${n}</b></button>`).join("")+(pend&&S.ui.filter==="pending"?`<button class="chip" onclick="dlAll(LISTS.lib)">${I("dl",14)}Tout télécharger</button>`:""):"";
   const el=$("#lib"); el.className=S.ui.view==="list"?"list":"grid";
-  el.innerHTML=a.length?(S.ui.view==="list"?a.map((t,i)=>row(t,"lib",i)).join(""):a.map((t,i)=>card(t,"lib",i)).join(""))
+  el.innerHTML=a.length?withAds(S.ui.view==="list"?a.map((t,i)=>row(t,"lib",i)):a.map((t,i)=>card(t,"lib",i)))
     :S.tracks.length?`<p class="empty">Aucun résultat${S.ui.filter!=="all"?` dans ce filtre. <a href="#" onclick="S.ui.filter='all';renderLib();return false">Tout afficher</a>`:"."}</p>`
-    :bigEmpty("music","Ta bibliothèque est vide","Colle un lien TikTok pour ajouter ton premier son. Il sera stocké sur ton appareil.",`<a class="btn" href="#ajouter">${I("plus",18)}Ajouter un son</a>`);
+    :bigEmpty("music","Ta bibliothèque est vide","Colle un lien TikTok pour ajouter ton premier son. "+(isPrem()?"Il sera stocké sur ton appareil.":"Tu pourras l'écouter dès qu'il est prêt."),`<a class="btn" href="#ajouter">${I("plus",18)}Ajouter un son</a>`);
 }
 
 function smartPls(){ return [
@@ -1520,7 +1819,7 @@ function renderPlaylists(){
       :bigEmpty(pl.smart?pl.icon:"music","Rien ici pour l'instant",pl.smart?"Cette playlist se remplit toute seule au fil de tes écoutes.":"Ajoute des sons depuis Mes sons avec le bouton ⋯.",pl.smart?"":`<a class="btn" href="#bibliotheque">Aller à Mes sons</a>`)}</div>`);
   } else {
     const sm=smartPls().filter(p=>p.ids.length);
-    safeSet(v,`<h2>Playlists</h2><div class="top"><input id="npn" placeholder="Nom de la nouvelle playlist" maxlength="40" aria-label="Nom" onkeydown="if(event.key==='Enter')newPl()"><button class="btn" onclick="newPl()">${I("plus",18)}Créer</button></div>
+    safeSet(v,`<h2>Playlists</h2><div class="top"><input id="npn" placeholder="Nom de la nouvelle playlist" maxlength="40" aria-label="Nom" onkeydown="if(event.key==='Enter')newPl()"><button class="btn" onclick="newPl()">${I("plus",18)}Créer</button></div>${adSlot("banner",1)}
       ${sm.length?`<div class="sec-h" style="margin-top:28px"><h2>Pour toi</h2></div><div class="pls">${sm.map(plCard).join("")}</div>`:""}
       <div class="sec-h" style="margin-top:${sm.length?40:28}px"><h2>Mes playlists</h2>${S.pls.length?`<span class="a">${plural(S.pls.filter(p=>p.pub).length,"publique")}</span>`:""}</div>
       ${S.pls.length?`<div class="pls">${S.pls.map(plCard).join("")}</div>`:bigEmpty("queue","Crée ta première playlist","Range tes sons, écoute-les à la suite, et rends-les publiques pour les partager avec la communauté.")}`);
@@ -1544,7 +1843,8 @@ function moveIn(pid,i,d){ const p=S.pls.find(x=>x.id===pid); const j=i+d; if(!p|
 // Profil
 function renderProf(){
   const el=$("#profil-content"); if(!el) return;
-  { const sel=$("#stor"); if(sel) sel.value=S.ui.storage||"local"; }
+  { const lock=PAYWALL&&!isPrem(), sel=$("#storsel"); if(sel){ sel.value=storeMode(); sel.disabled=lock; }
+    const l=$("#stor-lock"); if(l) l.hidden=!lock; const hp=$("#stor-help"); if(hp) hp.hidden=lock; }
   const favN=S.tracks.filter(t=>t.fav).length, st=streak();
   const top=S.tracks.filter(t=>t.plays).sort((a,b)=>b.plays-a.plays).slice(0,3); LISTS.ptop=top.map(t=>t.id);
   const stats=`<div class="stat-row">${[["Sons",S.tracks.length],["Playlists",S.pls.length],["Favoris",favN],["Série",st]].map(([l,n])=>`<div class="stat gcard"><b data-n="${n}">${n}</b><span>${l}</span></div>`).join("")}<div class="stat gcard"><b>${fmtLen(S.stats.sec)}</b><span>d'écoute</span></div></div>`;
@@ -1552,7 +1852,7 @@ function renderProf(){
   if(!ME) h+=`<div class="prof gcard">${avatarHTML({username:"?",color:S.prof.color||0},96)}<div class="m"><h3 style="font-size:24px">Tu n'es pas connecté</h3><p class="a" style="margin:6px 0 14px;max-width:44ch">Crée un compte gratuit pour publier tes playlists, avoir ton profil public et liker celles des autres.</p><div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn" onclick="openAuth('register')">Créer un compte</button><button class="btn alt" onclick="openAuth('login')">Se connecter</button></div></div></div>`;
   else h+=`<div class="pbox gcard" style="${accStyle(ME)}">${bannerHTML(ME,true)}<div class="prof">
       <div style="position:relative">${avatarHTML(ME,96)}<button class="icon-btn ring" style="position:absolute;right:-6px;bottom:-6px;width:34px;height:34px" onclick="avatarMenu()" aria-label="Changer la photo">${I("edit",15)}</button></div>
-      <div class="m"><div style="display:flex;align-items:center;gap:6px"><span class="disp" style="font-size:28px;font-weight:800">@${esc(ME.username)}</span><button class="icon-btn sm" onclick="changeUsername()" aria-label="Changer de pseudo">${I("edit",16)}</button></div>
+      <div class="m"><div style="display:flex;align-items:center;gap:6px"><span class="disp" style="font-size:28px;font-weight:800">@${esc(ME.username)}</span>${PAYWALL&&premActive()?pBadge():""}<button class="icon-btn sm" onclick="changeUsername()" aria-label="Changer de pseudo">${I("edit",16)}</button></div>
         <div class="a">${esc(ME.email)}${ME.created?" · membre depuis "+new Date(ME.created.replace(" ","T")+"Z").toLocaleDateString("fr-FR",{month:"long",year:"numeric"}):""}</div>
         <textarea id="bio" rows="2" maxlength="160" placeholder="Écris une petite bio (visible sur ton profil public)…" onblur="saveBio()">${esc(ME.bio||"")}</textarea>
         <div class="swr">${COL.map((c,i)=>`<button class="sw ${i==ME.color?"on":""}" style="background:${c}" onclick="setColor(${i})" aria-label="Couleur ${i+1}"></button>`).join("")}</div>
@@ -1562,6 +1862,7 @@ function renderProf(){
       <div style="display:flex;flex-direction:column;gap:8px"><button class="btn alt sm" onclick="viewUser(${js(ME.username)})">${I("eye",16)}Mon profil public</button><button class="btn alt sm" onclick="copyTxt(location.origin+'/?u='+encodeURIComponent(ME.username),'Lien du profil copié')">${I("link",16)}Copier mon lien</button><button class="btn alt sm" onclick="logout()">${I("logout",16)}Se déconnecter</button></div>
     </div></div>`;
   h+=stats;
+  h+=premBox(); if(ME&&ME.is_admin) h+=adminBox();
   if(top.length) h+=`<div class="box gcard"><h3>${I("flame",20)}Ton podium</h3><div class="list">${top.map((t,i)=>row(t,"ptop",i).replace(`<span class="n">${i+1}</span>`,`<span class="n">${["","",""][i]}</span>`)).join("")}</div></div>`;
   h+=`<div class="box gcard"><h3>${I("palette",20)}Apparence</h3><p class="a" style="margin-bottom:14px">Thème, couleurs, fond animé, effet verre, police, pochettes vinyle…</p><button class="btn" onclick="openCustom()">${I("spark",18)}Personnaliser l'interface</button></div>`;
   const rec=S.pls.filter(x=>x.from);
@@ -1576,6 +1877,7 @@ function renderProf(){
   h+=`<div class="note">Tes sons et tes playlists sont enregistrés sur cet appareil. Usage personnel uniquement : les sons restent soumis aux droits d'auteur et aux conditions d'utilisation de TikTok.</div>`;
   const wasEmpty=!el.innerHTML;
   safeSet(el,h);
+  if(ME&&ME.is_admin){ keysDraw(); if(KEYS===null) renderAdminKeys(); }
   storage();
   if(wasEmpty||profAnim){ profAnim=false; countUp(el); }
 }
@@ -1602,7 +1904,7 @@ async function deleteAccount(){
   openGen("Supprimer mon compte",`<p class="sub">Ton compte et tes playlists publiques seront supprimés définitivement. Tes sons restent sur cet appareil. Confirme avec ton mot de passe.</p><div class="fld"><input id="delpw" type="password" placeholder="Mot de passe" autocomplete="current-password"><div class="fld-err" id="delerr"></div><button class="btn danger" onclick="doDelete()">Supprimer définitivement</button></div>`);
   setTimeout(()=>$("#delpw").focus(),100);
 }
-async function doDelete(){ try{ await api("/api/auth/me",{method:"DELETE",body:{password:$("#delpw").value}}); closeSh("gen"); ME=null; S.pls.forEach(p=>{p.pub=false;p.pubId=null;p.owner=null}); save(); render(); toast("Compte supprimé"); }catch(e){ $("#delerr").textContent=e.message; } }
+async function doDelete(){ try{ await api("/api/auth/me",{method:"DELETE",body:{password:$("#delpw").value}}); closeSh("gen"); ME=null; KEYS=null; clearPrem(); S.pls.forEach(p=>{p.pub=false;p.pubId=null;p.owner=null}); save(); render(); toast("Compte supprimé"); }catch(e){ $("#delerr").textContent=e.message; } }
 function exportData(){ const data={app:"tiksound",v:2,date:new Date().toISOString(),tracks:S.tracks.map(t=>({...t,local:false,pending:!!t.url})),pls:S.pls,ui:S.ui,stats:S.stats}; const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,1)],{type:"application/json"})); a.download="tiksound-sauvegarde-"+dayKey(new Date())+".json"; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),4000); toast("Sauvegarde exportée",{type:"ok"}); }
 async function importData(file){
   if(!file) return;
@@ -1839,7 +2141,7 @@ async function renderExplore(force){
   if(rec.length) h+=`<div class="sec-h"><h2>Nouveautés</h2></div><div class="hs">${rec.map(pubCard).join("")}</div>`;
   if(!FEED.top.length) h+=bigEmpty("spark","Sois le premier à publier !","Aucune playlist publique pour l'instant. Ouvre une de tes playlists et active « Publique » pour qu'elle apparaisse ici.",`<a class="btn" href="#playlists">Mes playlists</a>`);
   if(FEED.users.length) h+=`<div class="sec-h"><h2>Nouveaux membres</h2></div><div class="users-grid">${FEED.users.map(userCard).join("")}</div>`;
-  el.innerHTML=h;
+  el.innerHTML=adSlot("banner",2)+h;
   if(!POSTS.length&&POSTS_MORE) loadPosts(); else renderPosts();
 }
 function searchAll(){ clearTimeout(searchTimer); searchTimer=setTimeout(doSearch,300); }
@@ -1866,7 +2168,7 @@ async function viewUser(username){
 function renderPubProfile(){
   const u=pubData, mine=ME&&ME.id===u.id;
   $("#pub-view").innerHTML=`<a class="ib back" href="#decouvrir">${I("back",16)} Explorer</a>
-    <div class="pbox gcard" style="${accStyle(u)}">${bannerHTML(u,false)}<div class="pub-header">${avatarHTML(u,88)}<div class="m"><h2>@${esc(u.username)}</h2>${u.status?`<div class="stt">${esc(u.status)}</div>`:""}${u.bio?`<p style="margin-bottom:6px">${esc(u.bio)}</p>`:""}<p class="a">${plural(u.playlists.length,"playlist publique")} · ${I("heart",12)} ${u.likes} j'aime${u.created?" · depuis "+new Date(u.created.replace(" ","T")+"Z").toLocaleDateString("fr-FR",{month:"long",year:"numeric"}):""}</p></div>
+    <div class="pbox gcard" style="${accStyle(u)}">${bannerHTML(u,false)}<div class="pub-header">${avatarHTML(u,88)}<div class="m"><h2>@${esc(u.username)}${PAYWALL&&u.premium?pBadge():""}</h2>${u.status?`<div class="stt">${esc(u.status)}</div>`:""}${u.bio?`<p style="margin-bottom:6px">${esc(u.bio)}</p>`:""}<p class="a">${plural(u.playlists.length,"playlist publique")} · ${I("heart",12)} ${u.likes} j'aime${u.created?" · depuis "+new Date(u.created.replace(" ","T")+"Z").toLocaleDateString("fr-FR",{month:"long",year:"numeric"}):""}</p></div>
     <div style="display:flex;gap:8px">${mine?`<a class="btn alt sm" href="#profil">${I("edit",16)}Modifier</a>`:""}<button class="btn alt sm" onclick="shareLink(location.origin+'/?u='+encodeURIComponent(${js(u.username)}),'@'+${js(u.username)})">${I("share",16)}Partager</button></div></div></div>
     <div style="height:26px"></div>${u.playlists.length?`<div class="pls">${u.playlists.map(pubCard).join("")}</div>`:bigEmpty("queue",mine?"Tu n'as pas encore de playlist publique":"Pas encore de playlist publique",mine?"Ouvre une playlist et active « Publique » pour la partager ici.":"Reviens plus tard !",mine?`<a class="btn" href="#playlists">Mes playlists</a>`:"")}`;
 }
@@ -1952,7 +2254,7 @@ addEventListener("hashchange", route);
 //  Démarrage
 // ═══════════════════════════════════════════════════════════════════════════
 (async()=>{
-  applyUI();
+  applyUI(); updatePremUI();
   document.querySelector(".eq").innerHTML=Array.from({length:28},(_,i)=>`<i style="animation-delay:${(i*.13%1.1).toFixed(2)}s;animation-duration:${(.7+i*.37%.9).toFixed(2)}s"></i>`).join("");
   document.querySelector(".np-viz").innerHTML=Array.from({length:24},(_,i)=>`<i style="animation-delay:${(i*.11%.7).toFixed(2)}s;animation-duration:${(.45+i*.29%.6).toFixed(2)}s"></i>`).join("");
   $$("[data-i]").forEach(el=>el.insertAdjacentHTML("afterbegin",I(el.dataset.i,+el.dataset.s||20)));
@@ -1961,8 +2263,8 @@ addEventListener("hashchange", route);
   if(!navigator.onLine) $("#offline").hidden=false;
 
   const sp=new URLSearchParams(location.search);
-  const P_=sp.get("p"), PL_=sp.get("pl"), U_=sp.get("u"), shared=[sp.get("text"),sp.get("url"),sp.get("title")].filter(Boolean).join(" ");
-  if(P_||PL_||U_||shared) history.replaceState(null,"",location.pathname+location.hash);
+  const P_=sp.get("p"), PL_=sp.get("pl"), U_=sp.get("u"), shared=[sp.get("text"),sp.get("url"),sp.get("title")].filter(Boolean).join(" "), PREM_=sp.get("premium");
+  if(P_||PL_||U_||shared||PREM_) history.replaceState(null,"",location.pathname+location.hash);
 
   route();
   loadCovers();
@@ -1970,6 +2272,8 @@ addEventListener("hashchange", route);
   await Promise.all([checkMe(), ping()]);
   render();
   if(ME){ restorePublic(); syncAllPublic(); syncLibrary(); }
+  BOOTED=true; updatePremUI();
+  if(PREM_) handlePremiumReturn(PREM_);
   if(ONLINE) loadFeed().then(()=>{ renderHome(); });
 
   if(P_) checkImport(P_);

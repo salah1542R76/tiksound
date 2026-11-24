@@ -3,5 +3,7 @@ yt-dlp>=2024.1
 sqlalchemy>=2.0
 gunicorn>=21.0
 boto3>=1.34
+# paiement par abonnement (Premium)
+stripe>=15.0.0
 # uniquement utile si DATABASE_URL pointe vers PostgreSQL
 psycopg2-binary>=2.9

@@ -7,6 +7,7 @@ from flask import Flask, request, jsonify, send_from_directory, make_response
 from werkzeug.middleware.proxy_fix import ProxyFix
 import yt_dlp
 from sqlalchemy import create_engine, text, inspect, bindparam
+from sqlalchemy.exc import IntegrityError
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("tiksound")
@@ -15,6 +16,7 @@ app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 app.config["MAX_CONTENT_LENGTH"] = 2 * 1024 * 1024
 os.makedirs("audio", exist_ok=True)
+os.makedirs("ads", exist_ok=True)
 
 
 # ── Secret (persistant, partagé entre workers) ────────────────────────────────
@@ -55,6 +57,18 @@ CODE_TTL = 15 * 60          # durée de validité d'un code
 RESEND_COOLDOWN = 60        # délai avant de renvoyer un code
 MAX_ATTEMPTS = 5            # essais par code
 MAX_PUBLIC_PLAYLISTS = 100
+FOREVER = 4102444800        # 2100-01-01 : « à vie »
+PREMIUM_GRACE = 2 * 86400   # marge après la fin de période Stripe (webhook en retard, serveur en panne…)
+STRIPE_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
+STRIPE_PRICE = os.environ.get("STRIPE_PRICE_ID", "")
+STRIPE_PUB = os.environ.get("STRIPE_PUBLISHABLE_KEY", "")     # clé publique (pk_…) : le formulaire de paiement intégré en a besoin
+STRIPE_WH = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
+PUBLIC_URL = os.environ.get("PUBLIC_URL", "").rstrip("/")
+
+def parse_admin_emails(s):
+    return {e.strip().lower() for e in (s or "").split(",") if e.strip()}
+
+ADMIN_EMAILS = parse_admin_emails(os.environ.get("ADMIN_EMAIL", ""))
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
       "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36")
 STATIQUE = {
@@ -205,6 +219,12 @@ def init_db():
             user_id TEXT NOT NULL, playlist_id TEXT NOT NULL, created TEXT, PRIMARY KEY (user_id, playlist_id))""",
         """CREATE TABLE IF NOT EXISTS libraries (
             user_id TEXT PRIMARY KEY, data TEXT NOT NULL, updated TEXT NOT NULL)""",
+        """CREATE TABLE IF NOT EXISTS stripe_events (
+            id TEXT PRIMARY KEY, type TEXT, created TEXT)""",
+        """CREATE TABLE IF NOT EXISTS access_keys (
+            id TEXT PRIMARY KEY, key_hash TEXT UNIQUE NOT NULL, label TEXT DEFAULT '', hint TEXT DEFAULT '',
+            max_uses INTEGER DEFAULT 1, uses INTEGER DEFAULT 0, days INTEGER DEFAULT 0, created TEXT,
+            revoked INTEGER DEFAULT 0)""",
     ]
     for s in stmts:
         if not IS_SQLITE:  # PostgreSQL : REAL = 4 octets, trop peu précis pour un horodatage
@@ -216,7 +236,11 @@ def init_db():
         for col, ddl in [("bio", "TEXT DEFAULT ''"), ("avatar", "TEXT DEFAULT ''"), ("created", "TEXT"),
                          ("avatar_img", "TEXT DEFAULT ''"), ("banner_img", "TEXT DEFAULT ''"), ("imgv", "TEXT DEFAULT ''"),
                          ("accent", "TEXT DEFAULT ''"), ("status", "TEXT DEFAULT ''"), ("ui", "TEXT DEFAULT ''"),
-                         ("ui_v", "TEXT DEFAULT ''"), ("banner_color", "TEXT DEFAULT ''")]:
+                         ("ui_v", "TEXT DEFAULT ''"), ("banner_color", "TEXT DEFAULT ''"),
+                         ("premium_until", "BIGINT DEFAULT 0"), ("plan_status", "TEXT DEFAULT ''"),
+                         ("cancel_at_end", "INTEGER DEFAULT 0"), ("stripe_customer_id", "TEXT DEFAULT ''"),
+                         ("stripe_sub_id", "TEXT DEFAULT ''"), ("gift_until", "BIGINT DEFAULT 0"),
+                         ("gift_key_id", "TEXT DEFAULT ''")]:
             if col not in cols:
                 try: x(f"ALTER TABLE users ADD COLUMN {col} {ddl}")
                 except Exception: pass
@@ -228,7 +252,8 @@ def init_db():
               "CREATE INDEX IF NOT EXISTS ix_tlikes_url ON track_likes (url)",
               "CREATE UNIQUE INDEX IF NOT EXISTS ux_posts_user_url ON posts (user_id, url)",
               "CREATE INDEX IF NOT EXISTS ix_posts_created ON posts (created)",
-              "CREATE INDEX IF NOT EXISTS ix_plikes_post ON post_likes (post_id)"]:
+              "CREATE INDEX IF NOT EXISTS ix_plikes_post ON post_likes (post_id)",
+              "CREATE INDEX IF NOT EXISTS ix_users_stripe_cust ON users (stripe_customer_id)"]:
         try: x(s)
         except Exception as e: log.warning("index: %s (doublons de pseudo existants ?)", e)
 
@@ -274,6 +299,34 @@ def require_auth():
     if not u or not q1("SELECT id FROM users WHERE id=:id", id=u["sub"]):
         return None, (jsonify(error="Non authentifié"), 401)
     return u, None
+
+
+# ── Premium : qui a droit à quoi ─────────────────────────────────────────────
+def paywall_on():
+    """Pubs + abonnement actifs seulement si Stripe (clés secrète et publique + tarif) ET le stockage en ligne (R2) sont configurés."""
+    return bool(STRIPE_KEY and STRIPE_PRICE and STRIPE_PUB and R2_OK)
+
+def is_admin(row):
+    return (getattr(row, "email", "") or "").lower() in ADMIN_EMAILS
+
+def premium_state(row, now=None):
+    """Premium = admin, OU clé d'accès (gift_until), OU abonnement Stripe (premium_until + marge)."""
+    now = time.time() if now is None else now
+    pu = int(getattr(row, "premium_until", 0) or 0)
+    gu = int(getattr(row, "gift_until", 0) or 0)
+    if is_admin(row):
+        exp, src = FOREVER, "admin"
+    else:
+        s_exp = pu + PREMIUM_GRACE if pu > 0 else 0
+        exp = max(gu, s_exp)
+        src = "" if exp <= now else ("key" if gu >= s_exp else "stripe")
+    return {"premium": exp > now, "premium_until": pu, "premium_exp": exp, "src": src}
+
+def request_premium():
+    """L'utilisateur du cookie courant est-il Premium ? (anonyme = gratuit)"""
+    u = current_user()
+    row = q1("SELECT * FROM users WHERE id=:id", id=u["sub"]) if u else None
+    return bool(row and premium_state(row)["premium"])
 
 
 # ── Mots de passe (sel par utilisateur) ──────────────────────────────────────
@@ -411,6 +464,12 @@ def user_json(row, private=True):
         try: d["ui"] = json.loads(getattr(row, "ui", "") or "{}")
         except Exception: d["ui"] = {}
         d["ui_v"] = getattr(row, "ui_v", "") or ""
+    ps = premium_state(row)
+    d["premium"] = ps["premium"]
+    if private:
+        d.update(premium_until=ps["premium_until"], premium_exp=ps["premium_exp"], premium_src=ps["src"],
+                 plan_status=getattr(row, "plan_status", "") or "",
+                 cancel_at_end=bool(getattr(row, "cancel_at_end", 0)), is_admin=is_admin(row))
     return d
 
 def login_response(row, status=200):
@@ -728,6 +787,19 @@ def delete_me():
     row = q1("SELECT * FROM users WHERE id=:id", id=u["sub"])
     if not verify_pw(body().get("password") or "", row.pw_hash)[0]:
         return err("Mot de passe incorrect", 403)
+    # Un abonnement Stripe ne doit jamais survivre au compte : on le résilie d'abord, et on garde le compte si ça échoue.
+    sid = str(getattr(row, "stripe_sub_id", "") or "")
+    if sid and STRIPE_KEY and (getattr(row, "plan_status", "") or "") not in ("canceled", "incomplete_expired"):
+        try:
+            stripe_cancel_subscription(sid)
+        except Exception as e1:
+            try:
+                gone = str(stripe_get_subscription(sid).get("status")) in ("canceled", "incomplete_expired")
+            except Exception:
+                gone = False
+            if not gone:
+                log.error("Résiliation Stripe impossible pour %s : %s", sid, e1)
+                return err("Impossible de résilier ton abonnement pour le moment : ton compte n'a pas été supprimé. Réessaie dans un instant.", 502)
     with engine.begin() as c:
         p = {"u": row.id}
         c.execute(text("DELETE FROM playlist_likes WHERE user_id=:u"), p)
@@ -788,7 +860,7 @@ def feed():
 
 @app.get("/api/users/<username>")
 def get_user(username):
-    row = q1("SELECT id,username,color,avatar,bio,created,avatar_img,banner_img,imgv,accent,status,banner_color FROM users WHERE lower(username)=:u", u=username.lower())
+    row = q1("SELECT id,email,username,color,avatar,bio,created,avatar_img,banner_img,imgv,accent,status,banner_color,premium_until,gift_until FROM users WHERE lower(username)=:u", u=username.lower())
     if not row: return err("Utilisateur introuvable", 404)
     cu = current_user()
     lk = liked_set(cu["sub"] if cu else None)
@@ -1076,6 +1148,312 @@ def put_library():
     return jsonify(ok=True, updated=ver)
 
 
+# ── Stripe : appels sortants (SDK) ───────────────────────────────────────────
+def _stripe():
+    import stripe
+    stripe.api_key = STRIPE_KEY
+    return stripe
+
+def stripe_get_price():
+    p = _stripe().Price.retrieve(STRIPE_PRICE)
+    rec = getattr(p, "recurring", None)
+    return {"amount": int(p.unit_amount or 0), "currency": str(p.currency),
+            "interval": str(getattr(rec, "interval", None) or "month")}
+
+_price = {"t": 0.0, "v": None}
+
+def premium_price():
+    """Prix de l'abonnement lu chez Stripe, gardé 10 min (1 min après un échec)."""
+    if time.time() - _price["t"] < 600:
+        return _price["v"]
+    try:
+        v = stripe_get_price()
+        _price.update(t=time.time(), v=v)
+    except Exception as e:
+        log.warning("Prix Stripe indisponible : %s", e)
+        _price.update(t=time.time() - 540, v=None)
+    return _price["v"]
+
+@app.get("/api/premium")
+def premium_info():
+    on = paywall_on()
+    return jsonify(enabled=on, price=premium_price() if on else None, publishable_key=STRIPE_PUB if on else None)
+
+def _plain(o):
+    """Objet Stripe -> dict Python ordinaire."""
+    d = getattr(getattr(o, "last_response", None), "data", None)
+    if isinstance(d, dict):
+        return d
+    return o.to_dict() if hasattr(o, "to_dict") else json.loads(json.dumps(o))
+
+def stripe_create_customer(email, user_id):
+    return _stripe().Customer.create(email=email, metadata={"user_id": user_id}).id
+
+def stripe_create_checkout(customer_id, user_id, base_url):
+    """Session Checkout pour le formulaire intégré (ui_mode "form") : renvoie le client_secret que le navigateur utilise."""
+    s = _stripe().checkout.Session.create(
+        ui_mode="form",
+        mode="subscription",
+        billing_address_collection="auto",
+        phone_number_collection={"enabled": False},
+        automatic_tax={"enabled": False},
+        payment_method_collection="always",
+        submit_type="auto",
+        integration_identifier="custom_embedded_web_0001",
+        line_items=[{"price": STRIPE_PRICE, "quantity": 1}],
+        customer=customer_id, client_reference_id=user_id,                # le webhook retrouve l'utilisateur grâce à eux
+        subscription_data={"metadata": {"user_id": user_id}},
+        return_url=f"{base_url}/?premium=success")
+    return s.client_secret
+
+def stripe_create_portal(customer_id, return_url):
+    return _stripe().billing_portal.Session.create(customer=customer_id, return_url=return_url).url
+
+def stripe_get_subscription(sub_id):
+    return _plain(_stripe().Subscription.retrieve(sub_id))
+
+def stripe_cancel_subscription(sub_id):
+    _stripe().Subscription.cancel(sub_id)
+
+def public_base():
+    return PUBLIC_URL or request.host_url.rstrip("/")
+
+def _id(v):
+    """Un champ Stripe est tantôt un id, tantôt l'objet développé."""
+    return (v.get("id") if isinstance(v, dict) else v) or None
+
+@app.post("/api/stripe/checkout")
+def stripe_checkout():
+    u, e = require_auth()
+    if e: return e
+    if not paywall_on():
+        return err("L'abonnement n'est pas disponible pour le moment", 503)
+    if limited("checkout:" + u["sub"], 20, 3600):
+        return err("Trop d'essais, réessaie plus tard", 429)
+    row = q1("SELECT * FROM users WHERE id=:id", id=u["sub"])
+    if is_admin(row):
+        return err("Tu es administrateur : le Premium est déjà actif", 409)
+    if (row.plan_status or "") in ("active", "trialing") and int(row.premium_until or 0) + PREMIUM_GRACE > time.time():
+        return err("Tu as déjà un abonnement : gère-le depuis ton profil", 409, portal=True)
+    try:
+        cid = row.stripe_customer_id or ""
+        if not cid:
+            cid = stripe_create_customer(row.email, row.id)
+            x("UPDATE users SET stripe_customer_id=:c WHERE id=:u", c=cid, u=row.id)
+        return jsonify(client_secret=stripe_create_checkout(cid, row.id, public_base()))
+    except Exception as ex:
+        log.error("Stripe checkout : %s", ex)
+        return err("Le paiement est momentanément indisponible, réessaie dans un instant", 502)
+
+@app.post("/api/stripe/portal")
+def stripe_portal():
+    u, e = require_auth()
+    if e: return e
+    row = q1("SELECT * FROM users WHERE id=:id", id=u["sub"])
+    if not row.stripe_customer_id:
+        return err("Aucun abonnement à gérer", 404)
+    if not STRIPE_KEY:
+        return err("L'abonnement n'est pas disponible pour le moment", 503)
+    try:
+        return jsonify(url=stripe_create_portal(row.stripe_customer_id, public_base() + "/#profil"))
+    except Exception as ex:
+        log.error("Stripe portail : %s", ex)
+        return err("Le portail est momentanément indisponible, réessaie dans un instant", 502)
+
+# ── Webhook Stripe ──
+def verify_stripe_signature(payload, header, secret, tolerance=300, now=None):
+    """Schéma Stripe : en-tête « t=...,v1=... », HMAC-SHA256 de « {t}.{corps} ». Comparaison à temps constant."""
+    if not secret or not header or not isinstance(header, str):
+        return False
+    t, sigs = None, []
+    for part in header.split(","):
+        k, _, v = part.strip().partition("=")
+        if k == "t": t = v
+        elif k == "v1": sigs.append(v)
+    try:
+        ts = int(t)
+    except Exception:
+        return False
+    if abs((time.time() if now is None else now) - ts) > tolerance:
+        return False
+    good = hmac.new(secret.encode(), t.encode() + b"." + payload, hashlib.sha256).hexdigest().encode()
+    return any(hmac.compare_digest(good, s.encode()) for s in sigs)
+
+def sub_id_from(o):
+    """Id d'abonnement d'une facture ou d'une session, quelle que soit la version de l'API Stripe."""
+    if not isinstance(o, dict): return None
+    s = _id(o.get("subscription"))
+    if s: return s
+    s = _id(((o.get("parent") or {}).get("subscription_details") or {}).get("subscription"))
+    if s: return s
+    for ln in (o.get("lines") or {}).get("data") or []:
+        ln = ln or {}
+        s = _id((((ln.get("parent") or {}).get("subscription_item_details")) or {}).get("subscription")) or _id(ln.get("subscription"))
+        if s: return s
+    return None
+
+def period_end(sub):
+    """Fin de période payée : au niveau de l'abonnement (ancienne API) ou de ses lignes (API récentes)."""
+    vals = [int(sub.get("current_period_end") or 0)]
+    for it in (sub.get("items") or {}).get("data") or []:
+        vals.append(int((it or {}).get("current_period_end") or 0))
+    return max(vals)
+
+def apply_subscription(c, row, sub):
+    """Recopie l'état d'un abonnement Stripe sur l'utilisateur (dans la transaction de l'appelant).
+    Ne touche jamais à gift_until : une clé d'accès survit à un abonnement résilié."""
+    sid, status = str(sub.get("id") or ""), str(sub.get("status") or "")
+    live = status in ("active", "trialing")
+    cur = str(getattr(row, "stripe_sub_id", "") or "")
+    if cur and sid and cur != sid and not live:
+        return False                       # évènement tardif d'un ancien abonnement : on n'écrase pas l'actuel
+    until = period_end(sub) if live else 0
+    if live and until <= 0:
+        raise ValueError(f"abonnement {sid} actif sans fin de période")
+    c.execute(text("UPDATE users SET premium_until=:p, plan_status=:s, cancel_at_end=:k, stripe_sub_id=:sid, "
+                   "stripe_customer_id=COALESCE(NULLIF(stripe_customer_id,''),:cu) WHERE id=:u"),
+              {"p": until, "s": status, "k": 1 if (sub.get("cancel_at_period_end") or sub.get("cancel_at")) else 0,
+               "sid": sid, "cu": _id(sub.get("customer")) or "", "u": row.id})
+    return True
+
+STRIPE_EVENTS = {"checkout.session.completed", "invoice.paid", "invoice.payment_failed",
+                 "customer.subscription.updated", "customer.subscription.deleted"}
+
+@app.post("/api/stripe/webhook")
+def stripe_webhook():
+    if not STRIPE_WH:
+        return err("Webhook non configuré", 503)
+    raw = request.get_data()
+    if not verify_stripe_signature(raw, request.headers.get("Stripe-Signature"), STRIPE_WH):
+        return err("Signature invalide", 400)
+    try:
+        ev = json.loads(raw)
+        eid, etype, obj = str(ev["id"]), str(ev["type"]), ev["data"]["object"]
+        assert isinstance(obj, dict)
+    except Exception:
+        return err("Évènement illisible", 400)
+    if etype not in STRIPE_EVENTS or (etype == "checkout.session.completed" and obj.get("mode") != "subscription"):
+        return jsonify(ok=True, ignored=True)
+    if q1("SELECT id FROM stripe_events WHERE id=:i", i=eid):
+        return jsonify(ok=True, duplicate=True)
+    cust = _id(obj.get("customer"))
+    row = q1("SELECT * FROM users WHERE stripe_customer_id=:c", c=cust) if cust else None
+    if not row and etype == "checkout.session.completed" and obj.get("client_reference_id"):
+        row = q1("SELECT * FROM users WHERE id=:i", i=str(obj["client_reference_id"]))
+    if not row:
+        log.warning("Webhook Stripe %s (%s) : client %s inconnu", etype, eid, cust)
+        return jsonify(ok=True, unknown_user=True)
+    sub_id = obj.get("id") if etype.startswith("customer.subscription.") else sub_id_from(obj)
+    sub_id = sub_id or row.stripe_sub_id or None            # facture sans abonnement : on relit l'abonnement courant
+    if not sub_id:
+        return jsonify(ok=True, ignored=True)
+    try:
+        sub = stripe_get_subscription(sub_id)               # la vérité, quel que soit l'ordre d'arrivée des évènements
+        with engine.begin() as c:
+            c.execute(text("INSERT INTO stripe_events (id,type,created) VALUES (:i,:t,:c)"),
+                      {"i": eid, "t": etype, "c": now_iso()})
+            apply_subscription(c, row, sub)
+    except IntegrityError:
+        return jsonify(ok=True, duplicate=True)             # deux envois simultanés du même évènement
+    except Exception:
+        log.exception("Webhook Stripe %s (%s) : échec, Stripe réessaiera", etype, eid)
+        return err("Traitement impossible", 500)
+    return jsonify(ok=True)
+
+
+# ── Clés d'accès (Premium offert) ────────────────────────────────────────────
+KEY_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"      # sans 0 O 1 I L : pas de confusion à la dictée
+
+def new_access_key():
+    return "TKS-" + "-".join("".join(secrets.choice(KEY_ALPHABET) for _ in range(4)) for _ in range(3))
+
+def key_norm(k):
+    return re.sub(r"[^A-Z0-9]", "", str(k or "").upper())
+
+def key_hash(k):
+    return hmac.new(SECRET.encode(), ("key:" + key_norm(k)).encode(), hashlib.sha256).hexdigest()
+
+def to_int(v, default, lo, hi):
+    try: return max(lo, min(hi, int(float(v))))
+    except Exception: return default
+
+def require_admin():
+    u, e = require_auth()
+    if e: return None, e
+    row = q1("SELECT * FROM users WHERE id=:id", id=u["sub"])
+    if not is_admin(row):
+        return None, (jsonify(error="Réservé à l'administrateur"), 403)
+    return row, None
+
+def key_json(r, users=()):
+    return {"id": r.id, "label": r.label or "", "hint": r.hint or "", "max_uses": int(r.max_uses or 0),
+            "uses": int(r.uses or 0), "days": int(r.days or 0), "created": r.created,
+            "revoked": bool(r.revoked), "users": list(users)}
+
+@app.post("/api/admin/keys")
+def admin_create_key():
+    row, e = require_admin()
+    if e: return e
+    d = body()
+    label = str(d.get("label") or "").strip()[:60]
+    uses = to_int(d.get("uses", 1), 1, 0, 1000)          # 0 = illimité
+    days = to_int(d.get("days", 0), 0, 0, 3650)          # 0 = à vie
+    key = new_access_key()
+    kid = uuid.uuid4().hex
+    x("INSERT INTO access_keys (id,key_hash,label,hint,max_uses,uses,days,created,revoked) "
+      "VALUES (:i,:h,:l,:t,:m,0,:d,:c,0)", i=kid, h=key_hash(key), l=label, t=key[-4:], m=uses, d=days, c=now_iso())
+    return jsonify(key=key, **key_json(q1("SELECT * FROM access_keys WHERE id=:i", i=kid)))
+
+@app.get("/api/admin/keys")
+def admin_list_keys():
+    row, e = require_admin()
+    if e: return e
+    by_key = {}
+    for r in q("SELECT gift_key_id AS k, username FROM users WHERE gift_key_id <> '' ORDER BY username"):
+        by_key.setdefault(r.k, []).append(r.username)
+    rows = q("SELECT * FROM access_keys ORDER BY created DESC, id")
+    return jsonify(keys=[key_json(r, by_key.get(r.id, ())) for r in rows])
+
+@app.delete("/api/admin/keys/<kid>")
+def admin_revoke_key(kid):
+    row, e = require_admin()
+    if e: return e
+    if not q1("SELECT id FROM access_keys WHERE id=:i", i=kid):
+        return err("Clé introuvable", 404)
+    with engine.begin() as c:
+        c.execute(text("UPDATE access_keys SET revoked=1 WHERE id=:i"), {"i": kid})
+        c.execute(text("UPDATE users SET gift_until=0, gift_key_id='' WHERE gift_key_id=:i"), {"i": kid})
+    return jsonify(ok=True)
+
+@app.post("/api/premium/redeem")
+def redeem_key():
+    u, e = require_auth()
+    if e: return e
+    if limited("redeem:" + ip(), 10, 3600) or limited("redeem:" + u["sub"], 10, 3600):
+        return err("Trop d'essais, réessaie plus tard", 429)
+    row = q1("SELECT * FROM users WHERE id=:id", id=u["sub"])
+    k = key_norm(body().get("key"))
+    kr = q1("SELECT * FROM access_keys WHERE key_hash=:h", h=key_hash(k)) if k else None
+    if not kr or kr.revoked:
+        return err("Clé invalide ou expirée", 404)
+    gift_on = int(getattr(row, "gift_until", 0) or 0) > time.time()
+    if gift_on and row.gift_key_id == kr.id:
+        return jsonify(ok=True, already=True, **user_json(row))
+    if is_admin(row):
+        return err("Tu es administrateur : le Premium est déjà actif", 409)
+    if gift_on:
+        return err("Tu as déjà un accès Premium offert", 409)
+    with engine.begin() as c:
+        res = c.execute(text("UPDATE access_keys SET uses=uses+1 WHERE id=:i AND revoked=0 "
+                             "AND (max_uses=0 OR uses<max_uses)"), {"i": kr.id})
+        if res.rowcount != 1:
+            return err("Cette clé a déjà été utilisée le nombre maximum de fois", 409)
+        until = FOREVER if not kr.days else int(time.time()) + int(kr.days) * 86400
+        c.execute(text("UPDATE users SET gift_until=:g, gift_key_id=:k WHERE id=:u"),
+                  {"g": until, "k": kr.id, "u": row.id})
+    return jsonify(ok=True, **user_json(q1("SELECT * FROM users WHERE id=:id", id=row.id)))
+
+
 # ── Extraction audio ─────────────────────────────────────────────────────────
 @app.get("/")
 def accueil():
@@ -1083,7 +1461,48 @@ def accueil():
 
 @app.get("/api/health")
 def health():
-    return jsonify(ok=True, mail=MAIL_ON)
+    return jsonify(ok=True, mail=MAIL_ON, paywall=paywall_on(), adsense=adsense_public())
+
+
+# ── Pubs rémunérées (Google AdSense) : identifiants dans les variables d'environnement, jamais dans le code ──
+ADSENSE_PUB_RE = re.compile(r"(?:ca-)?pub-(\d{10,20})", re.I)
+ADSENSE_SLOT_RE = re.compile(r"\d{6,20}")
+GOOGLE_ADS_TXT_ID = "f08c47fec0942fa0"        # identifiant d'autorité de certification de Google dans ads.txt
+CONTACT_RE = re.compile(r"[A-Za-z0-9._%+\-]{1,64}@[A-Za-z0-9.\-]{1,190}\.[A-Za-z]{2,24}")
+
+def adsense_client():
+    """« ca-pub-… » depuis ADSENSE_CLIENT (le préfixe « ca- » est facultatif), ou « » si la valeur est invalide."""
+    m = ADSENSE_PUB_RE.fullmatch(os.environ.get("ADSENSE_CLIENT", "").strip())
+    return f"ca-pub-{m.group(1)}" if m else ""
+
+def adsense_public():
+    """Ce que le navigateur a le droit de savoir : seulement avec l'abonnement actif (sinon on ne peut pas retirer les pubs)."""
+    client, slot = adsense_client(), os.environ.get("ADSENSE_SLOT", "").strip()
+    if paywall_on() and client and ADSENSE_SLOT_RE.fullmatch(slot):
+        return {"client": client, "slot": slot}
+    return None
+
+@app.get("/ads.txt")
+def ads_txt():
+    client = adsense_client()
+    if not client:
+        return "", 404
+    r = make_response(f"google.com, {client[3:]}, DIRECT, {GOOGLE_ADS_TXT_ID}\n")
+    r.mimetype = "text/plain"
+    r.headers["Cache-Control"] = "public, max-age=300"
+    return r
+
+@app.get("/confidentialite")
+def confidentialite():
+    with open(os.path.join(app.root_path, "confidentialite.html"), encoding="utf-8") as f:
+        html = f.read()
+    mail = os.environ.get("CONTACT_EMAIL", "").strip()
+    contact = (f'<a href="mailto:{mail}">{mail}</a>' if CONTACT_RE.fullmatch(mail)
+               else "l'adresse de l'éditeur n'est pas encore renseignée.")
+    r = make_response(html.replace("{{CONTACT}}", contact))
+    r.mimetype = "text/html"
+    r.headers["Cache-Control"] = "no-cache"
+    return r
 
 R2_OK = all(os.environ.get(k) for k in ("R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET", "R2_PUBLIC_URL"))
 _s3 = None
@@ -1352,7 +1771,9 @@ def extract():
         url = trouver_lien(raw)
     if not url:
         return err("Lien TikTok invalide")
-    online = R2_OK and b.get("store") == "online"
+    # Gratuit (ou anonyme) quand l'abonnement est actif : stockage en ligne imposé, jamais de fichier local.
+    forced = paywall_on() and not request_premium()
+    online = R2_OK and (b.get("store") == "online" or forced)
     key = hashlib.sha1(url.encode()).hexdigest()
     if online:  # déjà converti par quelqu'un : on réutilise, sans retélécharger
         try:
@@ -1407,8 +1828,17 @@ def extract():
             try: os.remove(f"audio/{uid}.mp3")
             except Exception: pass
         except Exception as e:
+            if forced:
+                log.warning("Envoi R2 échoué (stockage en ligne imposé) : %s", e)
+                try: os.remove(f"audio/{uid}.mp3")
+                except Exception: pass
+                return err("Le stockage en ligne ne répond pas, réessaie dans un instant.", 502, retry=True)
             log.warning("Envoi R2 échoué, repli en local : %s", e)
     return jsonify(**res)
+
+@app.get("/ads/<path:f>")
+def ads_file(f):
+    return send_from_directory(os.path.abspath("ads"), f, max_age=3600, conditional=True)
 
 @app.get("/audio/<path:f>")
 def audio(f):
