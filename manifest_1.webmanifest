@@ -1,0 +1,26 @@
+{
+  "name": "Tiksound",
+  "short_name": "Tiksound",
+  "description": "Tes sons TikTok en playlist, sans la vidéo.",
+  "lang": "fr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0b0b0c",
+  "theme_color": "#0b0b0c",
+  "categories": ["music", "entertainment"],
+  "icons": [
+    {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
+    {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+  ],
+  "shortcuts": [
+    {"name": "Ajouter un son", "url": "/#ajouter"},
+    {"name": "Mes sons", "url": "/#bibliotheque"},
+    {"name": "Explorer", "url": "/#decouvrir"}
+  ],
+  "share_target": {
+    "action": "/",
+    "method": "GET",
+    "params": {"title": "title", "text": "text", "url": "url"}
+  }
+}
