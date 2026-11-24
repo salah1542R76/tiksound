@@ -46,6 +46,9 @@ DB_URL = os.environ.get("DATABASE_URL", "sqlite:///tiksound.db")
 # Tolère les adresses copiées telles quelles depuis Neon : guillemets, « psql ... », postgres://, postgresql+psycopg://
 DB_URL = re.sub(r"^psql\s+", "", DB_URL.strip()).strip("'\"")
 DB_URL = re.sub(r"^postgres(?:ql)?(?:\+\w+)?://", "postgresql://", DB_URL)
+if DB_URL.startswith("postgresql://"):   # force psycopg2 (celui installé dans requirements.txt)
+    DB_URL = "postgresql+psycopg2://" + DB_URL[len("postgresql://"):]
+log.info("Base de données : %s", DB_URL.split("://")[0])
 IS_SQLITE = DB_URL.startswith("sqlite")
 TOKEN_DAYS = 30
 CODE_TTL = 15 * 60          # durée de validité d'un code
