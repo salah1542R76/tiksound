@@ -43,8 +43,9 @@ SECRET = _load_secret()
 
 # ── Config ───────────────────────────────────────────────────────────────────
 DB_URL = os.environ.get("DATABASE_URL", "sqlite:///tiksound.db")
-if DB_URL.startswith("postgres://"):
-    DB_URL = "postgresql://" + DB_URL[len("postgres://"):]
+# Tolère les adresses copiées telles quelles depuis Neon : guillemets, « psql ... », postgres://, postgresql+psycopg://
+DB_URL = re.sub(r"^psql\s+", "", DB_URL.strip()).strip("'\"")
+DB_URL = re.sub(r"^postgres(?:ql)?(?:\+\w+)?://", "postgresql://", DB_URL)
 IS_SQLITE = DB_URL.startswith("sqlite")
 TOKEN_DAYS = 30
 CODE_TTL = 15 * 60          # durée de validité d'un code
