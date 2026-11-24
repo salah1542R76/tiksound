@@ -603,6 +603,11 @@ button,a{-webkit-tap-highlight-color:transparent}
     <p style="margin:0 0 12px;opacity:.7;font-size:14px">Sur l'appareil : le son est téléchargé et marche hors connexion. En ligne : le son reste sur le serveur et se lit en streaming, sans occuper la mémoire de ton téléphone (internet nécessaire).</p>
     <select id="stor" onchange="S.ui.storage=this.value;save();toast(this.value==='online'?'Nouveaux sons : en ligne':'Nouveaux sons : sur l\'appareil')" style="padding:12px 14px;border-radius:14px;border:1px solid rgba(255,255,255,.18);background:transparent;color:inherit;font-size:16px"><option value="local">Sur l'appareil</option><option value="online">En ligne (streaming)</option></select>
   </div>
+  <div style="margin-top:14px;padding:18px;border-radius:20px;border:1px solid rgba(255,255,255,.12)">
+    <h3 style="margin:0 0 6px">Synchronisation</h3>
+    <p style="margin:0 0 12px;opacity:.7;font-size:14px">Connecté, ta bibliothèque (sons, favoris, playlists) se synchronise entre tes appareils. Les sons « En ligne » se lisent partout ; ceux stockés sur l’appareil sont à retélécharger sur les autres.</p>
+    <button class="btn alt" onclick="syncLibrary(true)">Synchroniser maintenant</button>
+  </div>
 </section>
 </main>
 
@@ -1032,7 +1037,7 @@ async function resendCode(){
   try{ const d=await api("/api/auth/resend",{method:"POST",body:{email:AU.email.trim().toLowerCase(),purpose:AU.purpose}}); startCd(d.cooldown); toast("Nouveau code envoyé",{type:"ok"}); authErr(""); }
   catch(e){ if(e.data&&e.data.wait) startCd(e.data.wait); authErr(e.message); }
 }
-function setMe(d){ ME={id:d.id,username:d.username,color:d.color||0,email:d.email,bio:d.bio||"",avatar:d.avatar||"",created:d.created}; AU.pw=""; closeAuth(); FEED=null; render(); restorePublic(); syncAllPublic(); }
+function setMe(d){ ME={id:d.id,username:d.username,color:d.color||0,email:d.email,bio:d.bio||"",avatar:d.avatar||"",created:d.created}; AU.pw=""; closeAuth(); FEED=null; render(); restorePublic(); syncAllPublic(); syncLibrary(); }
 async function logout(){ try{ await api("/api/auth/logout",{method:"POST"}); }catch(e){} ME=null; render(); toast("Déconnecté"); }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1557,6 +1562,72 @@ async function togglePub(pid){
     render();
   }
 }
+// ═══════════════════════════════════════════════════════════════════════════
+//  Bibliothèque synchronisée entre appareils (compte)
+// ═══════════════════════════════════════════════════════════════════════════
+const SYNC = {busy:false};
+function libSnap(){
+  const byId = new Map(S.tracks.map(t=>[t.id,t]));
+  return {
+    tracks: S.tracks.filter(t=>t.url).map(t=>({url:t.url,title:t.title,author:t.author||"",duration:t.duration||0,fav:!!t.fav,added:t.added||0,remote:t.remote||""})),
+    pls: S.pls.filter(p=>!p.smart).map(p=>({id:p.id,name:p.name,urls:p.ids.map(i=>byId.get(i)).filter(t=>t&&t.url).map(t=>t.url),pub:!!p.pub,pubId:p.pubId||""}))
+  };
+}
+function rmTrackLocal(id){
+  S.tracks=S.tracks.filter(t=>t.id!==id);
+  S.pls.forEach(p=>{ p.ids=p.ids.filter(i=>i!==id); });
+  dbop("delete",id).catch(()=>{}); dbop("delete","cv:"+id).catch(()=>{});
+}
+async function syncLibrary(manual){
+  if(!ME){ if(manual===true) toast("Connecte-toi pour synchroniser",{type:"err"}); return; }
+  if(SYNC.busy) return; SYNC.busy=true;
+  try{
+    for(let essai=0; essai<2; essai++){
+      const r = await api("/api/me/library");
+      const base = (S.sync && S.sync.uid===ME.id) ? S.sync : {tr:[],pl:[],hash:null};
+      const lc = JSON.stringify(libSnap()) !== base.hash;   // modifié sur cet appareil depuis la dernière synchro
+      let changed = false;
+      if(r.data){
+        const bt=new Set(base.tr), bp=new Set(base.pl);
+        const sT=new Map(r.data.tracks.map(t=>[t.url,t])), lT=new Map(S.tracks.filter(t=>t.url).map(t=>[t.url,t]));
+        for(const [url,st] of sT){
+          const lt=lT.get(url);
+          if(lt){
+            if(!lc && (lt.title!==st.title || !!lt.fav!==!!st.fav)){ lt.title=st.title; lt.fav=!!st.fav; changed=true; }
+            if(!lt.local && !lt.remote && st.remote){ lt.remote=st.remote; lt.pending=false; changed=true; }
+          } else if(!bt.has(url)){
+            S.tracks.push({id:newId("t"),title:st.title,author:st.author||"",cover:"",duration:st.duration||0,url,local:false,remote:st.remote||"",pending:!st.remote,fav:!!st.fav,added:st.added||Date.now()}); changed=true;
+          }
+        }
+        for(const [url,lt] of lT){ if(!sT.has(url) && bt.has(url)){ rmTrackLocal(lt.id); changed=true; } }
+        const byUrl=new Map(S.tracks.filter(t=>t.url).map(t=>[t.url,t.id]));
+        const ids=urls=>urls.map(u=>byUrl.get(u)).filter(Boolean);
+        for(const sp of r.data.pls){
+          const lp=S.pls.find(p=>p.id===sp.id);
+          if(lp){ if(!lc){ const n=ids(sp.urls); if(lp.name!==sp.name || n.join()!==lp.ids.join()){ lp.name=sp.name; lp.ids=n; changed=true; } } }
+          else if(!bp.has(sp.id)){ S.pls.push({id:sp.id,name:sp.name,ids:ids(sp.urls),pub:sp.pub,pubId:sp.pubId||null,owner:sp.pub?ME.id:undefined}); changed=true; }
+        }
+        const sIds=new Set(r.data.pls.map(p=>p.id)), before=S.pls.length;
+        S.pls=S.pls.filter(p=>p.smart || sIds.has(p.id) || !bp.has(p.id));
+        if(S.pls.length!==before) changed=true;
+        if(changed){ save(); render(); }
+      }
+      const snap=libSnap();
+      try{
+        const w = await api("/api/me/library",{method:"PUT",body:{data:snap,base:r.updated||null}});
+        S.sync = {uid:ME.id, at:w.updated, tr:snap.tracks.map(t=>t.url), pl:snap.pls.map(p=>p.id), hash:JSON.stringify(snap)};
+        save();
+        if(changed) toast("Bibliothèque synchronisée avec ton compte",{type:"ok"});
+        else if(manual===true) toast("Tout est déjà à jour",{type:"ok"});
+        break;
+      }catch(e){ if(e.status===409 && essai===0) continue; throw e; }
+    }
+  }catch(e){ if(manual===true) toast("Synchronisation impossible : "+e.message,{type:"err"}); }
+  SYNC.busy=false;
+}
+setInterval(()=>{ if(ME && !SYNC.busy && (!S.sync || S.sync.uid!==ME.id || JSON.stringify(libSnap())!==S.sync.hash)) syncLibrary(false); }, 6000);
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden && ME) syncLibrary(false); });
+
 async function restorePublic(){
   if(!ME) return;
   try{ const d=await api("/api/me/playlists"); let n=0;
@@ -1777,7 +1848,7 @@ addEventListener("hashchange", route);
   loadCovers();
   await Promise.all([checkMe(), ping()]);
   render();
-  if(ME){ restorePublic(); syncAllPublic(); }
+  if(ME){ restorePublic(); syncAllPublic(); syncLibrary(); }
   if(ONLINE) loadFeed().then(()=>{ renderHome(); });
 
   if(P_) checkImport(P_);

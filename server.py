@@ -199,8 +199,12 @@ def init_db():
             user_id TEXT NOT NULL, post_id TEXT NOT NULL, created TEXT, PRIMARY KEY (user_id, post_id))""",
         """CREATE TABLE IF NOT EXISTS playlist_likes (
             user_id TEXT NOT NULL, playlist_id TEXT NOT NULL, created TEXT, PRIMARY KEY (user_id, playlist_id))""",
+        """CREATE TABLE IF NOT EXISTS libraries (
+            user_id TEXT PRIMARY KEY, data TEXT NOT NULL, updated TEXT NOT NULL)""",
     ]
     for s in stmts:
+        if not IS_SQLITE:  # PostgreSQL : REAL = 4 octets, trop peu précis pour un horodatage
+            s = re.sub(r"\bREAL\b", "DOUBLE PRECISION", s)
         try: x(s)
         except Exception as e: log.warning("init_db: %s", e)
     try:
@@ -647,6 +651,7 @@ def delete_me():
         c.execute(text("DELETE FROM posts WHERE user_id=:u"), p)
         c.execute(text("DELETE FROM playlist_likes WHERE playlist_id IN (SELECT id FROM public_playlists WHERE user_id=:u)"), p)
         c.execute(text("DELETE FROM public_playlists WHERE user_id=:u"), p)
+        c.execute(text("DELETE FROM libraries WHERE user_id=:u"), p)
         c.execute(text("DELETE FROM users WHERE id=:u"), p)
     resp = make_response(jsonify(ok=True))
     resp.delete_cookie("tk_sess")
@@ -911,6 +916,78 @@ def like_post(pid):
         liked = True
     n = q1("SELECT COUNT(*) AS n FROM post_likes WHERE post_id=:i", i=pid).n
     return jsonify(liked=liked, likes=int(n))
+
+
+# ── Bibliothèque synchronisée entre appareils ────────────────────────────────
+def clean_library(d):
+    d = d if isinstance(d, dict) else {}
+    r2 = os.environ.get("R2_PUBLIC_URL", "").rstrip("/")
+    tracks, seen = [], set()
+    raw_t = d.get("tracks") if isinstance(d.get("tracks"), list) else []
+    for t in raw_t[:1500]:
+        if not isinstance(t, dict):
+            continue
+        url = str(t.get("url") or "")[:500]
+        if not ok_url(url) or url in seen:
+            continue
+        seen.add(url)
+        remote = str(t.get("remote") or "")[:500]
+        if not (r2 and remote.startswith(r2 + "/")):
+            remote = ""
+        try: dur = max(0, min(int(float(t.get("duration") or 0)), 36000))
+        except Exception: dur = 0
+        try: added = max(0, int(float(t.get("added") or 0)))
+        except Exception: added = 0
+        tracks.append({"url": url, "title": str(t.get("title") or "Son TikTok")[:120],
+                       "author": str(t.get("author") or "")[:60], "duration": dur,
+                       "fav": bool(t.get("fav")), "added": added, "remote": remote})
+    pls = []
+    raw_p = d.get("pls") if isinstance(d.get("pls"), list) else []
+    for p in raw_p[:200]:
+        if not isinstance(p, dict):
+            continue
+        pid = str(p.get("id") or "")
+        if not re.fullmatch(r"[\w-]{1,40}", pid):
+            continue
+        raw_u = p.get("urls") if isinstance(p.get("urls"), list) else []
+        urls = [u for u in raw_u[:500] if isinstance(u, str) and u in seen]
+        pub_id = str(p.get("pubId") or "")
+        pls.append({"id": pid, "name": str(p.get("name") or "Playlist")[:40], "urls": urls,
+                    "pub": bool(p.get("pub")), "pubId": pub_id if re.fullmatch(r"[0-9a-f]{32}", pub_id) else ""})
+    return {"tracks": tracks, "pls": pls}
+
+
+@app.get("/api/me/library")
+def get_library():
+    u, e = require_auth()
+    if e: return e
+    r = q1("SELECT data,updated FROM libraries WHERE user_id=:u", u=u["sub"])
+    return jsonify(data=json.loads(r.data) if r else None, updated=r.updated if r else None)
+
+
+@app.put("/api/me/library")
+def put_library():
+    u, e = require_auth()
+    if e: return e
+    if limited("lib:" + u["sub"], 120, 600):
+        return err("Trop de synchronisations, patiente un peu", 429)
+    b = body()
+    data = json.dumps(clean_library(b.get("data")))
+    cur = q1("SELECT updated FROM libraries WHERE user_id=:u", u=u["sub"])
+    if (cur.updated if cur else None) != (b.get("base") or None):
+        return err("Bibliothèque modifiée sur un autre appareil", 409)
+    ver = f"{time.time():.3f}"
+    try:
+        if cur:
+            res = x("UPDATE libraries SET data=:d, updated=:v WHERE user_id=:u AND updated=:o",
+                    d=data, v=ver, u=u["sub"], o=cur.updated)
+            if res.rowcount == 0:
+                return err("Bibliothèque modifiée sur un autre appareil", 409)
+        else:
+            x("INSERT INTO libraries (user_id,data,updated) VALUES (:u,:d,:v)", u=u["sub"], d=data, v=ver)
+    except Exception:
+        return err("Bibliothèque modifiée sur un autre appareil", 409)
+    return jsonify(ok=True, updated=ver)
 
 
 # ── Extraction audio ─────────────────────────────────────────────────────────
