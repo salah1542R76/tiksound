@@ -1125,11 +1125,62 @@ def spotify_import():
             tracks.append({"url": f"https://open.spotify.com/track/{tid}", "title": title,
                            "author": str(artist or "")[:60].replace("\xa0", " "), "cover": "", "duration": dur})
         if not tracks:
-            raise ValueError("vide")
+            raise ValueError("aucun titre dans la page Spotify")
+    except urllib.error.HTTPError as e:
+        log.warning("Import Spotify : HTTP %s sur %s/%s", e.code, kind, sid)
+        return err("Spotify a refusé la lecture de cette playlist (elle doit être publique, pas privée).", 502)
     except Exception as e:
-        log.warning("Import Spotify échoué : %s", e)
+        log.warning("Import Spotify échoué (%s/%s) : %r", kind, sid, e)
         return err("Impossible de lire ce lien Spotify. Vérifie que la playlist est publique.", 502)
-    return jsonify(name=name, tracks=tracks[:300])
+    return jsonify(name=name, sid=f"{kind}:{sid}", tracks=tracks[:300])
+
+def search_candidates(prefix, query, n=5):
+    """Résultats de recherche sans téléchargement. prefix : ytsearch (YouTube) ou scsearch (SoundCloud)."""
+    try:
+        with yt_dlp.YoutubeDL({"quiet": True, "extract_flat": True, "skip_download": True, "socket_timeout": 15}) as y:
+            res = y.extract_info(f"{prefix}{n}:{query}", download=False)
+        out = []
+        for e in (res or {}).get("entries") or []:
+            if not e:
+                continue
+            u = e.get("webpage_url") or e.get("url") or ""
+            if not str(u).startswith("http") and prefix == "ytsearch" and e.get("id"):
+                u = f"https://www.youtube.com/watch?v={e['id']}"
+            if not str(u).startswith("http"):
+                continue
+            try: d = int(float(e.get("duration") or 0))
+            except Exception: d = 0
+            out.append({"url": u, "duration": d, "src": prefix})
+        if not out:
+            log.warning("Recherche %s : aucun résultat pour « %s »", prefix, query)
+        return out
+    except Exception as ex:
+        log.warning("Recherche %s échouée pour « %s » : %s", prefix, query, str(ex)[:300])
+        return []
+
+def audio_from_search(opts, title, author, want):
+    """Cherche le titre sur YouTube puis SoundCloud, garde les versions dont la durée colle à Spotify."""
+    query = f"{author} - {title}".strip(" -")
+    pools = [search_candidates("ytsearch", query), search_candidates("scsearch", query)]
+    order = []
+    for tol in ((0.06, 0.25) if want else (None,)):
+        for cands in pools:
+            for c in cands:
+                if tol is None or (c["duration"] and abs(c["duration"] - want) <= max(8, want * tol)):
+                    if all(c["url"] != o["url"] for o in order):
+                        order.append(c)
+    for c in order[:4]:
+        try:
+            with yt_dlp.YoutubeDL(opts) as y:
+                info = y.extract_info(c["url"], download=True)
+            if info and info.get("entries"):
+                info = info["entries"][0]
+            log.info("Spotify « %s » → %s (%s)", query, c["src"], c["url"])
+            return info
+        except Exception as ex:
+            log.warning("Téléchargement %s échoué (%s) : %s", c["src"], c["url"], str(ex)[:300])
+    return None
+
 
 @app.post("/api/extract")
 def extract():
@@ -1164,22 +1215,25 @@ def extract():
         "postprocessors": [{"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "128"}],
     }
     info = None
-    essais = [url.replace("/photo/", "/video/"), url] if "/photo/" in url else [url]
     if spotify:
-        essais = [f"ytsearch1:{author_in} {title_in} audio"]
-    for u in essais:
-        try:
-            with yt_dlp.YoutubeDL(opts) as y:
-                info = y.extract_info(u, download=True)
-            if spotify and info.get("entries"):
-                info = info["entries"][0]
-            if not spotify:
+        try: want = int(float(b.get("duration") or 0))
+        except Exception: want = 0
+        info = audio_from_search(opts, title_in, author_in, want)
+        if not info:
+            return err(f"Aucune version audio trouvée pour « {title_in[:50]} ».", 502)
+    else:
+        essais = [url.replace("/photo/", "/video/"), url] if "/photo/" in url else [url]
+        for u in essais:
+            try:
+                with yt_dlp.YoutubeDL(opts) as y:
+                    info = y.extract_info(u, download=True)
                 url = u
-            break
-        except Exception:
-            continue
-    if not info:
-        return err("Impossible de récupérer le son. Vérifie que le lien est public.", 500)
+                break
+            except Exception as ex:
+                log.warning("Extraction TikTok échouée (%s) : %s", u, str(ex)[:300])
+                continue
+        if not info:
+            return err("Impossible de récupérer le son. Vérifie que le lien est public.", 500)
     cover = info.get("thumbnail", "") or ""
     try: duration = int(float(info.get("duration") or 0))
     except Exception: duration = 0

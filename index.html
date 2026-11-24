@@ -1051,14 +1051,17 @@ async function importSpotify(){
   try{
     const d=await api("/api/spotify",{method:"POST",body:{url}});
     const ids=[...new Set(d.tracks.map(ensureTrack))];
-    S.pls.push({id:newId("p"),name:d.name,ids}); save(); i.value=""; render();
-    toast(ids.length+" sons importés dans « "+d.name+" »",{type:"ok"}); location.hash="playlists";
+    const old=d.sid&&S.pls.find(p=>p.sp===d.sid);
+    if(old){ const add=ids.filter(x=>!old.ids.includes(x)); old.ids.push(...add); save(); i.value=""; render();
+      toast(add.length?add.length+" nouveau"+(add.length>1?"x":"")+" son"+(add.length>1?"s":"")+" ajouté"+(add.length>1?"s":"")+" à « "+old.name+" »":"« "+old.name+" » est déjà à jour",{type:"ok"}); location.hash="playlists"; }
+    else { S.pls.push({id:newId("p"),name:d.name,ids,sp:d.sid||""}); save(); i.value=""; render();
+      toast(ids.length+" sons importés dans « "+d.name+" »",{type:"ok"}); location.hash="playlists"; }
   }catch(e){ toast(e.message,{type:"err"}); }
   b.disabled=false;
 }
 async function grab(url, id){
   const tk=S.tracks.find(x=>x.id===id)||{};
-  const d=await api("/api/extract",{method:"POST",body:{url,title:tk.title,author:tk.author,store:S.ui.storage==="online"?"online":"local"}});
+  const d=await api("/api/extract",{method:"POST",body:{url,title:tk.title,author:tk.author,duration:tk.duration||0,store:S.ui.storage==="online"?"online":"local"}});
   if(!d.remote){
     const r=await fetch(API_URL+d.audio_url); if(!r.ok) throw new Error("Téléchargement du son impossible");
     await dbop("put", await r.blob(), id);
