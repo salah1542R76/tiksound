@@ -13,7 +13,7 @@ log = logging.getLogger("tiksound")
 
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
-app.config["MAX_CONTENT_LENGTH"] = 1024 * 1024
+app.config["MAX_CONTENT_LENGTH"] = 2 * 1024 * 1024
 os.makedirs("audio", exist_ok=True)
 
 
@@ -213,7 +213,10 @@ def init_db():
         except Exception as e: log.warning("init_db: %s", e)
     try:
         cols = {c["name"] for c in inspect(engine).get_columns("users")}
-        for col, ddl in [("bio", "TEXT DEFAULT ''"), ("avatar", "TEXT DEFAULT ''"), ("created", "TEXT")]:
+        for col, ddl in [("bio", "TEXT DEFAULT ''"), ("avatar", "TEXT DEFAULT ''"), ("created", "TEXT"),
+                         ("avatar_img", "TEXT DEFAULT ''"), ("banner_img", "TEXT DEFAULT ''"), ("imgv", "TEXT DEFAULT ''"),
+                         ("accent", "TEXT DEFAULT ''"), ("status", "TEXT DEFAULT ''"), ("ui", "TEXT DEFAULT ''"),
+                         ("ui_v", "TEXT DEFAULT ''"), ("banner_color", "TEXT DEFAULT ''")]:
             if col not in cols:
                 try: x(f"ALTER TABLE users ADD COLUMN {col} {ddl}")
                 except Exception: pass
@@ -366,10 +369,49 @@ def username_problem(u, exclude_email=None, exclude_uid=None):
         return "Ce pseudo est déjà pris"
     return None
 
-def user_json(row):
-    return {"id": row.id, "username": row.username, "color": row.color or 0, "email": row.email,
-            "bio": getattr(row, "bio", "") or "", "avatar": getattr(row, "avatar", "") or "",
-            "created": getattr(row, "created", None)}
+HEX_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
+IMG_RE = re.compile(r"^data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$")
+UI_KEYS = {"theme": ("dark", "oled", "nuit", "clair"), "bg": ("aurora", "cover", "mesh", "plain", "image"),
+           "cover": ("square", "vinyl"), "font": ("dm", "outfit", "space", "nunito", "syne", "mono")}
+UI_BOOL = ("grain", "motion")
+UI_NUM = {"blur": (0, 40), "radius": (4, 28), "bgo": (5, 100), "bgb": (0, 40)}
+
+def clean_ui(d):
+    """Réglages d'apparence synchronisables (rien de lié à l'appareil : taille, tri, vues…)."""
+    out = {}
+    if not isinstance(d, dict):
+        return out
+    for k, allowed in UI_KEYS.items():
+        if d.get(k) in allowed:
+            out[k] = d[k]
+    for k in UI_BOOL:
+        if k in d:
+            out[k] = bool(d[k])
+    for k, (lo, hi) in UI_NUM.items():
+        try:
+            if k in d: out[k] = max(lo, min(hi, int(float(d[k]))))
+        except Exception:
+            pass
+    if isinstance(d.get("accent"), str) and HEX_RE.match(d["accent"]):
+        out["accent"] = d["accent"].lower()
+    return out
+
+def pic_url_ver(row, col="avatar_img"):
+    return (getattr(row, "imgv", "") or "1") if getattr(row, col, "") else ""
+
+def user_json(row, private=True):
+    d = {"id": row.id, "username": row.username, "color": row.color or 0,
+         "bio": getattr(row, "bio", "") or "", "avatar": getattr(row, "avatar", "") or "",
+         "created": getattr(row, "created", None),
+         "pic": pic_url_ver(row, "avatar_img"), "ban": pic_url_ver(row, "banner_img"),
+         "accent": getattr(row, "accent", "") or "", "status": getattr(row, "status", "") or "",
+         "bcolor": getattr(row, "banner_color", "") or ""}
+    if private:
+        d["email"] = row.email
+        try: d["ui"] = json.loads(getattr(row, "ui", "") or "{}")
+        except Exception: d["ui"] = {}
+        d["ui_v"] = getattr(row, "ui_v", "") or ""
+    return d
 
 def login_response(row, status=200):
     resp = make_response(jsonify(ok=True, **user_json(row)), status)
@@ -407,10 +449,10 @@ def pl_summary(p, liked=frozenset()):
     tr = json.loads(p.tracks or "[]")
     return {"id": p.id, "name": p.name, "count": len(tr),
             "preview": [{"title": t.get("title", ""), "cover": t.get("cover", "")} for t in tr[:4]],
-            "username": p.username, "color": p.color or 0, "avatar": p.avatar or "",
+            "username": p.username, "color": p.color or 0, "avatar": p.avatar or "", "pic": p.pic or "",
             "likes": int(p.likes or 0), "liked": p.id in liked, "updated": p.updated}
 
-PL_SELECT = ("SELECT p.id,p.name,p.tracks,p.updated,p.user_id,u.username,u.color,u.avatar,"
+PL_SELECT = ("SELECT p.id,p.name,p.tracks,p.updated,p.user_id,u.username,u.color,u.avatar,(CASE WHEN COALESCE(u.avatar_img,'')<>'' THEN COALESCE(NULLIF(u.imgv,''),'1') ELSE '' END) AS pic,"
              "(SELECT COUNT(*) FROM playlist_likes l WHERE l.playlist_id=p.id) AS likes "
              "FROM public_playlists p JOIN users u ON u.id=p.user_id ")
 
@@ -623,6 +665,31 @@ def update_me():
         if len(av) > 8 or re.search(r"[<>&\"'A-Za-z0-9\s]", av):
             return err("Avatar invalide")
         fields.append("avatar=:avatar"); params["avatar"] = av
+    if "accent" in d:
+        ac = str(d["accent"] or "").strip()
+        if ac and not HEX_RE.match(ac): return err("Couleur invalide")
+        fields.append("accent=:accent"); params["accent"] = ac.lower()
+    if "bcolor" in d:
+        bc = str(d["bcolor"] or "").strip()
+        if bc and not HEX_RE.match(bc): return err("Couleur invalide")
+        fields.append("banner_color=:bcolor"); params["bcolor"] = bc.lower()
+    if "status" in d:
+        fields.append("status=:status"); params["status"] = re.sub(r"\s+", " ", str(d["status"] or "")).strip()[:40]
+    for key, col, limit in (("pic", "avatar_img", 220_000), ("ban", "banner_img", 650_000)):
+        if key in d:
+            v = d[key]
+            if v in (None, "", False):
+                v = ""
+            elif not isinstance(v, str) or len(v) > limit or not IMG_RE.match(v):
+                return err("Image invalide ou trop lourde")
+            fields.append(f"{col}=:{col}"); params[col] = v
+            params["imgv"] = f"{time.time():.0f}"
+    if "imgv" in params:
+        fields.append("imgv=:imgv")
+    if "ui" in d:
+        ui = clean_ui(d["ui"])
+        fields.append("ui=:ui"); params["ui"] = json.dumps(ui)
+        fields.append("ui_v=:ui_v"); params["ui_v"] = f"{time.time():.3f}"
     new_name = None
     if "username" in d:
         new_name = str(d["username"] or "").strip()
@@ -637,6 +704,21 @@ def update_me():
             return err("Ce pseudo est déjà pris", 409)
     row = q1("SELECT * FROM users WHERE id=:id", id=u["sub"])
     return login_response(row) if new_name else jsonify(ok=True, **user_json(row))
+
+
+@app.get("/api/img/<username>/<kind>")
+def user_img(username, kind):
+    col = {"a": "avatar_img", "b": "banner_img"}.get(kind)
+    if not col:
+        return "", 404
+    row = q1(f"SELECT {col} AS img FROM users WHERE lower(username)=:u", u=username.lower())
+    m = re.match(r"^data:(image/(?:jpeg|png|webp));base64,(.+)$", (row.img if row else "") or "")
+    if not m:
+        return "", 404
+    resp = make_response(base64.b64decode(m.group(2)))
+    resp.headers["Content-Type"] = m.group(1)
+    resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    return resp
 
 
 @app.delete("/api/auth/me")
@@ -667,9 +749,9 @@ def delete_me():
 def search_users():
     s = (request.args.get("q") or "").strip()
     if len(s) < 2: return jsonify(users=[])
-    rows = q("SELECT id,username,color,avatar FROM users WHERE lower(username) LIKE :q ESCAPE '\\' LIMIT 20",
+    rows = q("SELECT id,username,color,avatar," + "(CASE WHEN COALESCE(avatar_img,'')<>'' THEN COALESCE(NULLIF(imgv,''),'1') ELSE '' END) AS pic" + " FROM users WHERE lower(username) LIKE :q ESCAPE '\\' LIMIT 20",
              q=f"%{like_escape(s.lower())}%")
-    return jsonify(users=[{"id": r.id, "username": r.username, "color": r.color or 0, "avatar": r.avatar or ""} for r in rows])
+    return jsonify(users=[{"id": r.id, "username": r.username, "color": r.color or 0, "avatar": r.avatar or "", "pic": r.pic or ""} for r in rows])
 
 
 @app.get("/api/search")
@@ -677,13 +759,13 @@ def search_all():
     s = (request.args.get("q") or "").strip()[:60]
     if len(s) < 2: return jsonify(users=[], playlists=[])
     pat = f"%{like_escape(s.lower())}%"
-    users = q("SELECT id,username,color,avatar,bio,"
+    users = q("SELECT id,username,color,avatar,bio,(CASE WHEN COALESCE(avatar_img,'')<>'' THEN COALESCE(NULLIF(imgv,''),'1') ELSE '' END) AS pic,"
               "(SELECT COUNT(*) FROM public_playlists p WHERE p.user_id=users.id AND p.tracks <> '[]') AS n "
               "FROM users WHERE lower(username) LIKE :q ESCAPE '\\' ORDER BY length(username) LIMIT 20", q=pat)
     pls = q(PL_SELECT + "WHERE lower(p.name) LIKE :q ESCAPE '\\' AND p.tracks <> '[]' ORDER BY likes DESC, p.updated DESC LIMIT 24", q=pat)
     cu = current_user()
     lk = liked_set(cu["sub"] if cu else None)
-    return jsonify(users=[{"id": r.id, "username": r.username, "color": r.color or 0, "avatar": r.avatar or "",
+    return jsonify(users=[{"id": r.id, "username": r.username, "color": r.color or 0, "avatar": r.avatar or "", "pic": r.pic or "",
                            "bio": r.bio or "", "playlists": int(r.n or 0)} for r in users],
                    playlists=[pl_summary(p, lk) for p in pls])
 
@@ -694,19 +776,19 @@ def feed():
     lk = liked_set(cu["sub"] if cu else None)
     top = q(PL_SELECT + "WHERE p.tracks <> '[]' ORDER BY likes DESC, p.updated DESC LIMIT 12")
     recent = q(PL_SELECT + "WHERE p.tracks <> '[]' ORDER BY p.updated DESC LIMIT 12")
-    users = q("SELECT id,username,color,avatar,bio,"
+    users = q("SELECT id,username,color,avatar,bio,(CASE WHEN COALESCE(avatar_img,'')<>'' THEN COALESCE(NULLIF(imgv,''),'1') ELSE '' END) AS pic,"
               "(SELECT COUNT(*) FROM public_playlists p WHERE p.user_id=users.id AND p.tracks <> '[]') AS n "
               "FROM users ORDER BY COALESCE(created,'') DESC LIMIT 12")
     stats = q1("SELECT (SELECT COUNT(*) FROM users) AS u, (SELECT COUNT(*) FROM public_playlists WHERE tracks <> '[]') AS p")
     return jsonify(top=[pl_summary(p, lk) for p in top], recent=[pl_summary(p, lk) for p in recent],
-                   users=[{"id": r.id, "username": r.username, "color": r.color or 0, "avatar": r.avatar or "",
+                   users=[{"id": r.id, "username": r.username, "color": r.color or 0, "avatar": r.avatar or "", "pic": r.pic or "",
                            "bio": r.bio or "", "playlists": int(r.n or 0)} for r in users],
                    stats={"users": int(stats.u or 0), "playlists": int(stats.p or 0)})
 
 
 @app.get("/api/users/<username>")
 def get_user(username):
-    row = q1("SELECT id,username,color,avatar,bio,created FROM users WHERE lower(username)=:u", u=username.lower())
+    row = q1("SELECT id,username,color,avatar,bio,created,avatar_img,banner_img,imgv,accent,status,banner_color FROM users WHERE lower(username)=:u", u=username.lower())
     if not row: return err("Utilisateur introuvable", 404)
     cu = current_user()
     lk = liked_set(cu["sub"] if cu else None)
@@ -718,9 +800,9 @@ def get_user(username):
         s = pl_summary(p, lk)
         s["tracks"] = tr
         playlists.append(s)
-    return jsonify(id=row.id, username=row.username, color=row.color or 0, avatar=row.avatar or "",
-                   bio=row.bio or "", created=row.created, playlists=playlists,
-                   likes=sum(p["likes"] for p in playlists))
+    pub = user_json(row, private=False)
+    pub.update(playlists=playlists, likes=sum(p["likes"] for p in playlists))
+    return jsonify(pub)
 
 
 # ── Playlists publiques ──────────────────────────────────────────────────────
@@ -845,7 +927,7 @@ def like_track():
 
 
 # ── Sons publiés (indépendants, hors playlists) ──────────────────────────────
-POST_SELECT = ("SELECT p.id,p.url,p.title,p.author,p.cover,p.duration,p.created,u.username,u.color,u.avatar,"
+POST_SELECT = ("SELECT p.id,p.url,p.title,p.author,p.cover,p.duration,p.created,u.username,u.color,u.avatar,(CASE WHEN COALESCE(u.avatar_img,'')<>'' THEN COALESCE(NULLIF(u.imgv,''),'1') ELSE '' END) AS pic,"
                "(SELECT COUNT(*) FROM post_likes l WHERE l.post_id=p.id) AS likes "
                "FROM posts p JOIN users u ON u.id=p.user_id ")
 
@@ -866,7 +948,7 @@ def list_posts():
                 mine.add(r[0])
     return jsonify(more=more, posts=[{
         "id": r.id, "url": r.url, "title": r.title or "Son TikTok", "author": r.author or "", "cover": r.cover or "",
-        "duration": r.duration or 0, "created": r.created, "username": r.username, "color": r.color or 0,
+        "duration": r.duration or 0, "created": r.created, "username": r.username, "color": r.color or 0, "pic": r.pic or "",
         "likes": int(r.likes or 0), "liked": r.id in mine, "mine": bool(cu and cu["sub"] == r.user_id)} for r in rows])
 
 
@@ -1134,10 +1216,25 @@ def spotify_import():
         return err("Impossible de lire ce lien Spotify. Vérifie que la playlist est publique.", 502)
     return jsonify(name=name, sid=f"{kind}:{sid}", tracks=tracks[:300])
 
-def search_candidates(prefix, query, n=5):
+BAD_WORDS = ("cover", "karaoke", "instrumental", "reaction", "nightcore", "sped up", "speed up", "slowed",
+             "8d", "remix", "live", "tutorial", "lesson", "piano", "acoustic", "mashup", "bass boosted", "reverb",
+             "type beat", "lyric video", "shorts")
+STOP = {"the", "a", "an", "of", "and", "feat", "ft", "featuring", "with", "x", "&", "-", "official", "audio", "video"}
+
+def _norm(t):
+    t = re.sub(r"\(.*?\)|\[.*?\]", " ", str(t or "").lower())
+    t = re.sub(r"\s-\s(remaster(ed)?|\d{4}|live|mono|stereo|single|radio|version|edit|bonus).*$", " ", t)
+    return re.sub(r"\s+", " ", re.sub(r"[^\w\s]", " ", t, flags=re.U)).strip()
+
+def _tokens(t):
+    return [w for w in _norm(t).split() if w not in STOP and len(w) > 1]
+
+def search_candidates(prefix, query, n=6):
     """Résultats de recherche sans téléchargement. prefix : ytsearch (YouTube) ou scsearch (SoundCloud)."""
     try:
-        with yt_dlp.YoutubeDL({"quiet": True, "extract_flat": True, "skip_download": True, "socket_timeout": 15}) as y:
+        o = {"quiet": True, "extract_flat": True, "skip_download": True, "socket_timeout": 15}
+        o.update(_net_opts())
+        with yt_dlp.YoutubeDL(o) as y:
             res = y.extract_info(f"{prefix}{n}:{query}", download=False)
         out = []
         for e in (res or {}).get("entries") or []:
@@ -1150,7 +1247,8 @@ def search_candidates(prefix, query, n=5):
                 continue
             try: d = int(float(e.get("duration") or 0))
             except Exception: d = 0
-            out.append({"url": u, "duration": d, "src": prefix})
+            out.append({"url": u, "duration": d, "src": prefix, "title": str(e.get("title") or ""),
+                        "chan": str(e.get("uploader") or e.get("channel") or "")})
         if not out:
             log.warning("Recherche %s : aucun résultat pour « %s »", prefix, query)
         return out
@@ -1158,27 +1256,84 @@ def search_candidates(prefix, query, n=5):
         log.warning("Recherche %s échouée pour « %s » : %s", prefix, query, str(ex)[:300])
         return []
 
+def _net_opts():
+    """Options réseau optionnelles : cookies / proxy (utile quand YouTube bloque l'IP du serveur)."""
+    o = {}
+    ck = os.environ.get("YTDLP_COOKIES")
+    if ck and os.path.exists(ck):
+        o["cookiefile"] = ck
+    if os.environ.get("YTDLP_PROXY"):
+        o["proxy"] = os.environ["YTDLP_PROXY"]
+    return o
+
+def _score(c, title, author, want):
+    """Plus c'est haut, plus la version ressemble au titre Spotify. Négatif = à éviter."""
+    ct = _norm(c["title"] + " " + c["chan"])
+    tk, ak = _tokens(title), _tokens(author.split(",")[0])
+    sc = 0.0
+    if tk:
+        sc += 4.0 * sum(1 for w in tk if w in ct) / len(tk)
+    if ak:
+        sc += 2.0 * sum(1 for w in ak if w in ct) / len(ak)
+    want_bad = _norm(title + " " + author)
+    for w in BAD_WORDS:
+        if w in ct and w not in want_bad:
+            sc -= 2.5
+    if "topic" in c["chan"].lower() or "official audio" in c["title"].lower():
+        sc += 1.5
+    if want and c["duration"]:
+        diff = abs(c["duration"] - want)
+        if diff <= max(4, want * 0.03): sc += 4.0
+        elif diff <= max(8, want * 0.08): sc += 2.0
+        elif diff <= max(15, want * 0.2): sc -= 0.5
+        else: sc -= 6.0
+    elif want and not c["duration"]:
+        sc -= 0.5
+    return sc
+
 def audio_from_search(opts, title, author, want):
-    """Cherche le titre sur YouTube puis SoundCloud, garde les versions dont la durée colle à Spotify."""
-    query = f"{author} - {title}".strip(" -")
-    pools = [search_candidates("ytsearch", query), search_candidates("scsearch", query)]
-    order = []
-    for tol in ((0.06, 0.25) if want else (None,)):
-        for cands in pools:
-            for c in cands:
-                if tol is None or (c["duration"] and abs(c["duration"] - want) <= max(8, want * tol)):
-                    if all(c["url"] != o["url"] for o in order):
-                        order.append(c)
-    for c in order[:4]:
-        try:
-            with yt_dlp.YoutubeDL(opts) as y:
-                info = y.extract_info(c["url"], download=True)
-            if info and info.get("entries"):
-                info = info["entries"][0]
-            log.info("Spotify « %s » → %s (%s)", query, c["src"], c["url"])
-            return info
-        except Exception as ex:
-            log.warning("Téléchargement %s échoué (%s) : %s", c["src"], c["url"], str(ex)[:300])
+    """Cherche le titre sur YouTube puis SoundCloud avec plusieurs formulations, classe les résultats
+    (titre, artiste, durée) et essaie les meilleurs jusqu'à ce qu'un téléchargement réussisse."""
+    first = re.split(r",|&| feat\.?| ft\.?", author or "")[0].strip()
+    clean = re.sub(r"\s*[\(\[].*?[\)\]]", "", title).strip() or title
+    queries = []
+    for qq in (f"{first} {clean}".strip(), f"{first} - {title} audio".strip(" -"),
+               f"{clean} {author}".strip(), f"{clean} official audio".strip()):
+        if qq and qq.lower() not in [x.lower() for x in queries]:
+            queries.append(qq)
+    t0, tried, seen, last = time.time(), 0, set(), None
+    for qi_, query in enumerate(queries):
+        if time.time() - t0 > 85 or tried >= 7:
+            break
+        pools = [search_candidates("ytsearch", query, 6)]
+        if qi_ == 0 or not pools[0]:
+            pools.append(search_candidates("scsearch", query, 4))
+        cands = []
+        for p in pools:
+            for c in p:
+                if c["url"] in seen:
+                    continue
+                c["score"] = _score(c, title, author, want)
+                cands.append(c)
+        cands.sort(key=lambda c: -c["score"])
+        for c in cands:
+            if c["score"] < 1.5 and tried >= 2:
+                continue            # trop éloigné du titre demandé
+            if time.time() - t0 > 85 or tried >= 7:
+                break
+            seen.add(c["url"]); tried += 1
+            try:
+                o = dict(opts); o.update(_net_opts())
+                with yt_dlp.YoutubeDL(o) as y:
+                    info = y.extract_info(c["url"], download=True)
+                if info and info.get("entries"):
+                    info = info["entries"][0]
+                log.info("Spotify « %s » → %s (%s) score=%.1f", query, c["src"], c["url"], c["score"])
+                return info
+            except Exception as ex:
+                last = str(ex)[:300]
+                log.warning("Téléchargement %s échoué (%s) : %s", c["src"], c["url"], last)
+    log.warning("Spotify : aucune version trouvée pour « %s - %s » (%d essais)", author, title, tried)
     return None
 
 
@@ -1214,13 +1369,14 @@ def extract():
         "socket_timeout": 20,
         "postprocessors": [{"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "128"}],
     }
+    opts.update(_net_opts())
     info = None
     if spotify:
         try: want = int(float(b.get("duration") or 0))
         except Exception: want = 0
         info = audio_from_search(opts, title_in, author_in, want)
         if not info:
-            return err(f"Aucune version audio trouvée pour « {title_in[:50]} ».", 502)
+            return err(f"Aucune version audio trouvée pour « {title_in[:50]} ».", 502, retry=True)
     else:
         essais = [url.replace("/photo/", "/video/"), url] if "/photo/" in url else [url]
         for u in essais:

@@ -18,7 +18,7 @@
 <script>
 /* Applique le thème avant l'affichage pour éviter un flash */
 try{const u=(JSON.parse(localStorage.getItem("tiksound")||"{}").ui)||{},h=document.documentElement;
-if(u.theme)h.dataset.theme=u.theme;if(u.bg)h.dataset.bg=u.bg;if(u.motion===false)h.dataset.motion="off";if(u.grain===false)h.dataset.grain="off";if(u.cover)h.dataset.cover=u.cover;
+if(u.theme)h.dataset.theme=u.theme;if(u.bg)h.dataset.bg=(u.bg==="image"&&!u.hasBg)?"aurora":u.bg;if(u.motion===false)h.dataset.motion="off";if(u.grain===false)h.dataset.grain="off";if(u.cover)h.dataset.cover=u.cover;
 if(u.accent)h.style.setProperty("--ac",u.accent);if(u.blur!=null)h.style.setProperty("--blur",u.blur+"px");if(u.radius!=null)h.style.setProperty("--r",u.radius+"px");}catch(e){}
 </script>
 <style>
@@ -57,6 +57,24 @@ html[data-bg=mesh] #aurora i{animation:none}
 html[data-theme=clair] #aurora i{opacity:.32}
 html[data-grain=on] body::after{content:"";position:fixed;inset:0;z-index:60;pointer-events:none;opacity:.05;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
 
+#bgimg{position:absolute;inset:-6%;background-size:cover;background-position:center;opacity:0;transition:opacity .6s;filter:blur(var(--bgb,0px));transform:translateZ(0)}
+html[data-bg=image] #bgimg.on{opacity:var(--bgo,.5)}
+html[data-bg=image] #aurora i{opacity:.04}
+html:not([data-bg=image]) #bgimg{display:none}
+.av.img{background:var(--card);text-shadow:none}
+.av img{width:100%;height:100%;object-fit:cover;border-radius:50%;display:block}
+.av.emo1{background:var(--card)}
+.pbox{padding:0!important;overflow:hidden;margin-bottom:0}
+.banner{position:relative;height:150px;background-size:cover;background-position:center}
+.pbox .prof,.pbox .pub-header{padding:0 24px 24px;margin-bottom:0;align-items:flex-end}
+.pbox .prof>div:first-child,.pbox .pub-header>.av,.pbox .pub-header>.avw{margin-top:-46px}
+.pbox .av{box-shadow:0 0 0 4px var(--cardS),0 8px 24px #0006}
+.pbox .pub-header{border:0;background:none}
+.stt{display:inline-flex;align-items:center;gap:6px;padding:3px 11px;border-radius:99px;background:color-mix(in oklab,var(--ac) 18%,transparent);color:var(--act);font-size:13px;margin:2px 0 6px}
+.pa-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center}
+.pa-row .acc{width:26px;height:26px}
+.prof input.stin{width:100%;max-width:420px;padding:9px 14px;border-radius:12px;border:1px solid var(--br2);background:var(--card);margin-top:8px;font-size:14px}
+@media(max-width:760px){.banner{height:110px}.pbox .prof,.pbox .pub-header{padding:0 16px 20px}.pbox .prof>div:first-child{margin-top:-40px}}
 /* ── Verre ───────────────────────────── */
 .glass{background:var(--glass);-webkit-backdrop-filter:blur(var(--blur)) saturate(170%);backdrop-filter:blur(var(--blur)) saturate(170%);border:1px solid var(--br)}
 .gcard{background:var(--card);border:1px solid var(--br);border-radius:var(--r);box-shadow:inset 0 1px 0 var(--hl)}
@@ -508,7 +526,7 @@ button,a{-webkit-tap-highlight-color:transparent}
 </style>
 </head>
 <body class="nopl">
-<div id="aurora" aria-hidden="true"><i></i><i></i><i></i><b id="ambient"></b></div>
+<div id="aurora" aria-hidden="true"><i></i><i></i><i></i><b id="bgimg"></b><b id="ambient"></b></div>
 
 <header class="glass"><div class="bar">
   <a class="logo" href="#accueil"><span class="lg-eq"><i></i><i></i><i></i></span>Tiksound</a>
@@ -695,7 +713,7 @@ const FONTS   = {
   syne:{n:"Syne",b:'"DM Sans"',d:'"Syne"',u:"Syne:wght@600;800"},
   mono:{n:"JetBrains Mono",b:'"JetBrains Mono"',d:'"JetBrains Mono"',u:"JetBrains+Mono:wght@400;500;800"}
 };
-const UI_DEF  = {theme:"dark",accent:"#dcdce0",bg:"aurora",grain:true,blur:18,radius:16,size:"m",font:"dm",motion:true,haptic:true,cover:"square",view:"grid",sort:"recent",filter:"all"};
+const UI_DEF  = {theme:"dark",accent:"#dcdce0",bg:"aurora",grain:true,blur:18,radius:16,size:"m",font:"dm",motion:true,haptic:true,cover:"square",view:"grid",sort:"recent",filter:"all",bgo:50,bgb:0,hasBg:false,syncUI:null};
 const RATES   = {"1":[1,true,"Vitesse normale"],"0.75":[.75,true,"0,75×"],"1.25":[1.25,true,"1,25×"],"1.5":[1.5,true,"1,5×"],"2":[2,true,"2×"],"slowed":[.85,false,"Slowed"],"spedup":[1.25,false,"Sped up"]};
 const TIPS = [
   ["Mode plein écran","Touche la pochette dans le lecteur pour l'ouvrir en grand."],
@@ -823,7 +841,7 @@ const loadedFonts = new Set();
 function loadFont(f){ if(!f||!f.u||loadedFonts.has(f.u)) return; loadedFonts.add(f.u); const l=document.createElement("link"); l.rel="stylesheet"; l.href="https://fonts.googleapis.com/css2?family="+f.u+"&display=swap"; document.head.appendChild(l); }
 function applyUI(){
   const u=S.ui, h=document.documentElement;
-  h.dataset.theme=u.theme; h.dataset.bg=u.bg; h.dataset.motion=u.motion?"on":"off"; h.dataset.grain=u.grain?"on":"off"; h.dataset.cover=u.cover;
+  h.dataset.theme=u.theme; h.dataset.bg=(u.bg==="image"&&!u.hasBg)?"aurora":u.bg; h.style.setProperty("--bgo",(u.bgo==null?50:u.bgo)/100); h.style.setProperty("--bgb",(u.bgb||0)+"px"); h.dataset.motion=u.motion?"on":"off"; h.dataset.grain=u.grain?"on":"off"; h.dataset.cover=u.cover;
   h.style.setProperty("--ac",u.accent);
   h.style.setProperty("--on", lum(u.accent)>.42?"#0b0b0c":"#ffffff");
   h.style.setProperty("--blur",u.blur+"px");
@@ -834,7 +852,24 @@ function applyUI(){
   const bg=getComputedStyle(document.body).getPropertyValue("--bg").trim();
   document.querySelector('meta[name="theme-color"]').content=bg||"#0b0b0c";
 }
-function setUI(k,v,noRe){ S.ui[k]=v; save(); applyUI(); if(!noRe) renderCustom(); if(["size","view"].includes(k)) render(); }
+const UI_SYNC=["theme","accent","bg","grain","blur","radius","font","motion","cover","bgo","bgb"];
+const syncOn=()=>S.ui.syncUI==null ? matchMedia("(min-width:761px) and (pointer:fine)").matches : !!S.ui.syncUI;
+let uiPushT=null;
+function pushUI(){
+  if(!ME||!syncOn()) return; clearTimeout(uiPushT);
+  uiPushT=setTimeout(async()=>{ const ui={}; UI_SYNC.forEach(k=>ui[k]=S.ui[k]);
+    try{ const d=await api("/api/auth/me",{method:"PATCH",body:{ui}}); ME.ui=d.ui; ME.ui_v=d.ui_v; S.uiVer=d.ui_v; save(); }catch(e){} },900);
+}
+function applyServerUI(d){
+  if(!d||!syncOn()) return;
+  const ui=d.ui||{};
+  if(!Object.keys(ui).length){ pushUI(); return; }          // rien sur le compte : on y met l'apparence de cet appareil
+  if(d.ui_v && d.ui_v===S.uiVer) return;                    // déjà à jour
+  UI_SYNC.forEach(k=>{ if(k in ui) S.ui[k]=ui[k]; });
+  S.uiVer=d.ui_v; save(); applyUI(); if(!$("#cz").hidden) renderCustom();
+}
+function toggleSyncUI(){ S.ui.syncUI=!syncOn(); save(); if(S.ui.syncUI&&ME){ S.uiVer=null; applyServerUI(ME); toast("Apparence synchronisée avec ton compte",{type:"ok"}); } renderCustom(); }
+function setUI(k,v,noRe){ S.ui[k]=v; save(); applyUI(); if(!noRe) renderCustom(); if(["size","view"].includes(k)) render(); if(UI_SYNC.includes(k)) pushUI(); }
 function openCustom(){ Object.values(FONTS).forEach(loadFont); renderCustom(); openSh("cz"); }
 function renderCustom(){
   const u=S.ui;
@@ -843,17 +878,36 @@ function renderCustom(){
   $("#czb").innerHTML=`
   <div class="cz-sec"><h4>Thème</h4><div class="themes">${THEMES.map(([k,n,c1,c2])=>`<button class="th ${u.theme===k?"on":""}" onclick="setUI('theme','${k}')"><span class="thp" style="background:${c1}"><i style="background:${c2}"></i><i style="background:${c2}"></i><i style="background:var(--ac)"></i></span>${n}</button>`).join("")}</div></div>
   <div class="cz-sec"><h4>Couleur principale</h4><div class="accs">${ACCENTS.map(([n,c])=>`<button class="acc ${u.accent.toLowerCase()===c?"on":""}" style="--c:${c}" onclick="setUI('accent','${c}')" aria-label="${n}" title="${n}"></button>`).join("")}<label class="acc custom ${ACCENTS.some(a=>a[1]===u.accent.toLowerCase())?"":"on"}" style="--c:${esc(u.accent)}" title="Couleur personnalisée">${I("plus",16)}<input type="color" value="${esc(u.accent)}" oninput="setUI('accent',this.value,1)" onchange="renderCustom()" aria-label="Couleur personnalisée"></label></div></div>
-  <div class="cz-sec"><h4>Fond d'écran</h4>${seg("bg",[["aurora","Aurore"],["cover","Pochette"],["mesh","Statique"],["plain","Uni"]])}<div class="cz-row" style="margin-top:8px"><span>Grain façon pellicule</span>${sw("grain")}</div></div>
+  <div class="cz-sec"><h4>Fond d'écran</h4>${seg("bg",[["aurora","Aurore"],["cover","Pochette"],["mesh","Statique"],["plain","Uni"],["image","Ma photo"]])}${u.bg==="image"?`<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn alt sm" onclick="pickBg()">${I("up2",16)}${u.hasBg?"Changer l'image":"Choisir une image"}</button>${u.hasBg?`<button class="btn alt sm" onclick="clearBgImage()">${I("trash",16)}Retirer</button>`:""}</div>${u.hasBg?`<h4 style="margin-top:14px">Visibilité <em>${u.bgo} %</em></h4><input type="range" min="5" max="100" value="${u.bgo}" oninput="setUI('bgo',+this.value,1);this.previousElementSibling.querySelector('em').textContent=this.value+' %'"><h4 style="margin-top:10px">Flou <em>${u.bgb} px</em></h4><input type="range" min="0" max="40" value="${u.bgb}" oninput="setUI('bgb',+this.value,1);this.previousElementSibling.querySelector('em').textContent=this.value+' px'"><p class="a" style="margin-top:6px">L'image reste sur cet appareil.</p>`:""}`:""}<div class="cz-row" style="margin-top:8px"><span>Grain façon pellicule</span>${sw("grain")}</div></div>
   <div class="cz-sec"><h4>Effet verre <em>${u.blur} px</em></h4><input type="range" min="0" max="40" value="${u.blur}" oninput="setUI('blur',+this.value,1);this.previousElementSibling.querySelector('em').textContent=this.value+' px'"></div>
   <div class="cz-sec"><h4>Arrondis <em>${u.radius} px</em></h4><input type="range" min="4" max="28" value="${u.radius}" oninput="setUI('radius',+this.value,1);this.previousElementSibling.querySelector('em').textContent=this.value+' px'"></div>
   <div class="cz-sec"><h4>Taille des pochettes</h4>${seg("size",[["s","Petite"],["m","Moyenne"],["l","Grande"]])}</div>
   <div class="cz-sec"><h4>Style de pochette</h4>${seg("cover",[["square","Carrée"],["vinyl","Vinyle qui tourne"]])}</div>
   <div class="cz-sec"><h4>Police</h4><div class="fonts">${Object.entries(FONTS).map(([k,f])=>`<button class="${u.font===k?"on":""}" style="font-family:${esc(f.d)},sans-serif" onclick="setUI('font','${k}')">${f.n}</button>`).join("")}</div></div>
   <div class="cz-sec"><div class="cz-row"><span>Animations et effets</span>${sw("motion")}</div><div class="cz-row"><span>Vibrations au toucher</span>${sw("haptic")}</div></div>
+  <div class="cz-sec"><div class="cz-row"><span>Synchroniser avec mon compte<br><small class="a">${ME?(syncOn()?"Même apparence sur tes appareils":"Cet appareil garde son propre style"):"Connecte-toi pour l'activer"}</small></span><button class="sw2 ${syncOn()?"on":""}" role="switch" aria-checked="${syncOn()}" onclick="toggleSyncUI()"><i></i></button></div></div>
   <div class="cz-sec" style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn alt sm" onclick="resetUI()">Réinitialiser</button><button class="btn alt sm" onclick="closeSh('cz');showShortcuts()">${I("kbd",16)} Raccourcis clavier</button></div>`;
   $$("#czb input[type=range]").forEach(paintRange);
 }
-function resetUI(){ const keep={view:S.ui.view,sort:S.ui.sort,filter:S.ui.filter}; S.ui=Object.assign({},UI_DEF,keep); save(); applyUI(); renderCustom(); render(); toast("Apparence réinitialisée"); }
+let bgUrl=null;
+async function loadBgImage(){
+  try{ const b=await dbop("get","bgimg"), el=$("#bgimg"); if(bgUrl){ URL.revokeObjectURL(bgUrl); bgUrl=null; }
+    if(b){ bgUrl=URL.createObjectURL(b); el.style.backgroundImage=`url("${bgUrl}")`; el.classList.add("on"); }
+    else { el.style.backgroundImage=""; el.classList.remove("on"); if(S.ui.hasBg){ S.ui.hasBg=false; save(); applyUI(); } } }catch(e){}
+}
+async function shrink(file,w,h,q,out,crop){
+  let bmp=null; try{ bmp=await createImageBitmap(file); }catch(e){}
+  if(!bmp) bmp=await new Promise((ok,ko)=>{ const i=new Image(); i.onload=()=>ok(i); i.onerror=ko; i.src=URL.createObjectURL(file); });
+  const sw=bmp.width, sh=bmp.height; let dw,dh,sx=0,sy=0,sW=sw,sH=sh;
+  if(crop){ dw=w; dh=h; const r=w/h; if(sw/sh>r){ sW=sh*r; sx=(sw-sW)/2; } else { sH=sw/r; sy=(sh-sH)/2; } }
+  else { const k=Math.min(1,w/sw,h/sh); dw=Math.round(sw*k); dh=Math.round(sh*k); }
+  const c=document.createElement("canvas"); c.width=dw; c.height=dh; const g=c.getContext("2d"); g.fillStyle="#000"; g.fillRect(0,0,dw,dh); g.drawImage(bmp,sx,sy,sW,sH,0,0,dw,dh);
+  return out==="blob" ? new Promise(r=>c.toBlob(r,"image/jpeg",q)) : c.toDataURL("image/jpeg",q);
+}
+function pickFile(cb){ const i=document.createElement("input"); i.type="file"; i.accept="image/*"; i.onchange=()=>{ if(i.files[0]) cb(i.files[0]); }; i.click(); }
+function pickBg(){ pickFile(async f=>{ try{ const b=await shrink(f,1600,1600,.8,"blob"); await dbop("put",b,"bgimg"); S.ui.hasBg=true; S.ui.bg="image"; save(); await loadBgImage(); applyUI(); renderCustom(); pushUI(); }catch(e){ toast("Image illisible",{type:"err"}); } }); }
+async function clearBgImage(){ try{ await dbop("delete","bgimg"); }catch(e){} S.ui.hasBg=false; if(S.ui.bg==="image") S.ui.bg="aurora"; save(); await loadBgImage(); applyUI(); renderCustom(); pushUI(); }
+function resetUI(){ const keep={view:S.ui.view,sort:S.ui.sort,filter:S.ui.filter,storage:S.ui.storage,syncUI:S.ui.syncUI,hasBg:S.ui.hasBg}; S.ui=Object.assign({},UI_DEF,keep); save(); applyUI(); renderCustom(); render(); pushUI(); toast("Apparence réinitialisée"); }
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  Effets (ripple, spotlight, inclinaison, confettis)
@@ -939,7 +993,7 @@ function closeTop(){
 let AU={mode:"login", email:"", user:"", pw:"", purpose:"register", cdUntil:0, busy:false};
 let cdTimer=null, userTimer=null;
 
-async function checkMe(){ try { ME=await api("/api/auth/me"); } catch(e) { ME=null; } }
+async function checkMe(){ try { ME=await api("/api/auth/me"); applyServerUI(ME); } catch(e) { ME=null; } }
 function openAuth(mode="login"){ AU.mode=mode; renderAuth(); $("#auth-modal").hidden=false; }
 function closeAuth(){ $("#auth-modal").hidden=true; clearInterval(cdTimer); }
 function setMode(m){ AU.mode=m; renderAuth(); }
@@ -1037,7 +1091,7 @@ async function resendCode(){
   try{ const d=await api("/api/auth/resend",{method:"POST",body:{email:AU.email.trim().toLowerCase(),purpose:AU.purpose}}); startCd(d.cooldown); toast("Nouveau code envoyé",{type:"ok"}); authErr(""); }
   catch(e){ if(e.data&&e.data.wait) startCd(e.data.wait); authErr(e.message); }
 }
-function setMe(d){ ME={id:d.id,username:d.username,color:d.color||0,email:d.email,bio:d.bio||"",avatar:d.avatar||"",created:d.created}; AU.pw=""; closeAuth(); FEED=null; render(); restorePublic(); syncAllPublic(); syncLibrary(); }
+function setMe(d){ ME=Object.assign({},d,{color:d.color||0,bio:d.bio||"",avatar:d.avatar||""}); delete ME.ok; applyServerUI(ME); AU.pw=""; closeAuth(); FEED=null; render(); restorePublic(); syncAllPublic(); syncLibrary(); }
 async function logout(){ try{ await api("/api/auth/logout",{method:"POST"}); }catch(e){} ME=null; render(); toast("Déconnecté"); }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1110,7 +1164,7 @@ async function convert(inputId, btn){
     if(urls.length===1 && inputId==="u1") location.hash="bibliotheque";
   }
 }
-async function dl(id, silent){
+async function dl(id, silent, _try=0){
   const t=S.tracks.find(x=>x.id===id); if(!t||!t.url) return false;
   if(!ONLINE&&!await ping()){ toast("Service momentanément indisponible. Réessaie dans un instant.",{type:"err"}); return false; }
   if(!silent) toast("Téléchargement de « "+t.title+" »…");
@@ -1118,9 +1172,14 @@ async function dl(id, silent){
     const d=await grab(t.url,t.id);
     Object.assign(t,{title:t.title||d.title,author:d.author||t.author,cover:d.cover||t.cover||"",duration:d.duration||t.duration||0,local:!d.remote,remote:d.remote?d.audio_url:"",pending:false});
     save(); render(); if(!silent) toast("Prêt à écouter",{type:"ok"}); return true;
-  }catch(e){ toast(e.message,{type:"err"}); return false; }
+  }catch(e){ if(_try<1 && e.status!==429 && e.status!==0){ await sleep(1500); return dl(id,silent,1); } toast(e.message,{type:"err"}); return false; }
 }
-async function dlAll(ids){ const list=ids.filter(id=>{const t=S.tracks.find(x=>x.id===id);return t&&t.pending}); let n=0; for(const id of list){ toast("Téléchargement "+(++n)+" / "+list.length+"…"); await dl(id,true); } if(n) toast("Tous les sons sont prêts",{type:"ok"}); }
+async function dlAll(ids){
+  const list=ids.filter(id=>{const t=S.tracks.find(x=>x.id===id);return t&&t.pending}); let fail=[], n=0;
+  for(const id of list){ toast("Téléchargement "+(++n)+" / "+list.length+"…"); if(!await dl(id,true)) fail.push(id); }
+  if(fail.length){ toast("Nouvel essai pour "+fail.length+" son"+(fail.length>1?"s":"")+"…"); await sleep(2000); const f2=[]; for(const id of fail){ if(!await dl(id,true)) f2.push(id); } fail=f2; }
+  if(list.length) toast((list.length-fail.length)+" / "+list.length+" sons prêts"+(fail.length?" · "+fail.length+" introuvable"+(fail.length>1?"s":""):""),{type:fail.length?"":"ok",ms:4500});
+}
 async function pasteIt(){ try{ $("#u2").value=await navigator.clipboard.readText(); if(linksIn($("#u2").value).length) toast("Lien collé"); }catch(e){ toast("Colle le lien à la main"); $("#u2").focus(); } }
 async function loadCovers(){ for(const t of S.tracks){ if(COVERS[t.id]) continue; try{ const b=await dbop("get","cv:"+t.id); if(b) COVERS[t.id]=URL.createObjectURL(b); }catch(e){} } render(); }
 
@@ -1297,7 +1356,18 @@ function streak(){ const set=new Set(S.stats.days); let n=0; const d=new Date();
 //  Rendu : éléments
 // ═══════════════════════════════════════════════════════════════════════════
 const cover = (t, cls="") => { const s=cvSrc(t); return `<div class="cv ${cls}"><span>${esc(initial(t))}</span>${s?`<img src="${esc(s)}" alt="" loading="lazy">`:""}</div>`; };
-function avatarHTML(u, size=44){ const c=COL[(u&&u.color)||0]||COL[0]; return `<div class="av" style="background:linear-gradient(135deg,${c},color-mix(in oklab,${c} 55%,#000));width:${size}px;height:${size}px;font-size:${Math.round(size*.46)}px">${esc(((u&&u.username)||"?")[0].toUpperCase())}</div>`; }
+function avatarHTML(u, size=44){
+  const c=COL[(u&&u.color)||0]||COL[0], d=`width:${size}px;height:${size}px;font-size:${Math.round(size*.46)}px`;
+  if(u&&u.pic&&u.username) return `<div class="av img" style="${d}"><img src="/api/img/${encodeURIComponent(u.username)}/a?v=${encodeURIComponent(u.pic)}" alt="" loading="lazy"></div>`;
+  if(u&&u.avatar) return `<div class="av emo1" style="${d};font-size:${Math.round(size*.56)}px;text-shadow:none">${esc(u.avatar)}</div>`;
+  return `<div class="av" style="background:linear-gradient(135deg,${c},color-mix(in oklab,${c} 55%,#000));${d}">${esc(((u&&u.username)||"?")[0].toUpperCase())}</div>`;
+}
+const accOf=u=>(u&&u.accent)||COL[(u&&u.color)||0]||COL[0];
+const accStyle=u=>{ const a=accOf(u); return `--ac:${a};--act:${a};--on:${lum(a)>.42?"#0b0b0c":"#ffffff"}`; };
+function bannerHTML(u,edit){
+  const a=accOf(u), bg=u.ban?`url('/api/img/${encodeURIComponent(u.username)}/b?v=${encodeURIComponent(u.ban)}')`:`linear-gradient(120deg,${a},color-mix(in oklab,${a} 35%,#000))`;
+  return `<div class="banner" style="background-image:${bg}">${edit?`<button class="btn alt sm" style="position:absolute;right:12px;top:12px;backdrop-filter:blur(10px)" onclick="bannerMenu()">${I("up2",16)}Bannière</button>`:""}</div>`;
+}
 function card(t, key, i, actions=true){
   const c=q[qi]===t.id, pl=c&&!au.paused&&!!au.src, src=cvSrc(t);
   return `<div class="tc ${c?"cur":""} ${pl?"pl":""}" data-id="${t.id}">
@@ -1446,15 +1516,17 @@ function renderProf(){
   const stats=`<div class="stat-row">${[["Sons",S.tracks.length],["Playlists",S.pls.length],["Favoris",favN],["Série",st]].map(([l,n])=>`<div class="stat gcard"><b data-n="${n}">${n}</b><span>${l}</span></div>`).join("")}<div class="stat gcard"><b>${fmtLen(S.stats.sec)}</b><span>d'écoute</span></div></div>`;
   let h="";
   if(!ME) h+=`<div class="prof gcard">${avatarHTML({username:"?",color:S.prof.color||0},96)}<div class="m"><h3 style="font-size:24px">Tu n'es pas connecté</h3><p class="a" style="margin:6px 0 14px;max-width:44ch">Crée un compte gratuit pour publier tes playlists, avoir ton profil public et liker celles des autres.</p><div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn" onclick="openAuth('register')">Créer un compte</button><button class="btn alt" onclick="openAuth('login')">Se connecter</button></div></div></div>`;
-  else h+=`<div class="prof gcard">
-      <div>${avatarHTML(ME,96)}</div>
+  else h+=`<div class="pbox gcard" style="${accStyle(ME)}">${bannerHTML(ME,true)}<div class="prof">
+      <div style="position:relative">${avatarHTML(ME,96)}<button class="icon-btn ring" style="position:absolute;right:-6px;bottom:-6px;width:34px;height:34px" onclick="avatarMenu()" aria-label="Changer la photo">${I("edit",15)}</button></div>
       <div class="m"><div style="display:flex;align-items:center;gap:6px"><span class="disp" style="font-size:28px;font-weight:800">@${esc(ME.username)}</span><button class="icon-btn sm" onclick="changeUsername()" aria-label="Changer de pseudo">${I("edit",16)}</button></div>
         <div class="a">${esc(ME.email)}${ME.created?" · membre depuis "+new Date(ME.created.replace(" ","T")+"Z").toLocaleDateString("fr-FR",{month:"long",year:"numeric"}):""}</div>
         <textarea id="bio" rows="2" maxlength="160" placeholder="Écris une petite bio (visible sur ton profil public)…" onblur="saveBio()">${esc(ME.bio||"")}</textarea>
         <div class="swr">${COL.map((c,i)=>`<button class="sw ${i==ME.color?"on":""}" style="background:${c}" onclick="setColor(${i})" aria-label="Couleur ${i+1}"></button>`).join("")}</div>
+        <input class="stin" id="stt" maxlength="40" placeholder="Ton humeur du moment (ex : 🎧 en boucle sur du lofi)" value="${esc(ME.status||"")}" onblur="saveStatus()">
+        <div class="pa-row"><span class="a">Couleur du profil</span>${ACCENTS.map(([n,c])=>`<button class="acc ${(ME.accent||"").toLowerCase()===c?"on":""}" style="--c:${c}" title="${n}" aria-label="${n}" onclick="setProfAccent('${c}')"></button>`).join("")}<button class="chip" onclick="setProfAccent('')">Auto</button></div>
       </div>
       <div style="display:flex;flex-direction:column;gap:8px"><button class="btn alt sm" onclick="viewUser(${js(ME.username)})">${I("eye",16)}Mon profil public</button><button class="btn alt sm" onclick="copyTxt(location.origin+'/?u='+encodeURIComponent(ME.username),'Lien du profil copié')">${I("link",16)}Copier mon lien</button><button class="btn alt sm" onclick="logout()">${I("logout",16)}Se déconnecter</button></div>
-    </div>`;
+    </div></div>`;
   h+=stats;
   if(top.length) h+=`<div class="box gcard"><h3>${I("flame",20)}Ton podium</h3><div class="list">${top.map((t,i)=>row(t,"ptop",i).replace(`<span class="n">${i+1}</span>`,`<span class="n">${["","",""][i]}</span>`)).join("")}</div></div>`;
   h+=`<div class="box gcard"><h3>${I("palette",20)}Apparence</h3><p class="a" style="margin-bottom:14px">Thème, couleurs, fond animé, effet verre, police, pochettes vinyle…</p><button class="btn" onclick="openCustom()">${I("spark",18)}Personnaliser l'interface</button></div>`;
@@ -1477,7 +1549,18 @@ let profAnim=false;
 async function storage(){ try{ const e=await navigator.storage.estimate(); const s=$("#stor"); if(s) s.textContent=(e.usage/1048576).toFixed(1)+" Mo"; }catch(e){ const s=$("#stor"); if(s) s.textContent="—"; } }
 const isIOS=()=>/iphone|ipad|ipod/i.test(navigator.userAgent);
 const isStandalone=()=>matchMedia("(display-mode: standalone)").matches||navigator.standalone;
-async function patchMe(body, ok){ try{ const d=await api("/api/auth/me",{method:"PATCH",body}); Object.assign(ME,{username:d.username,color:d.color,bio:d.bio,avatar:d.avatar}); renderProf(); renderHome(); if(ok) toast(ok,{type:"ok"}); return true; }catch(e){ toast(e.message,{type:"err"}); return false; } }
+async function patchMe(body, ok){ try{ const d=await api("/api/auth/me",{method:"PATCH",body}); Object.assign(ME,{username:d.username,color:d.color,bio:d.bio,avatar:d.avatar,pic:d.pic,ban:d.ban,accent:d.accent,status:d.status}); renderProf(); renderHome(); if(ok) toast(ok,{type:"ok"}); return true; }catch(e){ toast(e.message,{type:"err"}); return false; } }
+const EMOJIS=["🎧","🎵","🎶","🔥","✨","🌙","🌈","💜","🖤","🦋","🐱","🐼","🦊","🐸","🚀","👾","🍒","🌸","⚡","😎","🥀","🪩","🎸","🎹"];
+function avatarMenu(){ if(!ME) return; showOptions("Photo de profil",[
+  {l:"Choisir une photo",i:"up2",fn:()=>pickFile(async f=>{ try{ let q=.88,d; do{ d=await shrink(f,256,256,q,"url",true); q-=.12; }while(d.length>200000&&q>.3); patchMe({pic:d,avatar:""},"Photo mise à jour"); }catch(e){ toast("Image illisible",{type:"err"}); } })},
+  {l:"Utiliser un emoji",i:"spark",fn:()=>openGen("Choisis un emoji",`<div class="emo">${EMOJIS.map(e=>`<button onclick="setEmoji('${e}')">${e}</button>`).join("")}</div>`)},
+  (ME.pic||ME.avatar)&&{l:"Revenir à l'initiale",i:"trash",danger:true,fn:()=>patchMe({pic:null,avatar:""},"Photo retirée")}]); }
+function setEmoji(e){ closeSh("gen"); patchMe({avatar:e,pic:null},"Avatar mis à jour"); }
+function bannerMenu(){ if(!ME) return; showOptions("Bannière",[
+  {l:"Choisir une image",i:"up2",fn:()=>pickFile(async f=>{ try{ let q=.82,d; do{ d=await shrink(f,1200,400,q,"url",true); q-=.12; }while(d.length>600000&&q>.3); patchMe({ban:d},"Bannière mise à jour"); }catch(e){ toast("Image illisible",{type:"err"}); } })},
+  ME.ban&&{l:"Retirer l'image",i:"trash",danger:true,fn:()=>patchMe({ban:null},"Bannière retirée")}],"La couleur du profil sert de fond quand il n'y a pas d'image."); }
+function saveStatus(){ const v=($("#stt")||{}).value; if(!ME||v==null||v.trim()===(ME.status||"")) return; patchMe({status:v.trim()},"Humeur enregistrée"); }
+function setProfAccent(c){ if(!ME) return; patchMe({accent:c}); }
 function setColor(i){ if(!ME) return; ME.color=i; renderProf(); patchMe({color:i}); }
 function saveBio(){ const v=$("#bio").value.trim(); if(!ME||v===(ME.bio||"")) return; patchMe({bio:v},"Bio enregistrée"); }
 async function changeUsername(){ const v=await askText("Nouveau pseudo",ME.username,"3 à 24 caractères",24); if(!v||v===ME.username) return; if(!/^[A-Za-z0-9_-]{3,24}$/.test(v)) return toast("3 à 24 caractères : lettres, chiffres, _ ou -",{type:"err"}); patchMe({username:v},"Pseudo changé : @"+v); }
@@ -1629,7 +1712,7 @@ async function syncLibrary(manual){
   SYNC.busy=false;
 }
 setInterval(()=>{ if(ME && !SYNC.busy && (!S.sync || S.sync.uid!==ME.id || JSON.stringify(libSnap())!==S.sync.hash)) syncLibrary(false); }, 6000);
-document.addEventListener("visibilitychange",()=>{ if(!document.hidden && ME) syncLibrary(false); });
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden && ME){ syncLibrary(false); api("/api/auth/me").then(d=>{ if(ME){ Object.assign(ME,{ui:d.ui,ui_v:d.ui_v}); applyServerUI(d); } }).catch(()=>{}); } });
 
 async function restorePublic(){
   if(!ME) return;
@@ -1749,9 +1832,9 @@ async function viewUser(username){
 function renderPubProfile(){
   const u=pubData, mine=ME&&ME.id===u.id;
   $("#pub-view").innerHTML=`<a class="ib back" href="#decouvrir">${I("back",16)} Explorer</a>
-    <div class="pub-header gcard">${avatarHTML(u,88)}<div class="m"><h2>@${esc(u.username)}</h2>${u.bio?`<p style="margin-bottom:6px">${esc(u.bio)}</p>`:""}<p class="a">${plural(u.playlists.length,"playlist publique")} · ${I("heart",12)} ${u.likes} j'aime${u.created?" · depuis "+new Date(u.created.replace(" ","T")+"Z").toLocaleDateString("fr-FR",{month:"long",year:"numeric"}):""}</p></div>
-    <div style="display:flex;gap:8px">${mine?`<a class="btn alt sm" href="#profil">${I("edit",16)}Modifier</a>`:""}<button class="btn alt sm" onclick="shareLink(location.origin+'/?u='+encodeURIComponent(${js(u.username)}),'@'+${js(u.username)})">${I("share",16)}Partager</button></div></div>
-    ${u.playlists.length?`<div class="pls">${u.playlists.map(pubCard).join("")}</div>`:bigEmpty("queue",mine?"Tu n'as pas encore de playlist publique":"Pas encore de playlist publique",mine?"Ouvre une playlist et active « Publique » pour la partager ici.":"Reviens plus tard !",mine?`<a class="btn" href="#playlists">Mes playlists</a>`:"")}`;
+    <div class="pbox gcard" style="${accStyle(u)}">${bannerHTML(u,false)}<div class="pub-header">${avatarHTML(u,88)}<div class="m"><h2>@${esc(u.username)}</h2>${u.status?`<div class="stt">${esc(u.status)}</div>`:""}${u.bio?`<p style="margin-bottom:6px">${esc(u.bio)}</p>`:""}<p class="a">${plural(u.playlists.length,"playlist publique")} · ${I("heart",12)} ${u.likes} j'aime${u.created?" · depuis "+new Date(u.created.replace(" ","T")+"Z").toLocaleDateString("fr-FR",{month:"long",year:"numeric"}):""}</p></div>
+    <div style="display:flex;gap:8px">${mine?`<a class="btn alt sm" href="#profil">${I("edit",16)}Modifier</a>`:""}<button class="btn alt sm" onclick="shareLink(location.origin+'/?u='+encodeURIComponent(${js(u.username)}),'@'+${js(u.username)})">${I("share",16)}Partager</button></div></div></div>
+    <div style="height:26px"></div>${u.playlists.length?`<div class="pls">${u.playlists.map(pubCard).join("")}</div>`:bigEmpty("queue",mine?"Tu n'as pas encore de playlist publique":"Pas encore de playlist publique",mine?"Ouvre une playlist et active « Publique » pour la partager ici.":"Reviens plus tard !",mine?`<a class="btn" href="#playlists">Mes playlists</a>`:"")}`;
 }
 async function viewPublicPl(id){
   location.hash="user-profile"; const el=$("#pub-view");
@@ -1849,6 +1932,7 @@ addEventListener("hashchange", route);
 
   route();
   loadCovers();
+  loadBgImage();
   await Promise.all([checkMe(), ping()]);
   render();
   if(ME){ restorePublic(); syncAllPublic(); syncLibrary(); }
