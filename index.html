@@ -10,7 +10,14 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Tiksound">
-<link rel="apple-touch-icon" href="/icon-192.png">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="shortcut icon" href="/favicon.ico">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<meta name="msapplication-TileColor" content="#0b0b0c">
+<meta name="msapplication-TileImage" content="/icon-192.png">
 <script async src="https://js.stripe.com/dahlia/stripe.js"></script>
 <!--og-->
 <title>Tiksound – tes sons TikTok en playlist</title>
@@ -885,7 +892,7 @@ const FONTS   = {
 // Réservé à Premium (le choix reste enregistré : il revient si l'abonnement reprend)
 const PREM_UI={theme:new Set(["bordeaux","pastel","synth"]),bg:new Set(["vagues","etoiles","degrade"]),font:new Set(["playfair","caveat","pixel"])};
 const premUI=(k,v)=>(PREM_UI[k]&&PREM_UI[k].has(v))||(k==="accent2"&&!!v)||(k==="autoAcc"&&!!v);
-const UI_DEF  = {theme:"dark",accent:"#dcdce0",accent2:"",autoAcc:false,bg:"aurora",grain:true,blur:18,radius:16,size:"m",font:"dm",motion:true,haptic:true,cover:"square",view:"grid",sort:"recent",filter:"all",bgo:50,bgb:0,hasBg:false,syncUI:null,zoom:100,card:"glass",navl:true,viz:true,npbg:"cover",home:{}};
+const UI_DEF  = {theme:"dark",accent:"#dcdce0",accent2:"",autoAcc:false,bg:"aurora",grain:true,blur:18,radius:16,size:"m",font:"dm",motion:true,haptic:true,sfx:true,sfxv:60,cover:"square",view:"grid",sort:"recent",filter:"all",bgo:50,bgb:0,hasBg:false,syncUI:null,zoom:100,card:"glass",navl:true,viz:true,npbg:"cover",home:{}};
 const RATES   = {"1":[1,true,"Vitesse normale"],"0.75":[.75,true,"0,75×"],"1.25":[1.25,true,"1,25×"],"1.5":[1.5,true,"1,5×"],"2":[2,true,"2×"],"slowed":[.85,false,"Slowed"],"spedup":[1.25,false,"Sped up"]};
 const TIPS = [
   ["Mode plein écran","Touche la pochette dans le lecteur pour l'ouvrir en grand."],
@@ -987,6 +994,36 @@ function setRange(el,v){ el.value=v; paintRange(el); }
 function lum(hex){ const m=/^#?([0-9a-f]{6})$/i.exec(hex||""); if(!m) return .8; const n=parseInt(m[1],16); const c=[n>>16&255,n>>8&255,n&255].map(v=>{v/=255;return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4)}); return .2126*c[0]+.7152*c[1]+.0722*c[2]; }
 function haptic(){ if(S.ui.haptic && navigator.vibrate) try{navigator.vibrate(8)}catch(e){} }
 
+// ═══ Petits sons d'interface : synthétisés (aucun fichier à charger), courts, discrets, jamais en rafale ═══
+// [forme, Hz début, Hz fin, durée s, volume, retard s] — chaque son = 1 à 3 « notes » très brèves
+const SFXD={
+  tap:[["sine",540,300,.055,.22]], tick:[["triangle",1500,950,.03,.14]], nav:[["sine",900,640,.045,.13]],
+  pop:[["sine",320,780,.09,.28]], on:[["sine",420,900,.09,.26]], off:[["sine",640,300,.08,.22]],
+  like:[["sine",520,980,.1,.28],["sine",800,1600,.14,.2,.06]],
+  success:[["sine",880,880,.12,.18],["sine",1175,1175,.16,.18,.08],["sine",1568,1568,.24,.13,.16]],
+  err:[["sine",230,165,.14,.22],["sine",200,150,.17,.18,.09]],
+  play:[["sine",190,115,.11,.34],["triangle",900,520,.03,.1]], pause:[["sine",150,100,.09,.26]]
+};
+const SFX={ctx:null,t:0,n:0,last:"",idle:0};
+function sfx(name){
+  try{
+    const v=(+S.ui.sfxv||0)/100, d=SFXD[name], now=performance.now();
+    if(S.ui.sfx===false||!d||v<=0||document.hidden||now-SFX.t<70) return;     // anti-rafale : un son max toutes les 70 ms
+    SFX.t=now; SFX.n++; SFX.last=name;
+    if(!SFX.ctx){ const C=window.AudioContext||window.webkitAudioContext; if(!C) return; SFX.ctx=new C(); SFX.out=SFX.ctx.createGain(); SFX.out.connect(SFX.ctx.destination); }
+    const c=SFX.ctx; if(c.state==="suspended") c.resume().catch(()=>{});
+    SFX.out.gain.value=v*.6;
+    const t0=c.currentTime+.005;
+    for(const [type,f0,f1,dur,g,dl] of d){
+      const o=c.createOscillator(), a=c.createGain(), s=t0+(dl||0);
+      o.type=type; o.frequency.setValueAtTime(f0,s); o.frequency.exponentialRampToValueAtTime(f1,s+dur);
+      a.gain.setValueAtTime(.0001,s); a.gain.exponentialRampToValueAtTime(g,s+.004); a.gain.exponentialRampToValueAtTime(.0001,s+dur);
+      o.connect(a); a.connect(SFX.out); o.start(s); o.stop(s+dur+.02);
+    }
+    clearTimeout(SFX.idle); SFX.idle=setTimeout(()=>{ try{ c.suspend(); }catch(e){} },4000);   // libère la carte son quand rien ne se passe
+  }catch(e){}
+}
+
 function toast(m, o={}) {
   const box=$("#toasts"), t=document.createElement("div");
   t.className="toast glass "+(o.type||"");
@@ -994,6 +1031,7 @@ function toast(m, o={}) {
   let gone=false;
   const kill=()=>{ if(gone) return; gone=true; t.classList.remove("on"); setTimeout(()=>t.remove(),350); };
   if(o.action) t.querySelector("button").onclick=()=>{ o.fn&&o.fn(); kill(); };
+  if(o.type==="ok") sfx("success"); else if(o.type==="err") sfx("err");
   box.appendChild(t); requestAnimationFrame(()=>requestAnimationFrame(()=>t.classList.add("on")));
   while(box.children.length>3) box.firstChild.remove();
   setTimeout(kill, o.ms||2800);
@@ -1054,7 +1092,7 @@ function applyServerUI(d){
   S.uiVer=d.ui_v; save(); applyUI(); if(!$("#cz").hidden) renderCustom();
 }
 function toggleSyncUI(){ S.ui.syncUI=!syncOn(); save(); if(S.ui.syncUI&&ME){ S.uiVer=null; applyServerUI(ME); toast("Apparence synchronisée avec ton compte",{type:"ok"}); } renderCustom(); }
-function setUI(k,v,noRe){ if(premUI(k,v)&&!isPrem()){ premLock(); return; } S.ui[k]=v; save(); applyUI(); if(!noRe) renderCustom(); if(["size","view"].includes(k)) render(); if(UI_SYNC.includes(k)) pushUI(); }
+function setUI(k,v,noRe){ if(premUI(k,v)&&!isPrem()){ premLock(); return; } S.ui[k]=v; save(); if(k==="sfx"&&v) sfx("on"); applyUI(); if(!noRe) renderCustom(); if(["size","view"].includes(k)) render(); if(UI_SYNC.includes(k)) pushUI(); }
 function openCustom(){ Object.values(FONTS).forEach(loadFont); renderCustom(); openSh("cz"); }
 let CZOPEN=new Set(["look"]);
 const HOME_SECS=[["hello","Salutation"],["hero","Titre et explication"],["steps","Les 3 étapes"],["pins","Épinglés"],["day","Son du jour"],["resume","Reprendre l'écoute"],["recent","Récemment ajoutés"],["top","Tes plus écoutés"],["goal","Objectif de la semaine"],["stats","Chiffres"],["comm","De la communauté"],["trend","Tendances"],["tip","Astuce du jour"],["faq","Questions fréquentes"]];
@@ -1065,7 +1103,7 @@ function renderCustom(){
   const star=(k,v)=>premUI(k,v)&&!P_?`<span class="lk" title="Premium">${I("star",11)}</span>`:"";
   const seg=(k,opts)=>`<div class="seg">${opts.map(([v,l])=>`<button class="${u[k]===v?"on":""}" onclick='setUI("${k}","${v}")'>${l}${star(k,v)}</button>`).join("")}</div>`;
   const sw=(k,lbl,sub,val,fn)=>{ const on=val!=null?val:!!u[k]; return `<div class="cz-row"><span>${lbl}${star(k,true)}${sub?`<br><small class="a">${sub}</small>`:""}</span><button class="sw2 ${on?"on":""}" role="switch" aria-checked="${on}" onclick='${fn||`setUI("${k}",${!on})`}'><i></i></button></div>`; };
-  const rng=(k,lbl,min,max,unit)=>`<h4>${lbl} <em>${u[k]}${unit}</em></h4><input type="range" min="${min}" max="${max}" value="${u[k]}" oninput="setUI('${k}',+this.value,1);this.previousElementSibling.querySelector('em').textContent=this.value+'${unit}'">`;
+  const rng=(k,lbl,min,max,unit,chg)=>`<h4>${lbl} <em>${u[k]}${unit}</em></h4><input type="range" data-k="${k}" ${chg?`onchange="${chg}"`:""} min="${min}" max="${max}" value="${u[k]}" oninput="setUI('${k}',+this.value,1);this.previousElementSibling.querySelector('em').textContent=this.value+'${unit}'">`;
   const czd=(id,title,body)=>`<details class="czd" data-k="${id}" ${CZOPEN.has(id)?"open":""} ><summary onclick="CZOPEN[this.parentNode.open?'delete':'add']('${id}')">${title}${I("down",16)}</summary><div class="czc">${body}</div></details>`;
   const accOn=ACCENTS.some(a=>a[1]===u.accent.toLowerCase());
   $("#czb").innerHTML=
@@ -1079,7 +1117,7 @@ function renderCustom(){
     ${sw("grain","Effet grain","Texture légère sur tout l'écran")}`)+
   czd("ui","Interface",`${rng("zoom","Taille de l'interface",85,130," %")}${rng("blur","Effet verre",0,40," px")}${rng("radius","Arrondis",4,28," px")}
     <h4>Style des cartes</h4>${seg("card",[["glass","Verre"],["flat","Plein"],["line","Contour"]])}
-    ${sw("navl","Texte sous les icônes du menu","Sur téléphone")}${sw("motion","Animations et effets")}${sw("haptic","Vibrations au toucher")}`)+
+    ${sw("navl","Texte sous les icônes du menu","Sur téléphone")}${sw("motion","Animations et effets")}${sw("haptic","Vibrations au toucher")}${sw("sfx","Sons de l'interface","Petits clics et pops discrets")}${u.sfx?rng("sfxv","Volume des sons",0,100," %","sfx('pop')"):""}`)+
   czd("txt","Police",`<div class="fonts">${Object.entries(FONTS).map(([k,f])=>`<button class="${u.font===k?"on":""}" style="font-family:${esc(f.d)},sans-serif" onclick="setUI('font','${k}')">${f.n}${star("font",k)}</button>`).join("")}</div>`)+
   czd("play","Pochettes et lecteur",`<h4>Taille des pochettes</h4>${seg("size",[["s","Petite"],["m","Moyenne"],["l","Grande"]])}
     <h4 style="margin-top:14px">Forme des pochettes</h4>${seg("cover",[["square","Carrée"],["round","Ronde"],["vinyl","Vinyle qui tourne"]])}
@@ -1118,6 +1156,8 @@ function resetUI(){ const keep={view:S.ui.view,sort:S.ui.sort,filter:S.ui.filter
 //  Effets (ripple, spotlight, inclinaison, confettis)
 // ═══════════════════════════════════════════════════════════════════════════
 document.addEventListener("pointerdown", e => {
+  const sw=e.target.closest(".sw2,.seg button,.chip,.opt,.th,.rn,.btn,.ib,.pi-btn,nav a");           // sons : seulement sur les vrais choix
+  if(sw&&!sw.disabled) sfx(sw.matches(".sw2")?(sw.getAttribute("aria-checked")==="true"?"off":"on"):sw.matches(".seg button,.chip,.opt,.th,.rn")?"tick":sw.matches("nav a")?"nav":"tap");
   const el=e.target.closest(".btn,.ib,.pi-btn,.pc,.sr,.user-card,.chip,nav a,.icon-btn,.opt,.th,.rn");
   if(!el || el.disabled || el.tagName==="SELECT") return;
   haptic();
@@ -1783,7 +1823,7 @@ function step(d){
   if(d<0 && au.currentTime>3){ au.currentTime=0; return; }
   qi=(qi+d+q.length)%q.length; loadCur();
 }
-function togglePlay(){ if(AD.on) return; if(!au.src){ const id=S.lastId&&S.tracks.find(t=>t.id===S.lastId&&playable(t))?S.lastId:null; if(id) play([id],0); return; } if(au.paused) resumeAudio(); else au.pause(); }
+function togglePlay(){ if(AD.on) return; if(!au.src){ const id=S.lastId&&S.tracks.find(t=>t.id===S.lastId&&playable(t))?S.lastId:null; if(id) play([id],0); return; } if(au.paused){ sfx("play"); resumeAudio(); } else { sfx("pause"); au.pause(); } }
 function seekBy(s){ if(AD.on) return; if(au.duration) au.currentTime=Math.max(0,Math.min(au.duration,au.currentTime+s)); }
 function applyRate(){ const r=RATES[S.player.rate]||RATES["1"]; for(const k of ["preservesPitch","mozPreservesPitch","webkitPreservesPitch"]) try{au[k]=r[1]}catch(e){} au.defaultPlaybackRate=r[0]; au.playbackRate=r[0]; }
 function toggleShuffle(){ S.player.shuffle=!S.player.shuffle; save(); if(S.player.shuffle&&q.length>1){ const cur=q[qi]; q=[cur,...smartShuf(q.filter((_,k)=>k!==qi))]; qi=0; } toast(S.player.shuffle?"Lecture aléatoire activée":"Lecture aléatoire désactivée"); renderNP(); }
@@ -1843,27 +1883,36 @@ function eqNow(){
   if(ok){ if(k==="custom"){ const c=S.player.eqc||{}; b=+c.b||0; m=+c.m||0; t=+c.t||0; } else { b=e[1]; m=e[2]; t=e[3]; lp=e[5]; } }
   let r=prem()?(+S.player.rev||0):0;
   if(S.player.rate==="slowrev"&&prem()) r=Math.max(r,35);
-  return {b,m,t,r,lp};
+  const d=Math.max(0,Math.min(100,Math.round(+S.player.dist||0)));
+  return {b,m,t,r,lp,d};
 }
-const fxOn=()=>{ const e=eqNow(); return !!(e.b||e.m||e.t||e.r||e.lp); };
+const fxOn=()=>{ const e=eqNow(); return !!(e.b||e.m||e.t||e.r||e.lp||e.d); };
 function fxLabel(){
   const parts=[], k=S.player.eq, e=EQS[k];
   if(e&&k!=="flat"&&(!e[4]||prem())) parts.push(e[0]);
   const r=RATES[S.player.rate]; if(r&&S.player.rate!=="1"&&(!PREM_RATES.has(S.player.rate)||prem())) parts.push(r[2]);
+  if(eqNow().d) parts.push("Distorted");
   return parts.join(" · ")||"Effets";
 }
 function impulse(c,sec,decay){ const n=Math.floor(c.sampleRate*sec), b=c.createBuffer(2,n,c.sampleRate);
   for(let ch=0;ch<2;ch++){ const d=b.getChannelData(ch); for(let i=0;i<n;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/n,decay); } return b; }
+// Saturation douce (tanh) : plus le « drive » monte, plus le son est écrasé et riche en harmoniques
+function distCurve(d){
+  const n=2048, k=1+Math.pow(d/100,1.5)*14, c=new Float32Array(n), t=Math.tanh(k);
+  for(let i=0;i<n;i++){ const x=i/(n-1)*2-1; c[i]=Math.tanh(k*x)/t; }
+  return c;
+}
 function fxBuild(){
   if(FX.ctx) return true;
   const C=window.AudioContext||window.webkitAudioContext; if(!C) return false;
   try{
     const c=new C(), f=(type,fr,q)=>{ const n=c.createBiquadFilter(); n.type=type; n.frequency.value=fr; if(q) n.Q.value=q; return n; };
-    Object.assign(FX,{ctx:c,src:c.createMediaElementSource(au2),lo:f("lowshelf",110),mid:f("peaking",1000,.9),hi:f("highshelf",7000),lp:f("lowpass",20000),
+    Object.assign(FX,{ctx:c,src:c.createMediaElementSource(au2),lo:f("lowshelf",110),mid:f("peaking",1000,.9),hi:f("highshelf",7000),lp:f("lowpass",20000),shaper:c.createWaveShaper(),sat:c.createGain(),
       dry:c.createGain(),wet:c.createGain(),conv:c.createConvolver(),comp:c.createDynamicsCompressor(),out:c.createGain()});
     FX.conv.buffer=impulse(c,2.6,2.4);
     FX.comp.threshold.value=-8; FX.comp.ratio.value=4;               // évite la saturation quand on pousse les basses
-    FX.src.connect(FX.lo); FX.lo.connect(FX.mid); FX.mid.connect(FX.hi); FX.hi.connect(FX.lp);
+    FX.shaper.oversample="4x"; FX.dd=-1;
+    FX.src.connect(FX.lo); FX.lo.connect(FX.mid); FX.mid.connect(FX.hi); FX.hi.connect(FX.shaper); FX.shaper.connect(FX.sat); FX.sat.connect(FX.lp);
     FX.lp.connect(FX.dry); FX.lp.connect(FX.conv); FX.conv.connect(FX.wet);
     FX.dry.connect(FX.comp); FX.wet.connect(FX.comp); FX.comp.connect(FX.out); FX.out.connect(c.destination);
     return true;
@@ -1873,6 +1922,8 @@ function fxApply(){
   if(!FX.ctx) return; const e=eqNow();
   FX.lo.gain.value=e.b; FX.mid.gain.value=e.m; FX.hi.gain.value=e.t; FX.lp.frequency.value=e.lp||20000;
   FX.wet.gain.value=e.r/100*.9; FX.dry.gain.value=1-e.r/250;
+  if(FX.dd!==e.d){ FX.dd=e.d; FX.shaper.curve=e.d?distCurve(e.d):null; }
+  FX.sat.gain.value=1-e.d*.004;                                    // compense le volume gagné par la saturation
 }
 function volApply(){
   const v=Math.max(0,Math.min(1,VOL*FADE*SLEEPF));
@@ -1930,7 +1981,7 @@ function setEq(k){
   if(e[4]&&!prem()) return premLock("« "+e[0]+" »");
   S.player.eq=k; save(); reroute(); fxRefresh();
 }
-function setFxVal(k,v){ if(k==="rev"&&!prem()) return premLock("La réverbe"); S.player[k]=v; save(); if(k==="rev") reroute(); }
+function setFxVal(k,v){ if(k==="rev"&&!prem()) return premLock("La réverbe"); S.player[k]=v; save(); if(k==="rev"||k==="dist") reroute(); }
 function setEqc(band,v){ S.player.eqc=Object.assign({b:0,m:0,t:0},S.player.eqc,{[band]:v}); save(); fxApply(); }
 function setRate(k){ if(PREM_RATES.has(k)&&!prem()) return premLock("« "+RATES[k][2]+" »"); S.player.rate=k; save(); applyRate(); reroute(); fxRefresh(); }
 function fxRefresh(){ if(!$("#gen").hidden&&$("#genb .fx")) $("#genb").innerHTML=fxHTML(), $$("#genb input[type=range]").forEach(paintRange); renderNP(); }
@@ -1939,13 +1990,14 @@ function fxHTML(){
   const speeds=[["0.75","0,75×"],["1","1×"],["1.25","1,25×"],["1.5","1,5×"],["2","2×"]];
   const styles=[["1","Normal"],["slowed","Slowed"],["spedup","Sped up"],["slowrev","Slowed + reverb"]];
   const e=eqNow(), c=S.player.eqc||{b:0,m:0,t:0}, rv=+S.player.rev||0, fd=+S.player.fade||0;
-  const sl=(lbl,val,min,max,unit,oninput,locked)=>`<label class="fxs ${locked&&!P_?"off":""}"><span>${lbl}${star(locked)}<em>${val}${unit}</em></span><input type="range" min="${min}" max="${max}" value="${val}" oninput="this.previousElementSibling.querySelector('em').textContent=this.value+'${unit}';${oninput}" ${locked&&!P_?"disabled":""}></label>`;
+  const sl=(lbl,val,min,max,unit,oninput,locked,key)=>`<label class="fxs ${locked&&!P_?"off":""}" ${key?`data-fx="${key}"`:""}><span>${lbl}${star(locked)}<em>${val}${unit}</em></span><input type="range" min="${min}" max="${max}" value="${val}" oninput="this.previousElementSibling.querySelector('em').textContent=this.value+'${unit}';${oninput}" ${locked&&!P_?"disabled":""}></label>`;
   const onAu1=au===au1&&fxOn()&&au.src&&!/^blob:/.test(au.src);
   return `<div class="fx">
     <h4>Vitesse</h4><div class="seg">${speeds.map(([k,l])=>`<button class="${S.player.rate===k?"on":""}" onclick="setRate('${k}')">${l}</button>`).join("")}</div>
     <h4>Style</h4><div class="chips">${styles.map(([k,l])=>`<button class="chip ${S.player.rate===k||(k==="1"&&!["slowed","spedup","slowrev"].includes(S.player.rate))?"on":""}" onclick="setRate('${k}')">${l}${star(PREM_RATES.has(k))}</button>`).join("")}</div>
     <h4>Égaliseur</h4><div class="chips">${Object.entries(EQS).map(([k,v])=>`<button class="chip ${(S.player.eq||"flat")===k?"on":""}" data-eq="${k}" onclick="setEq('${k}')">${v[0]}${star(v[4])}</button>`).join("")}</div>
     ${S.player.eq==="custom"&&P_?`<div class="fxg">${sl("Graves",c.b||0,-12,12," dB","setEqc('b',+this.value)")}${sl("Médiums",c.m||0,-12,12," dB","setEqc('m',+this.value)")}${sl("Aigus",c.t||0,-12,12," dB","setEqc('t',+this.value)")}</div>`:""}
+    ${sl("Distorted",+S.player.dist||0,0,100," %","setFxVal('dist',+this.value)",false,"dist")}
     ${sl("Réverbe",rv,0,100," %","setFxVal('rev',+this.value)",true)}
     ${sl("Fondu entre les sons",fd,0,12," s","setFxVal('fade',+this.value)")}
     ${onAu1?`<p class="a fxn">L'égaliseur et la réverbe ne s'appliquent pas encore à ce son en ligne.</p>`:""}
@@ -2074,7 +2126,7 @@ function queueAdd(id){ if(!au.src||!q.length) return play([id],0); q.push(id); t
 // ═══════════════════════════════════════════════════════════════════════════
 //  Favoris, menus de son, stats
 // ═══════════════════════════════════════════════════════════════════════════
-function toggleFav(id){ const t=S.tracks.find(x=>x.id===id); if(!t) return; t.fav=!t.fav; save(); POP=t.fav?id:null; render(); if(q[qi]===id) renderNP(); if(t.fav) toast("Ajouté aux favoris"); setTimeout(()=>POP=null,600); }
+function toggleFav(id){ const t=S.tracks.find(x=>x.id===id); if(!t) return; t.fav=!t.fav; if(t.fav) sfx("like"); save(); POP=t.fav?id:null; render(); if(q[qi]===id) renderNP(); if(t.fav) toast("Ajouté aux favoris"); setTimeout(()=>POP=null,600); }
 function favCur(){ const t=curT(); if(t) toggleFav(t.id); }
 function trackMenu(id){
   const t=S.tracks.find(x=>x.id===id); if(!t) return;
@@ -2708,7 +2760,7 @@ function playPost(i){ const ids=POSTS.slice(i,i+10).map(ensureTrack); save(); re
 async function likePost(i){
   if(!ME){ toast("Connecte-toi pour aimer un son"); return openAuth(); }
   const p=POSTS[i]; if(!p) return;
-  try{ const d=await api("/api/posts/"+p.id+"/like",{method:"POST"}); p.liked=d.liked; p.likes=d.likes; renderPosts(); if(d.liked) haptic(); }
+  try{ const d=await api("/api/posts/"+p.id+"/like",{method:"POST"}); p.liked=d.liked; p.likes=d.likes; renderPosts(); if(d.liked){ haptic(); sfx("like"); } }
   catch(e){ toast(e.message,{type:"err"}); }
 }
 async function deletePost(i){
@@ -2794,12 +2846,12 @@ function importPublic(){
 async function likeTrack(i){
   if(!ME){ toast("Connecte-toi pour aimer un son"); return openAuth(); }
   const t=PUBPL.tracks[i]; if(!t) return;
-  try{ const d=await api("/api/tracks/like",{method:"POST",body:{url:t.url}}); t.liked=d.liked; t.likes=d.likes; renderPubPl(); if(d.liked) haptic(); }
+  try{ const d=await api("/api/tracks/like",{method:"POST",body:{url:t.url}}); t.liked=d.liked; t.likes=d.likes; renderPubPl(); if(d.liked){ haptic(); sfx("like"); } }
   catch(e){ toast(e.message,{type:"err"}); }
 }
 async function likePl(){
   if(!ME){ toast("Connecte-toi pour aimer une playlist"); return openAuth(); }
-  try{ const d=await api("/api/playlists/"+PUBPL.id+"/like",{method:"POST"}); PUBPL.liked=d.liked; PUBPL.likes=d.likes; renderPubPl(); if(d.liked){ haptic(); toast("Tu aimes « "+PUBPL.name+" »"); } FEED=null; }
+  try{ const d=await api("/api/playlists/"+PUBPL.id+"/like",{method:"POST"}); PUBPL.liked=d.liked; PUBPL.likes=d.likes; renderPubPl(); if(d.liked){ haptic(); sfx("like"); toast("Tu aimes « "+PUBPL.name+" »"); } FEED=null; }
   catch(e){ toast(e.message,{type:"err"}); }
 }
 
