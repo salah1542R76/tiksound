@@ -1,4 +1,4 @@
-import os, re, time, uuid, hashlib, hmac, json, base64, secrets, smtplib, ssl, threading, logging
+import os, re, time, uuid, hashlib, hmac, json, base64, secrets, smtplib, ssl, threading, logging, shutil
 import html as _html
 import urllib.request, urllib.error, urllib.parse
 from email.message import EmailMessage
@@ -1889,6 +1889,8 @@ def _tokens(t):
 
 def search_candidates(prefix, query, n=6):
     """Résultats de recherche sans téléchargement. prefix : ytsearch (YouTube) ou scsearch (SoundCloud)."""
+    if prefix == "ytsearch" and yt_blocked():
+        return []
     try:
         o = {"quiet": True, "extract_flat": True, "skip_download": True, "socket_timeout": 15}
         o.update(_net_opts())
@@ -1914,9 +1916,30 @@ def search_candidates(prefix, query, n=6):
         log.warning("Recherche %s échouée pour « %s » : %s", prefix, query, str(ex)[:300])
         return []
 
+# YouTube bloque souvent les serveurs d'hébergement (« confirm you're not a bot », 429, 403).
+# Dès qu'il le fait, on passe directement par SoundCloud pendant un moment au lieu de perdre du temps.
+_yt_block = {"until": 0}
+YT_BLOCK_S = int(os.environ.get("YT_BLOCK_S", "900"))
+YT_BLOCK_RE = re.compile(r"not a bot|sign in to confirm|HTTP Error 429|HTTP Error 403|PO Token|Only images are available", re.I)
+
+def yt_blocked():
+    return time.time() < _yt_block["until"]
+
+def _note_yt_error(msg):
+    if YT_BLOCK_RE.search(str(msg or "")):
+        if not yt_blocked():
+            log.warning("YouTube bloque le serveur : passage par SoundCloud pendant %d min", YT_BLOCK_S // 60)
+        _yt_block["until"] = time.time() + YT_BLOCK_S
+
+def _is_yt(url):
+    return bool(re.match(r"^https://(?:[\w-]+\.)?(?:youtube\.com|youtu\.be)/", str(url or "")))
+
 def _net_opts():
-    """Options réseau optionnelles : cookies / proxy (utile quand YouTube bloque l'IP du serveur)."""
+    """Options réseau : moteur JavaScript pour YouTube (obligatoire depuis fin 2025), cookies / proxy optionnels."""
     o = {}
+    rts = {rt: {} for rt in ("deno", "node", "bun") if shutil.which(rt)}
+    if rts:
+        o["js_runtimes"] = rts
     ck = os.environ.get("YTDLP_COOKIES")
     if ck and os.path.exists(ck):
         o["cookiefile"] = ck
@@ -1964,7 +1987,7 @@ def audio_from_search(opts, title, author, want):
         if time.time() - t0 > 85 or tried >= 7:
             break
         pools = [search_candidates("ytsearch", query, 6)]
-        if qi_ == 0 or not pools[0]:
+        if qi_ == 0 or not pools[0] or yt_blocked():
             pools.append(search_candidates("scsearch", query, 4))
         cands = []
         for p in pools:
@@ -1979,6 +2002,8 @@ def audio_from_search(opts, title, author, want):
                 continue            # trop éloigné du titre demandé
             if time.time() - t0 > 85 or tried >= 7:
                 break
+            if c["src"] == "ytsearch" and yt_blocked():
+                continue
             seen.add(c["url"]); tried += 1
             try:
                 o = dict(opts); o.update(_net_opts())
@@ -1990,8 +2015,42 @@ def audio_from_search(opts, title, author, want):
                 return info
             except Exception as ex:
                 last = str(ex)[:300]
+                if c["src"] == "ytsearch":
+                    _note_yt_error(last)
                 log.warning("Téléchargement %s échoué (%s) : %s", c["src"], c["url"], last)
     log.warning("Spotify : aucune version trouvée pour « %s - %s » (%d essais)", author, title, tried)
+    return None
+
+
+def _loose(t):
+    return [w for w in re.sub(r"[^\w\s]", " ", str(t or "").lower(), flags=re.U).split() if w not in STOP and len(w) > 1]
+
+def soundcloud_twin(opts, title, author, want):
+    """Le même son sur SoundCloud, quand YouTube refuse de le donner. None si rien ne ressemble assez."""
+    tk = _loose(title)
+    if not tk:
+        return None
+    cands, seen = [], set()
+    for q in (title, f"{title} {author}".strip()):
+        for c in search_candidates("scsearch", q, 8):
+            if c["url"] in seen:
+                continue
+            seen.add(c["url"])
+            ct = set(_loose(c["title"] + " " + c["chan"]))
+            match = sum(1 for w in tk if w in ct) / len(tk)
+            if match >= 0.6:
+                cands.append((-match, abs((c["duration"] or 0) - want) if want else 0, c["url"]))
+        if cands:
+            break
+    for _, _, u in sorted(cands)[:3]:
+        try:
+            o = dict(opts); o.update(_net_opts())
+            with yt_dlp.YoutubeDL(o) as y:
+                info = y.extract_info(u, download=True)
+            log.info("YouTube indisponible : « %s » récupéré sur SoundCloud (%s)", title, u)
+            return info
+        except Exception as ex:
+            log.warning("Téléchargement SoundCloud échoué (%s) : %s", u, str(ex)[:300])
     return None
 
 
@@ -2109,8 +2168,8 @@ def extract():
     raw = str(b.get("url", "")).strip()
     spotify = bool(SPT_RE.match(raw))
     found = bool(FIND_URL_RE.match(raw))
+    title_in = str(b.get("title") or "")[:120]; author_in = str(b.get("author") or "")[:60]
     if spotify:
-        title_in = str(b.get("title") or "")[:120]; author_in = str(b.get("author") or "")[:60]
         url = raw
     elif found:
         url = raw
@@ -2146,14 +2205,25 @@ def extract():
         if not info:
             return err(f"Aucune version audio trouvée pour « {title_in[:50]} ».", 502, retry=True)
     elif found:
-        try:
-            with yt_dlp.YoutubeDL(opts) as y:
-                pre = y.extract_info(url, download=False)
-                if pre.get("is_live") or (pre.get("duration") or 0) > FIND_MAX_DUR:
-                    return err("Ce son est trop long (plus de 20 min) ou en direct.")
-                info = y.process_ie_result(pre, download=True)
-        except Exception as ex:
-            log.warning("Téléchargement %s échoué : %s", url, str(ex)[:300])
+        yt = _is_yt(url)
+        if not (yt and yt_blocked()):
+            try:
+                with yt_dlp.YoutubeDL(opts) as y:
+                    pre = y.extract_info(url, download=False)
+                    if pre.get("is_live") or (pre.get("duration") or 0) > FIND_MAX_DUR:
+                        return err("Ce son est trop long (plus de 20 min) ou en direct.")
+                    info = y.process_ie_result(pre, download=True)
+            except Exception as ex:
+                log.warning("Téléchargement %s échoué : %s", url, str(ex)[:300])
+                if yt:
+                    _note_yt_error(ex)
+        if not info and yt and title_in:
+            try: want = int(float(b.get("duration") or 0))
+            except Exception: want = 0
+            info = soundcloud_twin(opts, title_in, author_in, want)
+        if not info:
+            if yt and yt_blocked():
+                return err("YouTube bloque le serveur en ce moment et ce son est introuvable sur SoundCloud. Essaie un résultat SoundCloud.", 502, retry=True)
             return err("Impossible de récupérer ce son pour le moment. Essaie un autre résultat.", 502, retry=True)
     else:
         essais = [url.replace("/photo/", "/video/"), url] if "/photo/" in url else [url]
@@ -2171,8 +2241,8 @@ def extract():
     cover = info.get("thumbnail", "") or ""
     try: duration = int(float(info.get("duration") or 0))
     except Exception: duration = 0
-    res = dict(id=uid, url=url, title=(title_in or titre(info)) if spotify else (str(info.get("title") or "")[:120] or titre(info)) if found else titre(info),
-               author=author_in if spotify else re.sub(r"\s*-\s*Topic$", "", info.get("uploader", "") or ""),
+    res = dict(id=uid, url=url, title=(title_in or titre(info)) if spotify else (title_in or str(info.get("title") or "")[:120] or titre(info)) if found else titre(info),
+               author=author_in if spotify or (found and author_in) else re.sub(r"\s*-\s*Topic$", "", info.get("uploader", "") or ""),
                cover=cover, cover_data=fetch_thumb(cover), duration=duration, audio_url=f"/audio/{uid}.mp3")
     if online:
         try:

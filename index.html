@@ -376,9 +376,9 @@ section.has .steps{display:none}
 .tc:hover .art img{transform:scale(1.06)}
 .art>b{font:800 56px var(--fd);color:color-mix(in oklab,var(--ac) 60%,#fff);opacity:.7}
 .ov{position:absolute;inset:0;background:linear-gradient(180deg,transparent 30%,#000b);display:grid;place-items:center;opacity:0;transition:opacity .25s}
-.ov span{width:54px;height:54px;border-radius:50%;display:grid;place-items:center;background:var(--ac);color:var(--on);transform:scale(.8) translateY(8px);transition:transform .3s cubic-bezier(.3,1.5,.5,1);box-shadow:0 8px 24px #0008}
+.ov>span{width:54px;height:54px;border-radius:50%;display:grid;place-items:center;background:var(--ac);color:var(--on);transform:scale(.8) translateY(8px);transition:transform .3s cubic-bezier(.3,1.5,.5,1);box-shadow:0 8px 24px #0008}
 .tc:hover .ov,.tc.cur .ov{opacity:1}
-.tc:hover .ov span,.tc.cur .ov span{transform:none}
+.tc:hover .ov>span,.tc.cur .ov>span{transform:none}
 .ip-pause{display:none}
 .pl .ip-play{display:none}.pl .ip-pause{display:inline-grid}
 .eqm{position:absolute;left:10px;bottom:10px;display:none;align-items:flex-end;gap:2px;height:16px}
