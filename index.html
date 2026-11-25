@@ -84,6 +84,23 @@ html[data-card=line] .gcard,html[data-card=line] .tc{background:transparent;box-
 html[data-viz=off] .eq,html[data-viz=off] .np-viz,html[data-viz=off] .eqm,html[data-viz=off] .lg-eq{display:none!important}
 html[data-cover=round] .cv,html[data-cover=round] .tc .art,html[data-cover=round] .np-cover,html[data-cover=round] #pl .cv{border-radius:50%}
 .btn:not(.alt),.pi-btn.p,.car-b.p,.sw2.on,.seg button.on{background-image:var(--acg)}
+html.cur,html.cur *{cursor:var(--cur) !important}
+html.cur input:not([type=range]):not([type=checkbox]):not([type=file]),html.cur textarea{cursor:text !important}
+html[data-glow=on] .btn:not(.alt),html[data-glow=on] .chip.on,html[data-glow=on] .sw2.on{box-shadow:0 0 18px color-mix(in oklab,var(--ac) 55%,transparent),0 0 3px var(--ac)}
+.banner.bn-aurore{background:radial-gradient(60% 90% at 20% 10%,#6ee7b755,transparent),radial-gradient(50% 80% at 85% 90%,#8b5cf655,transparent),linear-gradient(120deg,#0f2027,#203a43 50%,#2c5364)}
+.banner.bn-sunset{background:linear-gradient(120deg,#ff5e7e,#ff9a8b 45%,#ffc371)}
+.banner.bn-ocean{background:radial-gradient(70% 100% at 80% 0,#7bdff266,transparent),linear-gradient(120deg,#06213a,#1b5e8c 60%,#3aa6c9)}
+.banner.bn-fleurs{background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Ctext x='6' y='28' font-size='22' opacity='.85'%3E🌸%3C/text%3E%3Ctext x='38' y='56' font-size='16' opacity='.7'%3E🌷%3C/text%3E%3C/svg%3E"),linear-gradient(120deg,#ffd6e8,#ffb3d1 55%,#e9b8ff)}
+.banner.bn-neon{background:repeating-linear-gradient(90deg,#ffffff0d 0 1px,transparent 1px 28px),repeating-linear-gradient(0deg,#ffffff0d 0 1px,transparent 1px 28px),linear-gradient(120deg,#12002b,#3b0a6b 50%,#00c2ff88)}
+.banner.bn-etoiles{background:radial-gradient(1.5px 1.5px at 12% 30%,#fff,transparent),radial-gradient(1px 1px at 28% 70%,#fff,transparent),radial-gradient(1.5px 1.5px at 46% 22%,#fff,transparent),radial-gradient(1px 1px at 63% 62%,#fff,transparent),radial-gradient(2px 2px at 78% 28%,#ffe27a,transparent),radial-gradient(1px 1px at 90% 78%,#fff,transparent),linear-gradient(120deg,#050816,#1a1b4b 60%,#3b2a73)}
+.av.fr-or{outline:3px solid #f5c542;outline-offset:2px;box-shadow:0 0 16px #f5c54288}
+.av.fr-neon{outline:3px solid #36e0ff;outline-offset:2px;box-shadow:0 0 14px #36e0ff,0 0 26px #d946ef88}
+.av.fr-fleurs{outline:3px solid #ff9ec4;outline-offset:2px}.av.fr-fleurs::after{content:"🌸";position:absolute;right:-8%;top:-8%;font-size:.8em;text-shadow:none}
+.av.fr-etoiles{outline:3px solid #ffd45e;outline-offset:2px;box-shadow:0 0 12px #ffd45e66}.av.fr-etoiles::after{content:"✨";position:absolute;right:-8%;top:-8%;font-size:.8em;text-shadow:none}
+.av.fr-flamme{outline:3px solid #ff7a2f;outline-offset:2px;box-shadow:0 0 16px #ff7a2f99}.av.fr-flamme::after{content:"🔥";position:absolute;right:-6%;bottom:-6%;font-size:.8em;text-shadow:none}
+.av{position:relative}
+.cosd .cosr{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:6px 0 12px}.cosd .cosr>span{min-width:96px;color:var(--mut);font-size:14px}
+.chip .lk{margin-left:4px}
 .czd{border-top:1px solid var(--br)}.czd:first-child{border-top:0}
 .czd summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:15px 2px;font-weight:600;font-size:16px}
 .czd summary::-webkit-details-marker{display:none}
@@ -890,10 +907,11 @@ const FONTS   = {
   pixel:{n:"Pixel",b:'"DM Sans"',d:'"Press Start 2P"',u:"Press+Start+2P"}
 };
 // Réservé à Premium (le choix reste enregistré : il revient si l'abonnement reprend)
-const PREM_UI={theme:new Set(["bordeaux","pastel","synth"]),bg:new Set(["vagues","etoiles","degrade"]),font:new Set(["playfair","caveat","pixel"])};
-const premUI=(k,v)=>(PREM_UI[k]&&PREM_UI[k].has(v))||(k==="accent2"&&!!v)||(k==="autoAcc"&&!!v);
-const UI_DEF  = {theme:"dark",accent:"#dcdce0",accent2:"",autoAcc:false,bg:"aurora",grain:true,blur:18,radius:16,size:"m",font:"dm",motion:true,haptic:true,sfx:true,sfxv:60,cover:"square",view:"grid",sort:"recent",filter:"all",bgo:50,bgb:0,hasBg:false,syncUI:null,zoom:100,card:"glass",navl:true,viz:true,npbg:"cover",home:{}};
-const RATES   = {"1":[1,true,"Vitesse normale"],"0.75":[.75,true,"0,75×"],"1.25":[1.25,true,"1,25×"],"1.5":[1.5,true,"1,5×"],"2":[2,true,"2×"],"slowed":[.85,false,"Slowed"],"spedup":[1.25,false,"Sped up"]};
+const PREM_UI={theme:new Set(["bordeaux","pastel","synth"]),bg:new Set(["vagues","etoiles","degrade"]),font:new Set(["playfair","caveat","pixel"]),
+  trail:new Set(["star","flower","flame","bolt"]),cur:new Set(["star","heart","ring","arrow","moon"]),amb:new Set(["stars","petals","snow","fireflies"])};
+const premUI=(k,v)=>(PREM_UI[k]&&PREM_UI[k].has(v))||(k==="accent2"&&!!v)||(k==="autoAcc"&&!!v)||(k==="glow"&&!!v);
+const UI_DEF  = {theme:"dark",accent:"#dcdce0",accent2:"",autoAcc:false,bg:"aurora",grain:true,blur:18,radius:16,size:"m",font:"dm",motion:true,haptic:true,sfx:true,sfxv:60,cover:"square",view:"grid",sort:"recent",filter:"all",bgo:50,bgb:0,hasBg:false,syncUI:null,zoom:100,card:"glass",navl:true,viz:true,npbg:"cover",trail:"spark",cur:"def",amb:"off",glow:false,home:{}};
+const RATES   = {"1":[1,true,"Vitesse normale"],"0.75":[.75,true,"0,75×"],"1.25":[1.25,true,"1,25×"],"1.5":[1.5,true,"1,5×"],"2":[2,true,"2×"],"slowed":[.85,false,"Slowed"],"spedup":[1.25,false,"Sped up"],"uslow":[.7,false,"Ultra slowed"],"uspeed":[1.5,false,"Ultra sped up"],"slowrev":[.85,false,"Slowed + reverb"]};
 const TIPS = [
   ["Mode plein écran","Touche la pochette dans le lecteur pour l'ouvrir en grand."],
   ["Slowed & Sped up","Dans le lecteur plein écran, touche la vitesse pour essayer l'effet « Slowed » ou « Sped up »"],
@@ -1060,6 +1078,107 @@ function loadFont(f){ if(!f||!f.u||loadedFonts.has(f.u)) return; loadedFonts.add
 const uiv=k=>{ const v=S.ui[k]; return premUI(k,v)&&!isPrem()?UI_DEF[k]:v; };   // valeur effective (Premium expiré : valeur par défaut)
 let ACC_NOW=null;                              // couleur tirée de la pochette en cours (option Premium)
 function setAccent(c){ const h=document.documentElement; h.style.setProperty("--ac",c); h.style.setProperty("--on", lum(c)>.42?"#0b0b0c":"#ffffff"); }
+// ═══ Traînée de souris, curseurs, ambiance : dessinés sur un canvas léger, qui s'arrête dès qu'il n'y a plus rien à animer ═══
+const TR={p:[],raf:0,t:0,lx:-99,ly:-99,col:"#dcdce0",ct:0}, AMB={p:[],raf:0,k:"",t:0,f:0};
+const accNow=()=>{ const n=performance.now(); if(n-TR.ct>800){ TR.ct=n; TR.col=getComputedStyle(document.documentElement).getPropertyValue("--ac").trim()||"#dcdce0"; } return TR.col; };
+function fxCanvas(id,z){
+  let c=document.getElementById(id);
+  if(!c){ c=document.createElement("canvas"); c.id=id; c.setAttribute("aria-hidden","true"); c.style.cssText=`position:fixed;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:${z}`; document.body.appendChild(c); }
+  const dpr=Math.min(2,devicePixelRatio||1), w=Math.round(innerWidth*dpr), h=Math.round(innerHeight*dpr);
+  if(c.width!==w||c.height!==h){ c.width=w; c.height=h; }
+  const g=c.getContext("2d"); g.setTransform(dpr,0,0,dpr,0,0); return [c,g];
+}
+const rnd=(a,b)=>a+Math.random()*(b-a);
+function trailAdd(k,x,y,dx,dy){
+  const base={k,x,y,vx:rnd(-.25,.25),vy:rnd(-.25,.25),s:rnd(3,6),r:rnd(0,6.28),vr:rnd(-.05,.05),age:0,life:rnd(450,750)};
+  if(k==="star") Object.assign(base,{s:rnd(5,9),vy:rnd(.1,.5),life:rnd(550,900)});
+  else if(k==="flower") Object.assign(base,{s:rnd(5,8),vy:rnd(.2,.6),vx:rnd(-.4,.4),vr:rnd(-.08,.08),life:rnd(800,1200),c:["#ffb7d1","#ff9ec4","#fff0f5"][Math.random()*3|0]});
+  else if(k==="flame") Object.assign(base,{s:rnd(4,8),vy:rnd(-1,-.4),vx:rnd(-.3,.3),life:rnd(380,620)});
+  else if(k==="bolt"){ const L=rnd(10,22), a=rnd(0,6.28), pts=[[0,0]]; for(let i=1;i<=4;i++){ const f=i/4; pts.push([Math.cos(a)*L*f+rnd(-4,4),Math.sin(a)*L*f+rnd(-4,4)]); } Object.assign(base,{pts,vx:0,vy:0,vr:0,life:rnd(350,450)}); }
+  else if(k==="spark") base.s=rnd(1.6,3.2);
+  if(TR.p.length>=90) TR.p.shift();
+  TR.p.push(base);
+}
+document.addEventListener("pointermove",e=>{
+  if(e.pointerType==="touch"||document.hidden||!S.ui.motion) return;
+  const k=uiv("trail"); if(k==="off") return;
+  const dx=e.clientX-TR.lx, dy=e.clientY-TR.ly, d=Math.hypot(dx,dy);
+  if(d<10) return; TR.lx=e.clientX; TR.ly=e.clientY;
+  const n=k==="bolt"?1:d>40?2:1;
+  for(let i=0;i<n;i++) trailAdd(k,e.clientX+rnd(-3,3),e.clientY+rnd(-3,3),dx,dy);
+  if(!TR.raf){ TR.t=0; TR.raf=requestAnimationFrame(trailLoop); }
+},{passive:true});
+function sparkle(g,s){ g.beginPath(); for(let i=0;i<8;i++){ const a=i*Math.PI/4, r=i%2?s*.28:s; g.lineTo(Math.cos(a)*r,Math.sin(a)*r); } g.closePath(); g.fill(); }
+function drawP(g,p,t){
+  g.save(); g.translate(p.x,p.y); g.rotate(p.r); const a=1-t;
+  if(p.k==="spark"){ g.globalAlpha=a*.9; g.fillStyle=accNow(); g.beginPath(); g.arc(0,0,p.s*(1-t*.5),0,6.283); g.fill(); }
+  else if(p.k==="star"){ g.globalAlpha=a; g.fillStyle=accNow(); g.shadowColor=g.fillStyle; g.shadowBlur=6; sparkle(g,p.s*(1-t*.3)); }
+  else if(p.k==="flower"){ g.globalAlpha=a*.95; g.fillStyle=p.c; const s=p.s*(1-t*.25); for(let i=0;i<5;i++){ g.rotate(1.2566); g.beginPath(); g.ellipse(0,-s*.55,s*.32,s*.55,0,0,6.283); g.fill(); } g.fillStyle="#ffd45e"; g.beginPath(); g.arc(0,0,s*.22,0,6.283); g.fill(); }
+  else if(p.k==="flame"){ g.globalCompositeOperation="lighter"; g.globalAlpha=a*.85; g.fillStyle=t<.35?"#ffd45e":t<.7?"#ff7a2f":"#ff3b2f"; g.beginPath(); g.arc(0,0,p.s*(1-t*.8),0,6.283); g.fill(); }
+  else if(p.k==="bolt"){ g.globalAlpha=a; g.strokeStyle="#bff0ff"; g.lineWidth=1.6; g.lineJoin="round"; g.shadowColor="#4cc9ff"; g.shadowBlur=8; g.beginPath(); p.pts.forEach(([x,y],i)=>i?g.lineTo(x,y):g.moveTo(x,y)); g.stroke(); }
+  g.restore();
+}
+function trailLoop(now){
+  const dt=Math.min(40,TR.t?now-TR.t:16); TR.t=now;
+  const [c,g]=fxCanvas("trl",9999); g.clearRect(0,0,innerWidth,innerHeight);
+  for(let i=TR.p.length-1;i>=0;i--){
+    const p=TR.p[i]; p.age+=dt; if(p.age>=p.life){ TR.p.splice(i,1); continue; }
+    drawP(g,p,p.age/p.life); const f=dt/16; p.x+=p.vx*f; p.y+=p.vy*f; p.r+=p.vr*f;
+  }
+  if(TR.p.length) TR.raf=requestAnimationFrame(trailLoop); else { TR.raf=0; TR.t=0; c.remove(); }
+}
+// Ambiance de fond (Premium) : quelques dizaines de particules, ~30 images/s, en pause quand l'onglet est caché
+function ambMake(k,i){
+  const W=innerWidth,H=innerHeight,p={x:rnd(0,W),y:rnd(0,H),ph:rnd(0,6.28),r:rnd(0,6.28)};
+  if(k==="stars") Object.assign(p,{s:rnd(.6,1.8),sp:rnd(.5,1.6)});
+  else if(k==="petals") Object.assign(p,{s:rnd(5,9),vy:rnd(.35,.8),vx:rnd(-.2,.3),c:["#ffb7d1","#ff9ec4","#fff0f5"][i%3]});
+  else if(k==="snow") Object.assign(p,{s:rnd(1,3),vy:rnd(.3,.9),vx:rnd(-.15,.15)});
+  else Object.assign(p,{s:rnd(1.5,3),vx:rnd(-.25,.25),vy:rnd(-.25,.25),sp:rnd(.6,1.4)});
+  return p;
+}
+function ambLoop(now){
+  if(document.hidden||!AMB.k||AMB.k==="off"){ AMB.raf=0; return; }
+  AMB.raf=requestAnimationFrame(ambLoop);
+  if(now-AMB.t<32) return; const dt=Math.min(60,AMB.t?now-AMB.t:32); AMB.t=now; AMB.f+=dt/1000;
+  const [c,g]=fxCanvas("amb",2), W=innerWidth,H=innerHeight,k=AMB.k, ac=accNow(), f=dt/16;
+  g.clearRect(0,0,W,H);
+  for(const p of AMB.p){
+    if(k==="stars"){ g.globalAlpha=.25+.55*Math.abs(Math.sin(AMB.f*p.sp+p.ph)); g.fillStyle=p.s>1.4?ac:"#fff"; g.beginPath(); g.arc(p.x,p.y,p.s,0,6.283); g.fill(); continue; }
+    p.x+=(p.vx||0)*f+(k==="fireflies"?Math.sin(AMB.f*p.sp+p.ph)*.25:Math.sin(AMB.f+p.ph)*.25*f); p.y+=(p.vy||0)*f;
+    if(p.y>H+12) p.y=-12; else if(p.y<-12) p.y=H+12; if(p.x>W+12) p.x=-12; else if(p.x<-12) p.x=W+12;
+    if(k==="petals"){ p.r+=.012*f; g.save(); g.translate(p.x,p.y); g.rotate(p.r); g.globalAlpha=.6; g.fillStyle=p.c; g.beginPath(); g.ellipse(0,0,p.s*.45,p.s*.8,0,0,6.283); g.fill(); g.restore(); }
+    else if(k==="snow"){ g.globalAlpha=.7; g.fillStyle="#fff"; g.beginPath(); g.arc(p.x,p.y,p.s,0,6.283); g.fill(); }
+    else { const a=.35+.55*Math.abs(Math.sin(AMB.f*p.sp+p.ph)); g.fillStyle="#ffe27a"; g.globalAlpha=a*.18; g.beginPath(); g.arc(p.x,p.y,p.s*4,0,6.283); g.fill(); g.globalAlpha=a; g.beginPath(); g.arc(p.x,p.y,p.s,0,6.283); g.fill(); }
+  }
+}
+function ambSet(k){
+  if(k===AMB.k&&(AMB.raf||k==="off")) return;
+  cancelAnimationFrame(AMB.raf); AMB.raf=0; AMB.k=k; AMB.p=[];
+  if(k==="off"){ const c=document.getElementById("amb"); if(c) c.remove(); return; }
+  const n={stars:46,petals:24,snow:55,fireflies:28}[k]||30;
+  AMB.p=Array.from({length:n},(_,i)=>ambMake(k,i)); AMB.t=0;
+  AMB.raf=requestAnimationFrame(ambLoop);
+}
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden&&AMB.k&&AMB.k!=="off"&&!AMB.raf) AMB.raf=requestAnimationFrame(ambLoop); });
+// Curseurs (Premium sauf celui par défaut) : petites images SVG à la couleur de l'accent
+const CURS={
+  star:['<path d="M14 2.5l3.4 7.2 7.9.9-5.8 5.4 1.6 7.8L14 19.8l-7.1 4 1.6-7.8-5.8-5.4 7.9-.9z"/>',14,14],
+  heart:['<path d="M14 24.5C6 18.5 3 13.8 3 9.8A5.6 5.6 0 0 1 14 7.6a5.6 5.6 0 0 1 11 2.2c0 4-3 8.7-11 14.7z"/>',14,14],
+  ring:['<circle cx="14" cy="14" r="9" fill="none" stroke-width="3.2"/><circle cx="14" cy="14" r="1.8" fill="#fff" stroke="none"/>',14,14],
+  arrow:['<path d="M5 3l17 9.5-7.4 2L11 22z"/>',5,3],
+  moon:['<path d="M17.5 3.5a10.5 10.5 0 1 0 7 17.6A8.6 8.6 0 0 1 17.5 3.5z"/>',14,14]
+};
+function cursorCSS(k,col){
+  const c=CURS[k]; if(!c) return "";
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28" fill="${col}" stroke="#0b0b0c" stroke-width="1.6" stroke-linejoin="round">${c[0]}</svg>`;
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}") ${c[1]} ${c[2]}, auto`;
+}
+function applyFx(){
+  const h=document.documentElement, k=uiv("cur"), col=(uiv("autoAcc")&&ACC_NOW)||S.ui.accent||"#dcdce0";
+  if(CURS[k]){ h.style.setProperty("--cur",cursorCSS(k,col)); h.classList.add("cur"); } else { h.style.removeProperty("--cur"); h.classList.remove("cur"); }
+  h.dataset.glow=uiv("glow")?"on":"off";
+  ambSet(S.ui.motion?uiv("amb"):"off");
+}
 function applyUI(){
   const u=S.ui, h=document.documentElement, th=uiv("theme"), bg=uiv("bg");
   h.dataset.theme=th; h.dataset.light=LIGHT.has(th)?"1":""; h.dataset.bg=(bg==="image"&&!u.hasBg)?"aurora":bg; h.style.setProperty("--bgo",(u.bgo==null?50:u.bgo)/100); h.style.setProperty("--bgb",(u.bgb||0)+"px"); h.dataset.motion=u.motion?"on":"off"; h.dataset.grain=u.grain?"on":"off"; h.dataset.cover=u.cover;
@@ -1074,8 +1193,9 @@ function applyUI(){
   h.style.setProperty("--fb",f.b+",system-ui,sans-serif"); h.style.setProperty("--fd",f.d+",system-ui,sans-serif");
   const bgc=getComputedStyle(document.body).getPropertyValue("--bg").trim();
   document.querySelector('meta[name="theme-color"]').content=bgc||"#0b0b0c";
+  applyFx();
 }
-const UI_SYNC=["theme","accent","bg","grain","blur","radius","font","motion","cover","bgo","bgb","accent2","autoAcc","zoom","card","navl","viz","npbg","home"];
+const UI_SYNC=["trail","cur","amb","glow","theme","accent","bg","grain","blur","radius","font","motion","cover","bgo","bgb","accent2","autoAcc","zoom","card","navl","viz","npbg","home"];
 const syncOn=()=>S.ui.syncUI==null ? matchMedia("(min-width:761px) and (pointer:fine)").matches : !!S.ui.syncUI;
 let uiPushT=null;
 function pushUI(){
@@ -1103,6 +1223,7 @@ function renderCustom(){
   const star=(k,v)=>premUI(k,v)&&!P_?`<span class="lk" title="Premium">${I("star",11)}</span>`:"";
   const seg=(k,opts)=>`<div class="seg">${opts.map(([v,l])=>`<button class="${u[k]===v?"on":""}" onclick='setUI("${k}","${v}")'>${l}${star(k,v)}</button>`).join("")}</div>`;
   const sw=(k,lbl,sub,val,fn)=>{ const on=val!=null?val:!!u[k]; return `<div class="cz-row"><span>${lbl}${star(k,true)}${sub?`<br><small class="a">${sub}</small>`:""}</span><button class="sw2 ${on?"on":""}" role="switch" aria-checked="${on}" onclick='${fn||`setUI("${k}",${!on})`}'><i></i></button></div>`; };
+  const chp=(k,opts)=>`<div class="chips">${opts.map(([v,l])=>`<button class="chip ${uiv(k)===v||(u[k]===v&&P_)?"on":""}" onclick='setUI("${k}","${v}")'>${l}${star(k,v)}</button>`).join("")}</div>`;
   const rng=(k,lbl,min,max,unit,chg)=>`<h4>${lbl} <em>${u[k]}${unit}</em></h4><input type="range" data-k="${k}" ${chg?`onchange="${chg}"`:""} min="${min}" max="${max}" value="${u[k]}" oninput="setUI('${k}',+this.value,1);this.previousElementSibling.querySelector('em').textContent=this.value+'${unit}'">`;
   const czd=(id,title,body)=>`<details class="czd" data-k="${id}" ${CZOPEN.has(id)?"open":""} ><summary onclick="CZOPEN[this.parentNode.open?'delete':'add']('${id}')">${title}${I("down",16)}</summary><div class="czc">${body}</div></details>`;
   const accOn=ACCENTS.some(a=>a[1]===u.accent.toLowerCase());
@@ -1123,6 +1244,10 @@ function renderCustom(){
     <h4 style="margin-top:14px">Forme des pochettes</h4>${seg("cover",[["square","Carrée"],["round","Ronde"],["vinyl","Vinyle qui tourne"]])}
     <h4 style="margin-top:14px">Fond du lecteur plein écran</h4>${seg("npbg",[["cover","Pochette floue"],["accent","Couleur"],["plain","Uni"]])}
     ${sw("viz","Barres animées","Petit égaliseur qui bouge pendant l'écoute")}`)+
+  czd("fx","Traînée, curseur et ambiance",`<h4>Traînée de souris</h4>${chp("trail",[["off","Aucune"],["spark","Étincelles"],["star","Étoiles"],["flower","Fleurs"],["flame","Flammes"],["bolt","Éclairs"]])}
+    <h4 style="margin-top:14px">Curseur</h4>${chp("cur",[["def","Par défaut"],["star","★ Étoile"],["heart","♥ Cœur"],["ring","◯ Anneau"],["arrow","➤ Flèche"],["moon","☾ Lune"]])}
+    <h4 style="margin-top:14px">Ambiance de fond</h4>${chp("amb",[["off","Aucune"],["stars","Étoiles"],["petals","Pétales"],["snow","Neige"],["fireflies","Lucioles"]])}
+    ${sw("glow","Lueur des boutons","Un halo doux à la couleur de l'accent")}`)+
   czd("home","Page d'accueil",HOME_SECS.map(([k,l])=>sw("home_"+k,l,"",hs(k),`setHome("${k}",${!hs(k)})`)).join(""))+
   czd("a11y","Accessibilité",`${sw("_c","Contraste élevé","",u.theme==="contraste",`setUI("theme","${u.theme==="contraste"?"dark":"contraste"}")`)}
     ${sw("_f","Police très lisible","Atkinson Hyperlegible",u.font==="atkinson",`setUI("font","${u.font==="atkinson"?"dm":"atkinson"}")`)}
@@ -1771,10 +1896,12 @@ async function loadCur(){
   if(AD.on) return;                          // une pub tourne : le son visé (q/qi) se chargera juste après
   if(offlineLocked()) return offlineNotice();
   let t=curT(); if(!t) return;
+  fxLoad(t);                                 // les effets de CE son (ou aucun) : dès qu'on le vise, avant tout chargement
   if(adDue()){
     await runAd(adPick());
     if(AD.stop){ AD.stop=false; return; }    // minuterie de sommeil écoulée pendant la pub : on ne lance rien
     t=curT(); if(!t) return;                 // relu : on a pu viser un autre son pendant la pub
+    fxLoad(t);
   }
   if(!t.local&&!t.remote){
     if(t.pending&&t.url){ toast("Téléchargement de « "+t.title+" »…"); if(!await dl(t.id,true)) return; }
@@ -1787,6 +1914,7 @@ async function loadCur(){
     url=URL.createObjectURL(b);
   }
   if(LOOP&&LOOP.id!==t.id) LOOP=null;
+  applyRate();
   const my=++LOADN; await setSrc(url); if(my!==LOADN) return;    // un autre son a été demandé entre-temps
   const rs=S.player.resume!==false&&t.pos>5&&(!t.duration||t.pos<t.duration-8)?t.pos:0, st0=rs||(t.cut&&t.cut.a)||0;
   if(st0){ au.currentTime=st0; au.addEventListener("loadedmetadata",()=>{ if(au.currentTime<st0-1) au.currentTime=st0; },{once:true}); if(rs) toast("Reprise à "+fm(rs)); }
@@ -1876,6 +2004,13 @@ const FX={ctx:null};
 const EQS={flat:["Normal",0,0,0,0,0],bass:["Bass boost",7,0,-1,0,0],voice:["Voix",-3,4,2,0,0],bassmax:["Basses max",12,-2,1,1,0],
   treble:["Aigus",-2,0,6,1,0],warm:["Chaleureux",4,1,-3,1,0],lofi:["Lo-fi",3,-2,-8,1,3800],night:["Nuit (doux)",-3,0,-6,1,0],custom:["Perso",0,0,0,1,0]};
 const PREM_RATES=new Set(["slowrev"]);
+// Les réglages d'effets (vitesse, égaliseur, réverbe, distorsion) restent attachés au son : un autre son repart à zéro
+const FXK=["rate","eq","eqc","rev","dist"], FX_DEF={rate:"1",eq:"flat",eqc:null,rev:0,dist:0};
+function fxLoad(t){ const f=(t&&t.fx)||{}; for(const k of FXK){ if(k in f) S.player[k]=f[k]; else if(FX_DEF[k]===null) delete S.player[k]; else S.player[k]=FX_DEF[k]; } }
+function fxStore(){
+  const t=curT(); if(t){ const f={}; for(const k of FXK){ const v=S.player[k]; if(v!=null&&JSON.stringify(v)!==JSON.stringify(FX_DEF[k])) f[k]=v; } if(Object.keys(f).length) t.fx=f; else delete t.fx; }
+  save();
+}
 const prem=()=>isPrem();
 function eqNow(){
   const k=EQS[S.player.eq]?S.player.eq:"flat", e=EQS[k], ok=!e[4]||prem();
@@ -1979,27 +2114,28 @@ function premLock(what){ toast((what||"Cette option")+" fait partie de Premium")
 function setEq(k){
   const e=EQS[k]; if(!e) return;
   if(e[4]&&!prem()) return premLock("« "+e[0]+" »");
-  S.player.eq=k; save(); reroute(); fxRefresh();
+  S.player.eq=k; fxStore(); reroute(); fxRefresh();
 }
-function setFxVal(k,v){ if(k==="rev"&&!prem()) return premLock("La réverbe"); S.player[k]=v; save(); if(k==="rev"||k==="dist") reroute(); }
-function setEqc(band,v){ S.player.eqc=Object.assign({b:0,m:0,t:0},S.player.eqc,{[band]:v}); save(); fxApply(); }
-function setRate(k){ if(PREM_RATES.has(k)&&!prem()) return premLock("« "+RATES[k][2]+" »"); S.player.rate=k; save(); applyRate(); reroute(); fxRefresh(); }
+function setFxVal(k,v){ if(k==="rev"&&!prem()) return premLock("La réverbe"); S.player[k]=v; if(k==="fade") save(); else fxStore(); if(k==="rev"||k==="dist") reroute(); }
+function setEqc(band,v){ S.player.eqc=Object.assign({b:0,m:0,t:0},S.player.eqc,{[band]:v}); fxStore(); fxApply(); }
+function setRate(k){ if(PREM_RATES.has(k)&&!prem()) return premLock("« "+RATES[k][2]+" »"); S.player.rate=k; fxStore(); applyRate(); reroute(); fxRefresh(); }
 function fxRefresh(){ if(!$("#gen").hidden&&$("#genb .fx")) $("#genb").innerHTML=fxHTML(), $$("#genb input[type=range]").forEach(paintRange); renderNP(); }
 function fxHTML(){
   const P_=prem(), star=l=>l&&!P_?`<span class="lk">${I("star",11)}</span>`:"";
   const speeds=[["0.75","0,75×"],["1","1×"],["1.25","1,25×"],["1.5","1,5×"],["2","2×"]];
-  const styles=[["1","Normal"],["slowed","Slowed"],["spedup","Sped up"],["slowrev","Slowed + reverb"]];
+  const styles=[["1","Normal"],["slowed","Slowed"],["uslow","Ultra slowed"],["spedup","Sped up"],["uspeed","Ultra sped up"],["slowrev","Slowed + reverb"]];
   const e=eqNow(), c=S.player.eqc||{b:0,m:0,t:0}, rv=+S.player.rev||0, fd=+S.player.fade||0;
   const sl=(lbl,val,min,max,unit,oninput,locked,key)=>`<label class="fxs ${locked&&!P_?"off":""}" ${key?`data-fx="${key}"`:""}><span>${lbl}${star(locked)}<em>${val}${unit}</em></span><input type="range" min="${min}" max="${max}" value="${val}" oninput="this.previousElementSibling.querySelector('em').textContent=this.value+'${unit}';${oninput}" ${locked&&!P_?"disabled":""}></label>`;
   const onAu1=au===au1&&fxOn()&&au.src&&!/^blob:/.test(au.src);
   return `<div class="fx">
     <h4>Vitesse</h4><div class="seg">${speeds.map(([k,l])=>`<button class="${S.player.rate===k?"on":""}" onclick="setRate('${k}')">${l}</button>`).join("")}</div>
-    <h4>Style</h4><div class="chips">${styles.map(([k,l])=>`<button class="chip ${S.player.rate===k||(k==="1"&&!["slowed","spedup","slowrev"].includes(S.player.rate))?"on":""}" onclick="setRate('${k}')">${l}${star(PREM_RATES.has(k))}</button>`).join("")}</div>
+    <h4>Style</h4><div class="chips">${styles.map(([k,l])=>`<button class="chip ${S.player.rate===k||(k==="1"&&!["slowed","spedup","slowrev","uslow","uspeed"].includes(S.player.rate))?"on":""}" onclick="setRate('${k}')">${l}${star(PREM_RATES.has(k))}</button>`).join("")}</div>
     <h4>Égaliseur</h4><div class="chips">${Object.entries(EQS).map(([k,v])=>`<button class="chip ${(S.player.eq||"flat")===k?"on":""}" data-eq="${k}" onclick="setEq('${k}')">${v[0]}${star(v[4])}</button>`).join("")}</div>
     ${S.player.eq==="custom"&&P_?`<div class="fxg">${sl("Graves",c.b||0,-12,12," dB","setEqc('b',+this.value)")}${sl("Médiums",c.m||0,-12,12," dB","setEqc('m',+this.value)")}${sl("Aigus",c.t||0,-12,12," dB","setEqc('t',+this.value)")}</div>`:""}
     ${sl("Distorted",+S.player.dist||0,0,100," %","setFxVal('dist',+this.value)",false,"dist")}
     ${sl("Réverbe",rv,0,100," %","setFxVal('rev',+this.value)",true)}
     ${sl("Fondu entre les sons",fd,0,12," s","setFxVal('fade',+this.value)")}
+    <p class="a fxn">Ces réglages sont gardés pour ce son. Un autre son repart sans effet.</p>
     ${onAu1?`<p class="a fxn">L'égaliseur et la réverbe ne s'appliquent pas encore à ce son en ligne.</p>`:""}
     ${P_?"":`<p class="a fxn">${I("star",12)} = réservé à Premium. <button class="lnk" onclick="openPremium()">Découvrir Premium</button></p>`}
   </div>`;
@@ -2093,7 +2229,7 @@ function pickSleep(){ const on=sleepAt||sleepEnd; showOptions("Minuterie de somm
   {l:"À la fin de ce son",i:"moon",on:sleepEnd===true,fn:()=>setSleep("end")},{l:"À la fin de la file",i:"queue",on:sleepEnd==="queue",fn:()=>setSleep("queue")},
   {l:S.player.sleepSoft===false?"Arrêt en douceur : non":"Arrêt en douceur : oui (20 s)",i:"vol",fn:()=>{ S.player.sleepSoft=S.player.sleepSoft===false; save(); pickSleep(); }},
   on&&{l:"Désactiver",i:"x",fn:()=>setSleep(0)}], on?"Active : "+sleepLabel():"Arrête la musique automatiquement."); }
-function pickRate(){ showOptions("Vitesse & effets",Object.entries(RATES).map(([k,r])=>({l:r[2]+(k==="slowed"?" · plus lent et plus grave":k==="spedup"?" · plus rapide et plus aigu":""),i:k==="slowed"||k==="spedup"?"spark":"gauge",on:S.player.rate===k,fn:()=>{ S.player.rate=k; save(); applyRate(); renderNP(); toast(r[2]); }})), "S'applique à tous les sons."); }
+function pickRate(){ showOptions("Vitesse & effets",Object.entries(RATES).map(([k,r])=>({l:r[2]+(/slow/.test(k)?" · plus lent et plus grave":/speed|spedup/.test(k)?" · plus rapide et plus aigu":""),i:r[1]?"gauge":"spark",on:S.player.rate===k,fn:()=>{ setRate(k); toast(r[2]); }})), "S'applique à ce son uniquement."); }
 setInterval(()=>{ if(sleepAt&&!$("#np").hidden) $("#npsl").innerHTML=I("clock",16)+`<span>${sleepLabel()}</span>`; },30000);
 
 // Lecteur plein écran
@@ -2269,15 +2405,36 @@ function openStats(){
 const cover = (t, cls="") => { const s=cvSrc(t); return `<div class="cv ${cls}"><span>${esc(initial(t))}</span>${s?`<img src="${esc(s)}" alt="" loading="lazy">`:""}</div>`; };
 function avatarHTML(u, size=44){
   const c=COL[(u&&u.color)||0]||COL[0], d=`width:${size}px;height:${size}px;font-size:${Math.round(size*.46)}px`;
-  if(u&&u.pic&&u.username) return `<div class="av img" style="${d}"><img src="/api/img/${encodeURIComponent(u.username)}/a?v=${encodeURIComponent(u.pic)}" alt="" loading="lazy"></div>`;
-  if(u&&u.avatar) return `<div class="av emo1" style="${d};font-size:${Math.round(size*.56)}px;text-shadow:none">${esc(u.avatar)}</div>`;
-  return `<div class="av" style="background:linear-gradient(135deg,${c},color-mix(in oklab,${c} 55%,#000));${d}">${esc(((u&&u.username)||"?")[0].toUpperCase())}</div>`;
+  const fr=cosOf(u).frame?" fr-"+cosOf(u).frame:"";
+  if(u&&u.pic&&u.username) return `<div class="av img${fr}" style="${d}"><img src="/api/img/${encodeURIComponent(u.username)}/a?v=${encodeURIComponent(u.pic)}" alt="" loading="lazy"></div>`;
+  if(u&&u.avatar) return `<div class="av emo1${fr}" style="${d};font-size:${Math.round(size*.56)}px;text-shadow:none">${esc(u.avatar)}</div>`;
+  return `<div class="av${fr}" style="background:linear-gradient(135deg,${c},color-mix(in oklab,${c} 55%,#000));${d}">${esc(((u&&u.username)||"?")[0].toUpperCase())}</div>`;
 }
 const accOf=u=>(u&&u.accent)||COL[(u&&u.color)||0]||COL[0];
 const accStyle=u=>{ const a=accOf(u); return `--ac:${a};--act:${a};--on:${lum(a)>.42?"#0b0b0c":"#ffffff"}`; };
+const COSB=[["aurore","Aurore"],["sunset","Coucher de soleil"],["ocean","Océan"],["fleurs","Fleurs"],["neon","Néon"],["etoiles","Étoilé"]];
+const COSF=[["or","Or"],["fleurs","Fleurs"],["etoiles","Étoiles"],["flamme","Flamme"],["neon","Néon"]];
+const COSG=["⭐","🔥","🌸","⚡","👑","💎","🎧","🌙"];
+const cosOf=u=>(u&&u.cos)||{};
+const badgeOf=u=>cosOf(u).badge?`<span class="cosbadge" title="Badge Premium">${cosOf(u).badge}</span>`:"";
+async function setCos(k,v){
+  if(!ME) return openAuth("login");
+  if(v&&!isPrem()) return premLock("Les cosmétiques");
+  const cos=Object.assign({},ME.cos||{}); if(v) cos[k]=v; else delete cos[k];
+  try{ const d=await api("/api/auth/me",{method:"PATCH",body:{cos}}); ME.cos=d.cos||{}; renderProf(); sfx("pop"); }catch(e){ toast(e.message,{type:"err"}); }
+}
+function cosPicker(){
+  const c=cosOf(ME), star=isPrem()?"":`<span class="lk">${I("star",11)}</span>`;
+  const row=(lbl,k,opts)=>`<div class="cosr"><span>${lbl}</span><button class="chip ${!c[k]?"on":""}" onclick="setCos('${k}','')">Aucun</button>${opts.map(([v,l])=>`<button class="chip ${c[k]===v?"on":""}" onclick="setCos('${k}','${v}')">${l}${star}</button>`).join("")}</div>`;
+  return `<details class="box gcard cosd" ${COSOPEN?"open":""}><summary onclick="COSOPEN=!this.parentNode.open"><h3>${I("star",20)}Cosmétiques Premium</h3>${I("down",18)}</summary>
+    <p class="a">Bandeau, cadre et badge : visibles par tous ceux qui ouvrent ton profil.</p>
+    ${row("Bandeau","banner",COSB)}${row("Cadre de l'avatar","frame",COSF)}${row("Badge","badge",COSG.map(e=>[e,e]))}</details>`;
+}
+let COSOPEN=false;
 function bannerHTML(u,edit){
+  const bn=!u.ban&&cosOf(u).banner;
   const a=accOf(u), bg=u.ban?`url('/api/img/${encodeURIComponent(u.username)}/b?v=${encodeURIComponent(u.ban)}')`:`linear-gradient(120deg,${a},color-mix(in oklab,${a} 35%,#000))`;
-  return `<div class="banner" style="background-image:${bg}">${edit?`<button class="btn alt sm" style="position:absolute;right:12px;top:12px;backdrop-filter:blur(10px)" onclick="bannerMenu()">${I("up2",16)}Bannière</button>`:""}</div>`;
+  return `<div class="banner ${bn?"bn-"+bn:""}" ${bn?"":`style="background-image:${bg}"`}>${edit?`<button class="btn alt sm" style="position:absolute;right:12px;top:12px;backdrop-filter:blur(10px)" onclick="bannerMenu()">${I("up2",16)}Bannière</button>`:""}</div>`;
 }
 function card(t, key, i, actions=true){
   const c=q[qi]===t.id, pl=c&&!au.paused&&!!au.src, src=cvSrc(t);
@@ -2491,7 +2648,7 @@ function renderProf(){
   if(!ME) h+=`<div class="prof gcard">${avatarHTML({username:"?",color:S.prof.color||0},96)}<div class="m"><h3 style="font-size:24px">Tu n'es pas connecté</h3><p class="a" style="margin:6px 0 14px;max-width:44ch">Crée un compte gratuit pour publier tes playlists, avoir ton profil public et liker celles des autres.</p><div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn" onclick="openAuth('register')">Créer un compte</button><button class="btn alt" onclick="openAuth('login')">Se connecter</button></div></div></div>`;
   else h+=`<div class="pbox gcard" style="${accStyle(ME)}">${bannerHTML(ME,true)}<div class="prof">
       <div style="position:relative">${avatarHTML(ME,96)}<button class="icon-btn ring" style="position:absolute;right:-6px;bottom:-6px;width:34px;height:34px" onclick="avatarMenu()" aria-label="Changer la photo">${I("edit",15)}</button></div>
-      <div class="m"><div style="display:flex;align-items:center;gap:6px"><span class="disp" style="font-size:28px;font-weight:800">@${esc(ME.username)}</span>${PAYWALL&&premActive()?pBadge():""}<button class="icon-btn sm" onclick="changeUsername()" aria-label="Changer de pseudo">${I("edit",16)}</button></div>
+      <div class="m"><div style="display:flex;align-items:center;gap:6px"><span class="disp" style="font-size:28px;font-weight:800">@${esc(ME.username)}</span>${PAYWALL&&premActive()?pBadge():""}${badgeOf(ME)}<button class="icon-btn sm" onclick="changeUsername()" aria-label="Changer de pseudo">${I("edit",16)}</button></div>
         <div class="a">${esc(ME.email)}${ME.created?" · membre depuis "+new Date(ME.created.replace(" ","T")+"Z").toLocaleDateString("fr-FR",{month:"long",year:"numeric"}):""}</div>
         <textarea id="bio" rows="2" maxlength="160" placeholder="Écris une petite bio (visible sur ton profil public)…" onblur="saveBio()">${esc(ME.bio||"")}</textarea>
         <div class="swr">${COL.map((c,i)=>`<button class="sw ${i==ME.color?"on":""}" style="background:${c}" onclick="setColor(${i})" aria-label="Couleur ${i+1}"></button>`).join("")}</div>
@@ -2501,6 +2658,7 @@ function renderProf(){
       <div style="display:flex;flex-direction:column;gap:8px"><button class="btn alt sm" onclick="viewUser(${js(ME.username)})">${I("eye",16)}Mon profil public</button><button class="btn alt sm" onclick="copyTxt(location.origin+'/?u='+encodeURIComponent(ME.username),'Lien du profil copié')">${I("link",16)}Copier mon lien</button><button class="btn alt sm" onclick="showQR(location.origin+'/?u='+encodeURIComponent(ME.username),'@'+ME.username)">${I("qr",16)}QR code</button><button class="btn alt sm" onclick="logout()">${I("logout",16)}Se déconnecter</button></div>
     </div></div>`;
   h+=stats;
+  if(ME) h+=cosPicker();
   h+=premBox(); if(ME&&ME.is_admin) h+=adminBox()+`<div class="box gcard"><h3>${I("eye",20)}Signalements</h3><p class="a">Demandes envoyées depuis la page « Signaler un contenu ».</p><div id="reports-list" class="list"></div></div><div class="box gcard"><h3>${I("chart",20)}Tableau de bord</h3><div id="adm-stats"></div></div>`;
   if(top.length) h+=`<div class="box gcard"><h3>${I("flame",20)}Ton podium</h3><div class="list">${top.map((t,i)=>row(t,"ptop",i).replace(`<span class="n">${i+1}</span>`,`<span class="n">${["","",""][i]}</span>`)).join("")}</div></div>`;
   const rec=S.pls.filter(x=>x.from);
@@ -2814,7 +2972,7 @@ async function viewUser(username){
 function renderPubProfile(){
   const u=pubData, mine=ME&&ME.id===u.id;
   $("#pub-view").innerHTML=`<a class="ib back" href="#decouvrir">${I("back",16)} Explorer</a>
-    <div class="pbox gcard" style="${accStyle(u)}">${bannerHTML(u,false)}<div class="pub-header">${avatarHTML(u,88)}<div class="m"><h2>@${esc(u.username)}${PAYWALL&&u.premium?pBadge():""}</h2>${u.status?`<div class="stt">${esc(u.status)}</div>`:""}${u.bio?`<p style="margin-bottom:6px">${esc(u.bio)}</p>`:""}<p class="a">${plural(u.playlists.length,"playlist publique")} · ${I("heart",12)} ${u.likes} j'aime${u.created?" · depuis "+new Date(u.created.replace(" ","T")+"Z").toLocaleDateString("fr-FR",{month:"long",year:"numeric"}):""}</p></div>
+    <div class="pbox gcard" style="${accStyle(u)}">${bannerHTML(u,false)}<div class="pub-header">${avatarHTML(u,88)}<div class="m"><h2>@${esc(u.username)}${PAYWALL&&u.premium?pBadge():""}${badgeOf(u)}</h2>${u.status?`<div class="stt">${esc(u.status)}</div>`:""}${u.bio?`<p style="margin-bottom:6px">${esc(u.bio)}</p>`:""}<p class="a">${plural(u.playlists.length,"playlist publique")} · ${I("heart",12)} ${u.likes} j'aime${u.created?" · depuis "+new Date(u.created.replace(" ","T")+"Z").toLocaleDateString("fr-FR",{month:"long",year:"numeric"}):""}</p></div>
     <div style="display:flex;gap:8px">${mine?`<a class="btn alt sm" href="#profil">${I("edit",16)}Modifier</a>`:""}<button class="btn alt sm" onclick="shareLink(location.origin+'/?u='+encodeURIComponent(${js(u.username)}),'@'+${js(u.username)})">${I("share",16)}Partager</button></div></div></div>
     <div style="height:26px"></div>${u.playlists.length?`<div class="pls">${u.playlists.map(pubCard).join("")}</div>`:bigEmpty("queue",mine?"Tu n'as pas encore de playlist publique":"Pas encore de playlist publique",mine?"Ouvre une playlist et active « Publique » pour la partager ici.":"Reviens plus tard !",mine?`<a class="btn" href="#playlists">Mes playlists</a>`:"")}`;
 }

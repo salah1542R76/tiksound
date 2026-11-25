@@ -245,7 +245,7 @@ def init_db():
         for col, ddl in [("bio", "TEXT DEFAULT ''"), ("avatar", "TEXT DEFAULT ''"), ("created", "TEXT"),
                          ("avatar_img", "TEXT DEFAULT ''"), ("banner_img", "TEXT DEFAULT ''"), ("imgv", "TEXT DEFAULT ''"),
                          ("accent", "TEXT DEFAULT ''"), ("status", "TEXT DEFAULT ''"), ("ui", "TEXT DEFAULT ''"),
-                         ("ui_v", "TEXT DEFAULT ''"), ("banner_color", "TEXT DEFAULT ''"),
+                         ("ui_v", "TEXT DEFAULT ''"), ("banner_color", "TEXT DEFAULT ''"), ("cosm", "TEXT DEFAULT ''"),
                          ("premium_until", "BIGINT DEFAULT 0"), ("plan_status", "TEXT DEFAULT ''"),
                          ("cancel_at_end", "INTEGER DEFAULT 0"), ("stripe_customer_id", "TEXT DEFAULT ''"),
                          ("stripe_sub_id", "TEXT DEFAULT ''"), ("gift_until", "BIGINT DEFAULT 0"),
@@ -437,8 +437,24 @@ UI_KEYS = {"theme": ("dark", "oled", "nuit", "clair", "sepia", "foret", "ocean",
            "bg": ("aurora", "cover", "mesh", "plain", "image", "vagues", "etoiles", "degrade"),
            "cover": ("square", "round", "vinyl"),
            "font": ("dm", "outfit", "space", "nunito", "syne", "mono", "atkinson", "poppins", "lexend", "playfair", "caveat", "pixel"),
-           "card": ("glass", "flat", "line"), "npbg": ("cover", "accent", "plain")}
-UI_BOOL = ("grain", "motion", "autoAcc", "viz", "navl")
+           "card": ("glass", "flat", "line"), "npbg": ("cover", "accent", "plain"),
+           "trail": ("off", "spark", "star", "flower", "flame", "bolt"),
+           "cur": ("def", "star", "heart", "ring", "arrow", "moon"),
+           "amb": ("off", "stars", "petals", "snow", "fireflies")}
+UI_BOOL = ("grain", "motion", "autoAcc", "viz", "navl", "glow")
+# Cosmétiques de profil (Premium) : bandeau, cadre de l'avatar, badge à côté du pseudo
+COS_BANNER = ("aurore", "sunset", "ocean", "fleurs", "neon", "etoiles")
+COS_FRAME = ("or", "fleurs", "etoiles", "flamme", "neon")
+COS_BADGE = ("⭐", "🔥", "🌸", "⚡", "👑", "💎", "🎧", "🌙")
+
+def clean_cos(d):
+    out = {}
+    if not isinstance(d, dict):
+        return out
+    for k, allowed in (("banner", COS_BANNER), ("frame", COS_FRAME), ("badge", COS_BADGE)):
+        if d.get(k) in allowed:
+            out[k] = d[k]
+    return out
 UI_NUM = {"blur": (0, 40), "radius": (4, 28), "bgo": (5, 100), "bgb": (0, 40), "zoom": (85, 130)}
 UI_HOME = ("hello", "hero", "steps", "pins", "day", "resume", "recent", "top", "stats", "goal", "comm", "trend", "tip", "faq")
 
@@ -484,6 +500,9 @@ def user_json(row, private=True):
         d["ui_v"] = getattr(row, "ui_v", "") or ""
     ps = premium_state(row)
     d["premium"] = ps["premium"]
+    try: cos = json.loads(getattr(row, "cosm", "") or "{}") if ps["premium"] else {}
+    except Exception: cos = {}
+    d["cos"] = clean_cos(cos)                      # visibles seulement tant que l'abonnement est actif
     if private:
         d.update(premium_until=ps["premium_until"], premium_exp=ps["premium_exp"], premium_src=ps["src"],
                  plan_status=getattr(row, "plan_status", "") or "",
@@ -750,6 +769,13 @@ def update_me():
         bc = str(d["bcolor"] or "").strip()
         if bc and not HEX_RE.match(bc): return err("Couleur invalide")
         fields.append("banner_color=:bcolor"); params["bcolor"] = bc.lower()
+    if "cos" in d:
+        cos = clean_cos(d["cos"])
+        if cos:
+            me_row = q1("SELECT * FROM users WHERE id=:id", id=u["sub"])
+            if not (me_row and premium_state(me_row)["premium"]):
+                return err("Les cosmétiques sont réservés à Premium", 403)
+        fields.append("cosm=:cosm"); params["cosm"] = json.dumps(cos, ensure_ascii=False)
     if "status" in d:
         fields.append("status=:status"); params["status"] = re.sub(r"\s+", " ", str(d["status"] or "")).strip()[:40]
     for key, col, limit in (("pic", "avatar_img", 220_000), ("ban", "banner_img", 650_000)):
@@ -886,7 +912,7 @@ def feed():
 
 @app.get("/api/users/<username>")
 def get_user(username):
-    row = q1("SELECT id,email,username,color,avatar,bio,created,avatar_img,banner_img,imgv,accent,status,banner_color,premium_until,gift_until FROM users WHERE lower(username)=:u", u=username.lower())
+    row = q1("SELECT id,email,username,color,avatar,bio,created,avatar_img,banner_img,imgv,accent,status,banner_color,cosm,premium_until,gift_until FROM users WHERE lower(username)=:u", u=username.lower())
     if not row: return err("Utilisateur introuvable", 404)
     cu = current_user()
     lk = liked_set(cu["sub"] if cu else None)
