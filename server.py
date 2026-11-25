@@ -443,17 +443,25 @@ UI_KEYS = {"theme": ("dark", "oled", "nuit", "clair", "sepia", "foret", "ocean",
            "amb": ("off", "stars", "petals", "snow", "fireflies")}
 UI_BOOL = ("grain", "motion", "autoAcc", "viz", "navl", "glow")
 # Cosmétiques de profil (Premium) : bandeau, cadre de l'avatar, badge à côté du pseudo
-COS_BANNER = ("aurore", "sunset", "ocean", "fleurs", "neon", "etoiles")
-COS_FRAME = ("or", "fleurs", "etoiles", "flamme", "neon")
-COS_BADGE = ("⭐", "🔥", "🌸", "⚡", "👑", "💎", "🎧", "🌙")
+COS_BANNER = ("aurore", "sunset", "ocean", "fleurs", "neon", "etoiles", "uni", "degrade", "vagues", "points", "grille", "coeurs")
+COS_FRAME = ("fin", "double", "halo", "pulse", "orbite", "neon", "or", "glace", "fleurs", "etoiles", "flamme", "coeurs")
+COS_EFFECT = ("etoiles", "petales", "neige", "bulles", "brillance", "aurore", "confettis", "coeurs", "lucioles")
+COS_NAME = ("degrade", "brille", "neon")
+COS_BADGE = ("⭐", "🔥", "🌸", "⚡", "👑", "💎", "🎧", "🌙", "🦋", "🍒", "👾", "🪩")
+COS_COLORS = ("bc1", "bc2", "fc", "t1", "t2")     # couleurs libres : bandeau (2), décoration, thème du profil (2)
 
 def clean_cos(d):
     out = {}
     if not isinstance(d, dict):
         return out
-    for k, allowed in (("banner", COS_BANNER), ("frame", COS_FRAME), ("badge", COS_BADGE)):
+    for k, allowed in (("banner", COS_BANNER), ("frame", COS_FRAME), ("badge", COS_BADGE),
+                       ("effect", COS_EFFECT), ("name", COS_NAME)):
         if d.get(k) in allowed:
             out[k] = d[k]
+    for k in COS_COLORS:
+        v = d.get(k)
+        if isinstance(v, str) and HEX_RE.match(v):
+            out[k] = v.lower()
     return out
 UI_NUM = {"blur": (0, 40), "radius": (4, 28), "bgo": (5, 100), "bgb": (0, 40), "zoom": (85, 130)}
 UI_HOME = ("hello", "hero", "steps", "pins", "day", "resume", "recent", "top", "stats", "goal", "comm", "trend", "tip", "faq")
@@ -476,6 +484,10 @@ def clean_ui(d):
             pass
     if isinstance(d.get("accent"), str) and HEX_RE.match(d["accent"]):
         out["accent"] = d["accent"].lower()
+    for k, extra in (("trc", ("", "rainbow")), ("curc", ("",))):      # couleurs de la traînée / du curseur
+        v = d.get(k)
+        if isinstance(v, str) and (v in extra or HEX_RE.match(v)):
+            out[k] = v.lower()
     if isinstance(d.get("accent2"), str) and (d["accent2"] == "" or HEX_RE.match(d["accent2"])):
         out["accent2"] = d["accent2"].lower()                   # vide = pas de dégradé
     if isinstance(d.get("home"), dict):
