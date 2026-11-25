@@ -92,8 +92,11 @@ EMAIL_RE = re.compile(r"^[^@\s]{1,64}@[^@\s]+\.[^@\s]{2,}$")
 TT_RE = re.compile(r"^https?://([a-z0-9-]+\.)*tiktok\.com/", re.I)
 SPT_RE = re.compile(r"^https://open\.spotify\.com/track/[A-Za-z0-9]{22}$")
 SP_RE = re.compile(r"open\.spotify\.com/(?:intl-[a-z]+/)?(playlist|album|track)/([A-Za-z0-9]{22})")
+# Résultats de la recherche de sons : une vidéo YouTube ou un titre SoundCloud (pas de playlist / album)
+FIND_URL_RE = re.compile(r"^https://(?:(?:www\.|m\.|music\.)?youtube\.com/watch\?v=[\w-]{11}(?:&[^\s]*)?|youtu\.be/[\w-]{11}"
+                         r"|(?:www\.|m\.)?soundcloud\.com/(?!sets/|discover|search|stream)[\w-]+/(?!sets/)[\w-]+/?)$")
 def ok_url(u):
-    return bool(TT_RE.match(u) or SPT_RE.match(u))
+    return bool(TT_RE.match(u) or SPT_RE.match(u) or FIND_URL_RE.match(u))
 
 # ── Email ────────────────────────────────────────────────────────────────────
 RESEND_KEY = os.environ.get("RESEND_API_KEY", "")
@@ -1689,6 +1692,68 @@ def s3():
                            aws_secret_access_key=os.environ["R2_SECRET_ACCESS_KEY"], region_name="auto")
     return _s3
 
+# ── Sons en ligne relayés par le site : même origine, donc le moteur d'effets (bass boost, distorted…) peut les traiter
+MEDIA_RE = re.compile(r"^audio/[0-9a-f]{40}\.mp3$")
+RANGE_RE = re.compile(r"^bytes=(\d*)-(\d*)$")
+MEDIA_CHUNK = 1 << 20            # 1 Mo par réponse : le lecteur redemande la suite, aucune connexion ne reste bloquée
+
+def r2_range(key, start, end):
+    """(octets, taille totale) d'un morceau d'un fichier R2. KeyError = absent, IndexError = hors du fichier."""
+    try:
+        o = s3().get_object(Bucket=os.environ["R2_BUCKET"], Key=key, Range=f"bytes={start}-{end}")
+    except Exception as e:
+        code = str(getattr(e, "response", {}).get("Error", {}).get("Code", ""))
+        if code in ("NoSuchKey", "404"): raise KeyError(key)
+        if code == "InvalidRange": raise IndexError(start)
+        raise
+    return o["Body"].read(), int(str(o.get("ContentRange", "")).rsplit("/", 1)[-1] or o["ContentLength"])
+
+def r2_cors():
+    """Essaie d'autoriser la lecture directe des sons R2 par le site (CORS). Sans les droits « Admin », on garde le relais."""
+    try:
+        s3().put_bucket_cors(Bucket=os.environ["R2_BUCKET"], CORSConfiguration={"CORSRules": [{
+            "AllowedOrigins": ["*"], "AllowedMethods": ["GET", "HEAD"], "AllowedHeaders": ["*"],
+            "ExposeHeaders": ["Content-Length", "Content-Range", "Accept-Ranges"], "MaxAgeSeconds": 86400}]})
+        log.info("R2 : lecture directe autorisée (CORS) — les effets marchent sur les sons en ligne sans relais")
+    except Exception as e:
+        log.info("R2 : CORS non modifiable avec cette clé (%s) — les effets passeront par le relais /api/media", str(e)[:120])
+
+if R2_OK and os.environ.get("R2_AUTO_CORS", "1") != "0":
+    threading.Thread(target=r2_cors, daemon=True).start()
+
+@app.get("/api/media/<path:key>")
+def media(key):
+    if not R2_OK or not MEDIA_RE.match(key):
+        return "", 404
+    if limited("media:" + ip(), 1500, 600):
+        return "", 429
+    rng = RANGE_RE.match(request.headers.get("Range", "").strip())
+    try:
+        if rng and not rng.group(1) and rng.group(2):               # « les N derniers octets »
+            _, total = r2_range(key, 0, 0)
+            a = max(0, total - int(rng.group(2))); b = total - 1
+        else:
+            a = int(rng.group(1) or 0) if rng else 0
+            b = int(rng.group(2)) if rng and rng.group(2) else a + MEDIA_CHUNK - 1
+        b = min(b, a + MEDIA_CHUNK - 1)
+        data, total = r2_range(key, a, b)
+    except KeyError:
+        return "", 404
+    except IndexError:
+        return "", 416
+    except Exception as e:
+        log.warning("Relais audio R2 échoué (%s) : %s", key, str(e)[:200])
+        return "", 502
+    if a >= total:
+        return "", 416
+    r = make_response(data, 206 if rng or len(data) < total else 200)
+    r.mimetype = "audio/mpeg"
+    r.headers["Accept-Ranges"] = "bytes"
+    r.headers["Cache-Control"] = "public, max-age=86400"
+    if r.status_code == 206:
+        r.headers["Content-Range"] = f"bytes {a}-{a + len(data) - 1}/{total}"
+    return r
+
 def nettoyer():
     for f in os.listdir("audio"):
         p = os.path.join("audio", f)
@@ -1930,6 +1995,111 @@ def audio_from_search(opts, title, author, want):
     return None
 
 
+# ── Recherche de sons : 5 résultats par plateforme, téléchargeables comme un lien TikTok ──
+SPOTIFY_ID = os.environ.get("SPOTIFY_CLIENT_ID", "")
+SPOTIFY_SECRET = os.environ.get("SPOTIFY_CLIENT_SECRET", "")
+FIND_N, FIND_MAX_DUR = 5, 1200
+_find_cache, _sp_token = {}, {"t": "", "exp": 0}
+
+def _cover(e, src):
+    if src == "youtube" and e.get("id"):
+        return f"https://i.ytimg.com/vi/{e['id']}/mqdefault.jpg"
+    best = ""
+    for t in e.get("thumbnails") or []:
+        u = str(t.get("url") or "")
+        if u.startswith("https://"):
+            best = u
+            if (t.get("width") or 0) >= 300:
+                break
+    return best or (str(e.get("thumbnail") or "") if str(e.get("thumbnail") or "").startswith("https://") else "")
+
+def _find_items(entries, src):
+    out = []
+    for e in entries or []:
+        if not e:
+            continue
+        if src == "youtube":
+            url = f"https://www.youtube.com/watch?v={e['id']}" if e.get("id") else str(e.get("url") or "")
+        else:
+            url = str(e.get("webpage_url") or e.get("url") or "").split("?")[0]
+        if not FIND_URL_RE.match(url):
+            continue
+        try: d = int(float(e.get("duration") or 0))
+        except Exception: d = 0
+        if not d or d > FIND_MAX_DUR:
+            continue                                   # direct, ou mix de plusieurs heures
+        author = re.sub(r"\s*-\s*Topic$", "", str(e.get("uploader") or e.get("channel") or ""))[:60]
+        out.append({"src": src, "url": url, "title": str(e.get("title") or "")[:120], "author": author,
+                    "duration": d, "cover": _cover(e, src)})
+        if len(out) >= FIND_N:
+            break
+    return out
+
+def _find_yd(prefix, q, n):
+    o = {"quiet": True, "extract_flat": True, "skip_download": True, "socket_timeout": 12}
+    o.update(_net_opts())
+    with yt_dlp.YoutubeDL(o) as y:
+        return (y.extract_info(f"{prefix}{n}:{q}", download=False) or {}).get("entries") or []
+
+def find_yt(q):
+    return _find_items(_find_yd("ytsearch", q, 10), "youtube")
+
+def find_sc(q):
+    return _find_items(_find_yd("scsearch", q, 8), "soundcloud")
+
+def find_spotify(q):
+    """Titres Spotify (clés développeur gratuites requises). Le son est ensuite trouvé sur YouTube/SoundCloud."""
+    if time.time() > _sp_token["exp"]:
+        tok = base64.b64encode(f"{SPOTIFY_ID}:{SPOTIFY_SECRET}".encode()).decode()
+        req = urllib.request.Request("https://accounts.spotify.com/api/token", data=b"grant_type=client_credentials",
+                                     headers={"Authorization": "Basic " + tok, "Content-Type": "application/x-www-form-urlencoded"})
+        with urllib.request.urlopen(req, timeout=8) as r:
+            j = json.loads(r.read())
+        _sp_token.update(t=j["access_token"], exp=time.time() + int(j.get("expires_in", 3600)) - 60)
+    req = urllib.request.Request("https://api.spotify.com/v1/search?" + urllib.parse.urlencode({"q": q, "type": "track", "limit": FIND_N}),
+                                 headers={"Authorization": "Bearer " + _sp_token["t"]})
+    with urllib.request.urlopen(req, timeout=8) as r:
+        items = json.loads(r.read()).get("tracks", {}).get("items") or []
+    out = []
+    for it in items:
+        imgs = (it.get("album") or {}).get("images") or []
+        out.append({"src": "spotify", "url": f"https://open.spotify.com/track/{it.get('id', '')}", "title": str(it.get("name") or "")[:120],
+                    "author": ", ".join(a.get("name", "") for a in it.get("artists") or [])[:60],
+                    "duration": int((it.get("duration_ms") or 0) / 1000), "cover": (imgs[1] if len(imgs) > 1 else imgs[0])["url"] if imgs else ""})
+    return [x for x in out if SPT_RE.match(x["url"])]
+
+@app.get("/api/find")
+def find():
+    q = re.sub(r"\s+", " ", str(request.args.get("q", ""))).strip()[:100]
+    if len(q) < 2:
+        return err("Écris au moins 2 lettres")
+    jobs = {"youtube": find_yt, "soundcloud": find_sc}
+    if SPOTIFY_ID and SPOTIFY_SECRET:
+        jobs["spotify"] = find_spotify
+    key = (q.lower(), tuple(jobs))
+    hit = _find_cache.get(key)
+    if hit and time.time() - hit[0] < 900:
+        return jsonify(**hit[1])
+    if limited("find:" + ip(), 30, 600):
+        return err("Trop de recherches d'un coup, patiente un peu", 429)
+    from concurrent.futures import ThreadPoolExecutor
+    out = {}
+    with ThreadPoolExecutor(len(jobs)) as ex:
+        futs = {k: ex.submit(f, q) for k, f in jobs.items()}
+        for k, f in futs.items():
+            try:
+                out[k] = f.result(timeout=25)
+            except Exception as e:
+                log.warning("Recherche %s échouée pour « %s » : %s", k, q, str(e)[:200])
+                out[k] = []
+    res = {"q": q, "sources": list(jobs), "results": out}
+    if any(out.values()):
+        if len(_find_cache) > 300:
+            _find_cache.clear()
+        _find_cache[key] = (time.time(), res)
+    return jsonify(**res)
+
+
 @app.post("/api/extract")
 def extract():
     if limited("extract:" + ip(), 40, 600):
@@ -1938,8 +2108,11 @@ def extract():
     b = body()
     raw = str(b.get("url", "")).strip()
     spotify = bool(SPT_RE.match(raw))
+    found = bool(FIND_URL_RE.match(raw))
     if spotify:
         title_in = str(b.get("title") or "")[:120]; author_in = str(b.get("author") or "")[:60]
+        url = raw
+    elif found:
         url = raw
     else:
         url = trouver_lien(raw)
@@ -1972,6 +2145,16 @@ def extract():
         info = audio_from_search(opts, title_in, author_in, want)
         if not info:
             return err(f"Aucune version audio trouvée pour « {title_in[:50]} ».", 502, retry=True)
+    elif found:
+        try:
+            with yt_dlp.YoutubeDL(opts) as y:
+                pre = y.extract_info(url, download=False)
+                if pre.get("is_live") or (pre.get("duration") or 0) > FIND_MAX_DUR:
+                    return err("Ce son est trop long (plus de 20 min) ou en direct.")
+                info = y.process_ie_result(pre, download=True)
+        except Exception as ex:
+            log.warning("Téléchargement %s échoué : %s", url, str(ex)[:300])
+            return err("Impossible de récupérer ce son pour le moment. Essaie un autre résultat.", 502, retry=True)
     else:
         essais = [url.replace("/photo/", "/video/"), url] if "/photo/" in url else [url]
         for u in essais:
@@ -1988,8 +2171,8 @@ def extract():
     cover = info.get("thumbnail", "") or ""
     try: duration = int(float(info.get("duration") or 0))
     except Exception: duration = 0
-    res = dict(id=uid, url=url, title=(title_in or titre(info)) if spotify else titre(info),
-               author=author_in if spotify else (info.get("uploader", "") or ""),
+    res = dict(id=uid, url=url, title=(title_in or titre(info)) if spotify else (str(info.get("title") or "")[:120] or titre(info)) if found else titre(info),
+               author=author_in if spotify else re.sub(r"\s*-\s*Topic$", "", info.get("uploader", "") or ""),
                cover=cover, cover_data=fetch_thumb(cover), duration=duration, audio_url=f"/audio/{uid}.mp3")
     if online:
         try:
