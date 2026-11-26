@@ -1042,7 +1042,7 @@ def test_customize_page_lists_trails_cursors_ambiance_with_premium_stars(live, m
     tx = c.page.inner_text("#pzp").lower()
     for w in ("Étincelles", "Étoiles", "Fleurs", "Flammes", "Éclairs", "Curseur", "Arc-en-ciel"):
         assert w.lower() in tx, w
-    assert c.page.locator("#pzp .pzt > .lk").count() == 9                 # 4 traînées + 5 curseurs
+    assert c.page.locator("#pzp .pzt > .lk").count() == 16                # 7 traînées + 9 curseurs
     assert c.page.locator("#pzp .pzt svg").count() >= 11                  # chaque choix a son aperçu
     c.page.click(".pz-tabs [data-tab=fond]")
     assert "Ambiance" in c.page.inner_text("#pzp") and c.page.locator("#pzp .pzt .pfx").count() == 4
@@ -1982,3 +1982,124 @@ def test_text_links_have_no_grey_button_background(live, mk):
     c.open()
     grey = c.ev("[...document.querySelectorAll('button.lnk')].map(b=>getComputedStyle(b).backgroundColor).filter(v=>v!=='rgba(0, 0, 0, 0)')")
     assert grey == []
+
+
+# ═══════════════════════════ Série 3 : bugs et cosmétiques ═══════════════════════════
+def test_accessibility_switches_give_back_your_own_settings(live, mk):
+    no_paywall(live)
+    c = opened(mk, tracks(1), paywall=False)
+    c.ev("setUI('theme','ocean'); setUI('font','space'); setUI('zoom',105)")
+    for name in ("_c", "_f", "_z"):                                           # contraste, police lisible, interface plus grande
+        c.ev(f"accToggle('{name}')"); c.ev(f"accToggle('{name}')")
+    assert c.ev("[S.ui.theme,S.ui.font,S.ui.zoom]") == ["ocean", "space", 105]
+
+
+def test_customize_can_cancel_or_save_changes(live, mk):
+    no_paywall(live)
+    c = opened(mk, tracks(1), paywall=False)
+    c.ev("setUI('theme','ocean'); openCustom('theme')")
+    c.ev("setUI('theme','foret'); setUI('blur',30)")
+    c.page.click("#pzcancel")
+    assert c.ev("[S.ui.theme,S.ui.blur]") == ["ocean", 18]
+    c.ev("setUI('theme','nuit')")
+    c.page.click("#pzsave")
+    c.page.wait_for_function("location.hash!=='#perso'")                   # retour à la page d'avant
+    c.page.wait_for_timeout(300)
+    c.ev("openCustom('theme')"); c.page.wait_for_selector("#pzcancel"); c.page.click("#pzcancel")
+    assert c.ev("S.ui.theme") == "nuit"
+
+
+def test_glass_effect_blurs_the_cards(live, mk):
+    no_paywall(live)
+    c = opened(mk, tracks(2), paywall=False)
+    c.ev("setUI('blur',26)")
+    c.page.wait_for_selector(".gcard", state="attached")
+    assert "blur(" in c.ev("getComputedStyle(document.querySelector('.gcard')).backdropFilter")
+
+
+def test_sound_length_is_corrected_from_the_real_audio(live, mk):
+    no_paywall(live)
+    tr = tracks(1); tr[0]["duration"] = 999
+    c = opened(mk, tr, paywall=False)
+    start(c, 1); playing_src(c, 1)
+    c.page.wait_for_function("S.tracks[0].duration===60")
+
+
+def test_new_cursors_trails_and_thinner_adjustable_borders(live, mk):
+    no_paywall(live)
+    c = opened(mk, tracks(1), paywall=False)
+    c.ev("openCustom('effets')")
+    for v in ("note", "diamond", "bolt", "plus"):
+        assert c.page.locator(f"#perso .pzt[data-v='{v}']").count() >= 1, v
+    for v in ("heart", "note", "bubble"):
+        assert c.page.locator(f"#perso .pzt[data-v='{v}']").count() >= 1, v
+        c.ev(f"trailAdd('{v}',50,50,1,1); trailLoop(performance.now())")
+    assert "stroke-width%3D%220.8%22" in c.ev("cursorCSS('heart','#ff0000')")      # bords fins par défaut
+    c.ev("setUI('curw',20)")
+    assert "stroke-width%3D%222%22" in c.ev("cursorCSS('heart','#ff0000')")
+    assert c.page.locator("#perso input[data-k='curw']").count() == 1
+    assert not c.logs, c.logs
+
+
+def test_username_font_and_colour_show_on_the_profile(live, mk):
+    c = opened(mk, tracks(1), premium=True)
+    c.ev("openCustom('profil')")
+    c.page.click("#perso [onclick=\"pickCos('nfont','pixel')\"]")
+    c.ev("cosColor('nc','#ff00aa',1)")
+    c.page.wait_for_function("ME.cos && ME.cos.nfont==='pixel' && ME.cos.nc==='#ff00aa'")
+    st = c.ev("getComputedStyle(document.querySelector('#pzv .disp'))")
+    assert c.ev("getComputedStyle(document.querySelector('#pzv .disp')).fontFamily").find("Press Start") >= 0
+    assert c.ev("getComputedStyle(document.querySelector('#pzv .disp')).color") == "rgb(255, 0, 170)"
+    for v in ("ombre", "contour", "pastel"):
+        assert c.page.locator(f"#perso [onclick=\"pickCos('name','{v}')\"]").count() == 1
+
+
+def test_any_background_colour_can_be_chosen(live, mk):
+    no_paywall(live)
+    c = opened(mk, tracks(1), paywall=False)
+    c.ev("openCustom('theme')")
+    assert c.page.locator("#perso input[type=color][data-k='tbg']").count() == 1
+    c.ev("setUI('tbg','#204060')")
+    assert c.ev("S.ui.theme") == "perso"
+    assert c.ev("getComputedStyle(document.body).getPropertyValue('--bg').trim()") == "#204060"
+
+
+def test_playlists_can_have_their_own_cover_picture(live, mk):
+    c = opened(mk, tracks(2), pls=[{"id": "p1", "name": "Gym", "ids": ["t1"]}])
+    c.ev("""(async()=>{ const cv=document.createElement('canvas'); cv.width=cv.height=8; await setPlCover('p1', await new Promise(r=>cv.toBlob(r,'image/jpeg'))); })()""")
+    c.page.wait_for_function("plArt(S.pls[0]).includes('<img')")
+    c.page.reload(); c.booted()
+    c.page.wait_for_function("plArt(S.pls[0]).includes('<img')")              # gardée sur l'appareil
+
+
+def test_gif_profile_pictures_are_premium_only(live, mk):
+    c = opened(mk, tracks(1))
+    c.signup("free@example.com", "gratuit"); c.page.reload(); c.booted(); c.page.wait_for_function("ME")
+    c.ev("useImage('pic', new File([new Uint8Array([71,73,70,56,57,97,0,0])],'a.gif',{type:'image/gif'}))")
+    c.page.wait_for_function("document.querySelector('#gen:not([hidden]),#toasts .toast')")
+    assert c.ev("ME.pic") in ("", None)
+
+
+def test_subscribe_button_says_it_out_loud(live, mk):
+    c = opened(mk, tracks(1))
+    b = c.page.locator("#premb")
+    assert b.is_visible() and "abonner" in b.inner_text().lower()
+
+
+def test_launch_screen_says_tikwave(live, mk):
+    c = opened(mk, tracks(1))
+    assert "TikWave" in c.page.inner_text("#splash", timeout=2000) if c.page.locator("#splash").count() else False
+    c.page.wait_for_function("document.getElementById('splash').hidden")
+
+
+def test_publishing_through_the_sound_menu_reaches_explore(live, mk):
+    no_paywall(live)
+    yt = [dict(id="t1", title="Son YouTube", author="A", duration=60, url="https://www.youtube.com/watch?v=abcdefghijk",
+               local=False, remote="{BASE}/__m/silence.wav", added=1)]
+    c = mk(); c.signup("me@example.com", "moi_test"); c.seed(yt); c.open(); c.page.wait_for_function("ME")
+    c.ev("location.hash='bibliotheque'")
+    c.page.click("#lib [data-id=t1] [aria-label='Options'], #lib [data-id=t1] [aria-label='Plus d\\'options']")
+    c.page.click("#optl .opt:has-text('Publier ce son')")
+    c.page.wait_for_function("S.tracks[0].postId")
+    c.ev("location.hash='decouvrir'")
+    c.page.wait_for_selector("#posts-wrap .post:has-text('Son YouTube')")

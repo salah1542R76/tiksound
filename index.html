@@ -159,6 +159,25 @@ html[data-motion=off] .banner,html[data-motion=off] .nf-arcenciel,html[data-moti
 .av.prem{box-shadow:0 0 0 2px #f5c542,0 0 calc(var(--avs,44px)*.32) color-mix(in oklab,#f5c542 60%,transparent)}
 .user-card .m{min-width:0}.user-card .t{display:flex;align-items:center;min-width:0}.user-card .t .un{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .user-card .a .pbadge{font-size:11px;padding:1px 7px;margin:0 6px 0 0}.user-card .t .cosbadge{flex:none;font-size:15px;margin-left:4px}
+/* Série 3 : verre sur les cartes, pseudo, couvertures de playlist, bouton S'abonner, écran de lancement */
+html[data-card=glass] .gcard,html[data-card=glass] .tc{-webkit-backdrop-filter:blur(var(--blur)) saturate(150%);backdrop-filter:blur(var(--blur)) saturate(150%)}
+@media(pointer:coarse){html[data-card=glass] .gcard,html[data-card=glass] .tc{-webkit-backdrop-filter:blur(min(var(--blur),10px));backdrop-filter:blur(min(var(--blur),10px))}}
+.nf-ombre{text-shadow:2px 2px 0 rgba(0,0,0,.55),0 0 14px rgba(0,0,0,.35)}
+.nf-contour{color:transparent!important;-webkit-text-stroke:1.4px var(--nc,var(--t1,var(--ac)))}
+.nf-pastel{background:linear-gradient(90deg,#ffd1dc,#c1e1ff,#d4f8d4,#fff3b0);-webkit-background-clip:text;background-clip:text;color:transparent!important}
+.plimg{overflow:hidden;padding:0}.plimg img{width:100%;height:100%;object-fit:cover;display:block}
+.prem-btn{display:inline-flex;align-items:center;gap:6px;height:40px;padding:0 16px;border-radius:99px;border:0;font:700 14px var(--fb);color:#2a1a00;background:linear-gradient(135deg,#ffd27a,#ff9ec4);box-shadow:0 6px 20px rgba(255,160,130,.35);position:relative;overflow:hidden;cursor:pointer;white-space:nowrap}
+.prem-btn svg{fill:currentColor}
+.prem-btn::after{content:"";position:absolute;top:0;bottom:0;width:40%;left:-60%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.55),transparent);animation:pbsh 3.4s ease-in-out infinite}
+@keyframes pbsh{0%,60%{left:-60%}100%{left:130%}}
+html[data-motion=off] .prem-btn::after{animation:none;display:none}
+.prem-btn.on{background:transparent;color:#ffc861;box-shadow:none;border:1px solid var(--br2)}.prem-btn.on::after{display:none}
+@media(max-width:520px){.prem-btn{height:36px;padding:0 12px;font-size:13px}}
+#splash{position:fixed;inset:0;z-index:99999;display:grid;place-items:center;background:var(--bg);transition:opacity .4s;pointer-events:none}
+#splash.out{opacity:0}
+#splash .spl{display:flex;align-items:center;gap:14px;font:800 34px var(--fd);letter-spacing:-.5px;color:var(--tx);animation:splin .7s cubic-bezier(.2,.8,.2,1) both}
+#splash .lg-eq{transform:scale(1.6)}
+@keyframes splin{from{opacity:0;transform:translateY(10px) scale(.96)}}
 .pbox{position:relative}
 .pbox.pth{background:linear-gradient(165deg,color-mix(in oklab,var(--t1) 34%,var(--bg)),color-mix(in oklab,var(--t2,var(--t1)) 34%,var(--bg)))!important;border-color:transparent!important}
 .pbox.pth::after{content:"";position:absolute;inset:0;border-radius:inherit;padding:3px;background:linear-gradient(165deg,var(--t1),var(--t2,var(--t1)));-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none;z-index:6}
@@ -828,6 +847,7 @@ button,a{-webkit-tap-highlight-color:transparent}
 </style>
 </head>
 <body class="nopl">
+<div id="splash" aria-hidden="true"><div class="spl"><span class="lg-eq"><i></i><i></i><i></i></span><b>TikWave</b></div></div>
 <div id="aurora" aria-hidden="true"><i></i><i></i><i></i><b id="bgimg"></b><b id="ambient"></b></div>
 
 <header class="glass"><div class="bar">
@@ -841,7 +861,7 @@ button,a{-webkit-tap-highlight-color:transparent}
     <a href="#profil"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></svg><span>Profil</span></a>
   </nav>
   <div class="hdr">
-    <button class="icon-btn ring prem-btn" id="premb" hidden onclick="openPremium()" aria-label="Premium" title="Premium" data-i="star"></button>
+    <button class="prem-btn" id="premb" hidden onclick="openPremium()"><span data-i="star" data-s="16"></span><span id="premt">S'abonner</span></button>
     <button class="icon-btn ring" id="inst" hidden onclick="installApp()" aria-label="Installer l'application" title="Installer l'app" data-i="dl"></button>
     <button class="icon-btn ring" onclick="openCustom()" aria-label="Personnaliser" title="Personnaliser" data-i="palette"></button>
     <a class="don" id="don" href="#" target="_blank" rel="noopener" onclick="return donate(event)"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-8-5.2-8-11a4.5 4.5 0 018-2.8A4.5 4.5 0 0120 10c0 5.8-8 11-8 11z"/></svg><span>Faire un don</span></a>
@@ -1027,7 +1047,7 @@ button,a{-webkit-tap-highlight-color:transparent}
 
 <div id="toasts" role="status" aria-live="polite"></div>
 
-<script>if(LANG==="en")document.write('<script src="/lang-en.js?v=10"><\/script>')   /* les textes anglais, seulement pour qui en a besoin */</script>
+<script>if(LANG==="en")document.write('<script src="/lang-en.js?v=11"><\/script>')   /* les textes anglais, seulement pour qui en a besoin */</script>
 <script>
 // ═══ Français / English : la phrase française est la clé ; les traductions sont dans lang-en.js ═══
 // Nouveau texte : passe-le dans la fonction _t (cases {0}, {1} pour les valeurs), puis ajoute la traduction dans lang-en.js.
@@ -1100,9 +1120,9 @@ const FONTS   = {
 };
 // Réservé à Premium (le choix reste enregistré : il revient si l'abonnement reprend)
 const PREM_UI={theme:new Set(["bordeaux","pastel","synth"]),bg:new Set(["vagues","etoiles","degrade"]),font:new Set(["playfair","caveat","pixel"]),
-  trail:new Set(["star","flower","flame","bolt"]),cur:new Set(["star","heart","ring","arrow","moon"]),amb:new Set(["stars","petals","snow","fireflies"])};
+  trail:new Set(["star","flower","flame","bolt","heart","note","bubble"]),cur:new Set(["star","heart","ring","arrow","moon","note","diamond","bolt","plus"]),amb:new Set(["stars","petals","snow","fireflies"])};
 const premUI=(k,v)=>(PREM_UI[k]&&PREM_UI[k].has(v))||(k==="accent2"&&!!v)||(k==="autoAcc"&&!!v)||(k==="glow"&&!!v)||(k==="trc"&&!!v)||(k==="curc"&&!!v);
-const UI_DEF  = {theme:"dark",accent:"#dcdce0",accent2:"",autoAcc:false,bg:"aurora",grain:true,blur:18,radius:16,size:"m",font:"dm",motion:true,haptic:true,sfx:true,sfxv:60,cover:"square",view:"grid",sort:"recent",filter:"all",bgo:50,bgb:0,hasBg:false,syncUI:null,zoom:100,card:"glass",navl:true,viz:true,npbg:"cover",trail:"spark",cur:"def",amb:"off",glow:false,trc:"",curc:"",home:{}};
+const UI_DEF  = {theme:"dark",accent:"#dcdce0",accent2:"",autoAcc:false,bg:"aurora",grain:true,blur:18,radius:16,size:"m",font:"dm",motion:true,haptic:true,sfx:true,sfxv:60,cover:"square",view:"grid",sort:"recent",filter:"all",bgo:50,bgb:0,hasBg:false,syncUI:null,zoom:100,card:"glass",navl:true,viz:true,npbg:"cover",trail:"spark",cur:"def",curw:8,tbg:"",amb:"off",glow:false,trc:"",curc:"",home:{}};
 const RATES   = {"1":[1,true,_t("Vitesse normale")],"0.75":[.75,true,"0,75×"],"1.25":[1.25,true,"1,25×"],"1.5":[1.5,true,"1,5×"],"2":[2,true,"2×"],"slowed":[.85,false,"Slowed"],"spedup":[1.25,false,"Sped up"],"uslow":[.7,false,"Ultra slowed"],"uspeed":[1.5,false,"Ultra sped up"],"slowrev":[.85,false,"Slowed + reverb"]};
 const TIPS = [
   [_t("Mode plein écran"),_t("Touche la pochette dans le lecteur pour l'ouvrir en grand.")],
@@ -1290,6 +1310,9 @@ function trailAdd(k,x,y,dx,dy){
   else if(k==="flame") Object.assign(base,{s:rnd(4,8),vy:rnd(-1,-.4),vx:rnd(-.3,.3),life:rnd(380,620)});
   else if(k==="bolt"){ const L=rnd(10,22), a=rnd(0,6.28), pts=[[0,0]]; for(let i=1;i<=4;i++){ const f=i/4; pts.push([Math.cos(a)*L*f+rnd(-4,4),Math.sin(a)*L*f+rnd(-4,4)]); } Object.assign(base,{pts,vx:0,vy:0,vr:0,life:rnd(350,450)}); }
   else if(k==="spark") base.s=rnd(1.6,3.2);
+  else if(k==="heart") Object.assign(base,{s:rnd(5,9),vy:rnd(-.6,-.2),life:rnd(700,1000),vr:rnd(-.03,.03)});
+  else if(k==="note") Object.assign(base,{s:rnd(4,6),vy:rnd(-.45,-.15),life:rnd(800,1100),r:rnd(-.4,.4),vr:0});
+  else if(k==="bubble") Object.assign(base,{s:rnd(2,5),vy:rnd(-.8,-.3),life:rnd(700,1000)});
   if(TR.p.length>=90) TR.p.shift();
   TR.p.push(base);
 }
@@ -1311,6 +1334,9 @@ function drawP(g,p,t){
   else if(p.k==="star"){ g.globalAlpha=a; g.fillStyle=trCol(p,accNow()); g.shadowColor=g.fillStyle; g.shadowBlur=6; sparkle(g,p.s*(1-t*.3)); }
   else if(p.k==="flower"){ g.globalAlpha=a*.95; g.fillStyle=trCol(p,p.c); const s=p.s*(1-t*.25); for(let i=0;i<5;i++){ g.rotate(1.2566); g.beginPath(); g.ellipse(0,-s*.55,s*.32,s*.55,0,0,6.283); g.fill(); } g.fillStyle="#ffd45e"; g.beginPath(); g.arc(0,0,s*.22,0,6.283); g.fill(); }
   else if(p.k==="flame"){ g.globalCompositeOperation="lighter"; g.globalAlpha=a*.85; g.fillStyle=TRC?(t<.3?"#ffffff":trCol(p)):t<.35?"#ffd45e":t<.7?"#ff7a2f":"#ff3b2f"; g.beginPath(); g.arc(0,0,p.s*(1-t*.8),0,6.283); g.fill(); }
+  else if(p.k==="heart"){ g.globalAlpha=a; g.fillStyle=trCol(p,"#ff6fa5"); const s=p.s*(1-t*.2); g.beginPath(); g.moveTo(0,s*.35); g.bezierCurveTo(-s,-s*.3,-s*.45,-s,0,-s*.45); g.bezierCurveTo(s*.45,-s,s,-s*.3,0,s*.35); g.fill(); }
+  else if(p.k==="note"){ g.globalAlpha=a; g.fillStyle=trCol(p,accNow()); g.font=`${Math.round(p.s*3)}px system-ui,sans-serif`; g.fillText("♪",-p.s,p.s); }
+  else if(p.k==="bubble"){ g.globalAlpha=a*.8; g.strokeStyle=trCol(p,"#bfe3ff"); g.lineWidth=1.2; g.beginPath(); g.arc(0,0,p.s*(1+t),0,6.283); g.stroke(); }
   else if(p.k==="bolt"){ g.globalAlpha=a; g.strokeStyle=trCol(p,"#bff0ff"); g.lineWidth=1.6; g.lineJoin="round"; g.shadowColor=trCol(p,"#4cc9ff"); g.shadowBlur=8; g.beginPath(); p.pts.forEach(([x,y],i)=>i?g.lineTo(x,y):g.moveTo(x,y)); g.stroke(); }
   g.restore();
 }
@@ -1362,11 +1388,16 @@ const CURS={
   heart:['<path d="M14 24.5C6 18.5 3 13.8 3 9.8A5.6 5.6 0 0 1 14 7.6a5.6 5.6 0 0 1 11 2.2c0 4-3 8.7-11 14.7z"/>',14,14],
   ring:['<circle cx="14" cy="14" r="9" fill="none" stroke="#0b0b0c" stroke-width="5.4"/><circle cx="14" cy="14" r="9" fill="none" stroke="currentColor" stroke-width="2.6"/><circle cx="14" cy="14" r="2" stroke="none"/>',14,14],
   arrow:['<path d="M5 3l17 9.5-7.4 2L11 22z"/>',5,3],
-  moon:['<path d="M17.5 3.5a10.5 10.5 0 1 0 7 17.6A8.6 8.6 0 0 1 17.5 3.5z"/>',14,14]
+  moon:['<path d="M17.5 3.5a10.5 10.5 0 1 0 7 17.6A8.6 8.6 0 0 1 17.5 3.5z"/>',14,14],
+  note:['<path d="M21 3v13.5a3.5 3.5 0 1 1-2-3.2V8.2l-8 2.2v8.6a3.5 3.5 0 1 1-2-3.2V6.6z"/>',14,14],
+  diamond:['<path d="M14 3l9 9.5L14 25 5 12.5z"/>',14,14],
+  bolt:['<path d="M16.5 2.5L6 16h7l-2 9.5L22 12h-7z"/>',12,3],
+  plus:['<path d="M11.5 4h5v7.5H24v5h-7.5V24h-5v-7.5H4v-5h7.5z"/>',14,14]
 };
 function curSVG(k,col,size=28,ns=""){
   const c=CURS[k]; if(!c) return "";
-  return `<svg ${ns}width="${size}" height="${size}" viewBox="0 0 28 28" color="${col}" fill="${col}" stroke="#0b0b0c" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true">${c[0]}</svg>`;
+  const w=(S.ui.curw==null?8:S.ui.curw)/10;          // épaisseur du contour sombre, réglable (0 à 3 px)
+  return `<svg ${ns}width="${size}" height="${size}" viewBox="0 0 28 28" color="${col}" fill="${col}" stroke="#0b0b0c" stroke-width="${w}" stroke-linejoin="round" aria-hidden="true">${c[0].replace('stroke-width="5.4"',`stroke-width="${2.6+2*w}"`)}</svg>`;
 }
 function cursorCSS(k,col){
   const c=CURS[k]; if(!c) return "";
@@ -1383,6 +1414,11 @@ function applyUI(){
   const u=S.ui, h=document.documentElement, th=uiv("theme"), bg=uiv("bg");
   h.dataset.theme=th; h.dataset.light=LIGHT.has(th)?"1":""; h.dataset.bg=(bg==="image"&&!u.hasBg)?"aurora":bg; h.style.setProperty("--bgo",(u.bgo==null?50:u.bgo)/100); h.style.setProperty("--bgb",(u.bgb||0)+"px"); h.dataset.motion=u.motion?"on":"off"; h.dataset.grain=u.grain?"on":"off"; h.dataset.cover=u.cover;
   h.dataset.card=u.card||"glass"; h.dataset.navl=u.navl===false?"off":"on"; h.dataset.viz=u.viz===false?"off":"on"; h.dataset.npbg=u.npbg||"cover";
+  if(th==="perso"&&u.tbg){ const L=lum(u.tbg)>.4, mx=(p,c)=>`color-mix(in oklab,${u.tbg} ${p}%,${c})`;
+    Object.entries({"--bg":u.tbg,"--cardS":mx(88,L?"#000":"#fff"),"--card":`color-mix(in oklab,${mx(80,L?"#000":"#fff")} 55%,transparent)`,"--glass":`color-mix(in oklab,${u.tbg} 72%,transparent)`,
+      "--tx":L?"#15151a":"#ececee","--mut":L?"#5f5f6b":"#9a9aa5","--br":L?"rgba(0,0,0,.1)":"rgba(255,255,255,.09)","--br2":L?"rgba(0,0,0,.2)":"rgba(255,255,255,.18)"}).forEach(([k,v])=>h.style.setProperty(k,v));
+    h.dataset.light=L?"1":""; h.style.colorScheme=L?"light":"dark"; }
+  else { ["--bg","--cardS","--card","--glass","--tx","--mut","--br","--br2"].forEach(k=>h.style.removeProperty(k)); h.style.colorScheme=""; }
   document.body.style.zoom=(u.zoom||100)/100;
   setAccent(uiv("autoAcc")&&ACC_NOW?ACC_NOW:u.accent);
   const a2=uiv("accent2"); h.style.setProperty("--acg",a2?`linear-gradient(135deg,var(--ac),${a2})`:"none");
@@ -1395,7 +1431,7 @@ function applyUI(){
   document.querySelector('meta[name="theme-color"]').content=bgc||"#0b0b0c";
   applyFx();
 }
-const UI_SYNC=["trail","cur","amb","glow","trc","curc","theme","accent","bg","grain","blur","radius","font","motion","cover","bgo","bgb","accent2","autoAcc","zoom","card","navl","viz","npbg","home"];
+const UI_SYNC=["trail","cur","amb","glow","trc","curc","curw","tbg","theme","accent","bg","grain","blur","radius","font","motion","cover","bgo","bgb","accent2","autoAcc","zoom","card","navl","viz","npbg","home"];
 const syncOn=()=>S.ui.syncUI==null ? matchMedia("(min-width:761px) and (pointer:fine)").matches : !!S.ui.syncUI;
 let uiPushT=null;
 function pushUI(){
@@ -1412,7 +1448,7 @@ function applyServerUI(d){
   S.uiVer=d.ui_v; save(); applyUI(); renderCustom();
 }
 function toggleSyncUI(){ S.ui.syncUI=!syncOn(); save(); if(S.ui.syncUI&&ME){ S.uiVer=null; applyServerUI(ME); toast(_t("Apparence synchronisée avec ton compte"),{type:"ok"}); } renderCustom(); }
-function setUI(k,v,noRe){ if(premUI(k,v)&&!isPrem()){ premLock(); return; } S.ui[k]=v; save(); if(k==="sfx"&&v) sfx("on"); applyUI(); if(!noRe) renderCustom(); if(["size","view"].includes(k)) render(); if(UI_SYNC.includes(k)) pushUI(); }
+function setUI(k,v,noRe){ if(premUI(k,v)&&!isPrem()){ premLock(); return; } S.ui[k]=v; if(k==="tbg") S.ui.theme="perso"; save(); if(k==="sfx"&&v) sfx("on"); applyUI(); if(!noRe) renderCustom(); if(["size","view"].includes(k)) render(); if(UI_SYNC.includes(k)) pushUI(); }
 const HOME_SECS=[["hello",_t("Salutation")],["hero",_t("Titre et explication")],["steps",_t("Les 3 étapes")],["pins",_t("Épinglés")],["day",_t("Son du jour")],["resume",_t("Reprendre l'écoute")],["recent",_t("Récemment ajoutés")],["top",_t("Tes plus écoutés")],["goal",_t("Objectif de la semaine")],["stats",_t("Chiffres")],["comm",_t("De la communauté")],["trend",_t("Tendances")],["tip",_t("Astuce du jour")],["faq",_t("Questions fréquentes")]];
 const hs=k=>!(S.ui.home&&S.ui.home[k]===false);
 function setHome(k,v){ S.ui.home=Object.assign({},S.ui.home,{[k]:!!v}); save(); renderHome(); renderCustom(); pushUI(); }
@@ -1423,19 +1459,21 @@ const PZT=[["profil",_t("Profil"),"user"],["theme",_t("Thème"),"palette"],["fon
 const PZ={tab:null,from:null};
 let PV={};                                   // cosmétiques « essayés » sans Premium : visibles dans l'aperçu seulement, jamais enregistrés
 const pzOn=()=>{ const s=document.querySelector('section[data-v="perso"]'); return !!s&&!s.hidden; };
-function openCustom(tab){
+function openCustom(tab){ if(!PZ.snap) PZ.snap=JSON.stringify(S.ui);
   Object.values(FONTS).forEach(loadFont);
   if(tab) PZ.tab=tab;
   if(location.hash!=="#perso"){ PZ.from=location.hash||"#accueil"; history.pushState(null,"","#perso"); route(); }
   else renderPerso();
 }
-function pzBack(){ if(PZ.from){ const f=PZ.from; PZ.from=null; history.back(); setTimeout(()=>{ if(location.hash==="#perso") location.hash=f; },150); } else location.hash="profil"; }
+function pzBack(){ PZ.snap=null; if(PZ.from){ const f=PZ.from; PZ.from=null; history.back(); setTimeout(()=>{ if(location.hash==="#perso") location.hash=f; },150); } else location.hash="profil"; }
 function renderCustom(){ if(pzOn()) pzRefresh(); }
+function pzCancel(){ if(!PZ.snap) return; S.ui=JSON.parse(PZ.snap); save(); applyUI(); try{ pushUI(); }catch(e){} renderCustom(); toast(_t("Changements annulés")); }
+function pzSave(){ PZ.snap=null; toast(_t("Enregistré"),{type:"ok"}); pzBack(); }
 function renderPerso(){
   const el=$("#perso"); if(!el) return;
   if(!PZ.tab||!PZT.some(t=>t[0]===PZ.tab)) PZ.tab=ME?"profil":"theme";
   el.innerHTML=`<div class="pz">
-    <div class="pz-head"><button class="icon-btn ring" onclick="pzBack()" aria-label="${_t("Retour")}">${I("back",18)}</button><div class="m"><h2>${_t("Personnalisation")}</h2><p class="a" id="pzsub"></p></div></div>
+    <div class="pz-head"><button class="icon-btn ring" onclick="pzBack()" aria-label="${_t("Retour")}">${I("back",18)}</button><div class="m"><h2>${_t("Personnalisation")}</h2><p class="a" id="pzsub"></p></div><div class="pzact"><button class="btn alt sm" id="pzcancel" onclick="pzCancel()">${_t("Annuler les changements")}</button><button class="btn sm" id="pzsave" onclick="pzSave()">${_t("Enregistrer")}</button></div></div>
     <div class="pz-tabs" role="tablist" id="pztabs"></div>
     <div class="pz-grid"><div class="pz-main" id="pzp"></div><aside class="pz-prev" id="pzv" aria-label="${_t("Aperçu en direct")}"></aside></div></div>`;
   pzRefresh();
@@ -1473,6 +1511,7 @@ function pzPanel(tab){
     const accOn=ACCENTS.some(a=>a[1]===u.accent.toLowerCase());
     return box(_t("Thème"),_t("Les couleurs de fond et des cartes."),`<div class="themes">${THEMES.map(([k,n,c1,c2])=>`<button class="th ${u.theme===k?"on":""}" onclick="setUI('theme','${k}')"><span class="thp" style="background:${c1}"><i style="background:${c2}"></i><i style="background:${c2}"></i><i style="background:var(--ac)"></i></span>${n}${star("theme",k)}</button>`).join("")}</div>`)+
     box(_t("Couleurs"),_t("La couleur des boutons, des barres et de la sélection."),`<div class="accs">${ACCENTS.map(([n,c])=>`<button class="acc ${u.accent.toLowerCase()===c?"on":""}" style="--c:${c}" onclick="setUI('accent','${c}')" aria-label="${n}" title="${n}"></button>`).join("")}<label class="acc custom ${accOn?"":"on"}" style="--c:${esc(u.accent)}" title="${_t("Couleur personnalisée")}">${I("plus",16)}<input type="color" value="${esc(u.accent)}" oninput="setUI('accent',this.value,1)" onchange="renderCustom()" aria-label="${_t("Couleur personnalisée")}"></label></div>
+      <h4>${_t("Fond personnalisé")}</h4><div class="accs"><label class="acc custom ${u.theme==="perso"?"on":""}" style="--c:${esc(u.tbg||"#1a1a2e")}" title="${_t("Fond personnalisé")}">${I("plus",16)}<input type="color" data-k="tbg" value="${esc(u.tbg||"#1a1a2e")}" oninput="this.parentNode.style.setProperty('--c',this.value);setUI('tbg',this.value,1)" onchange="setUI('tbg',this.value)" aria-label="${_t("Fond personnalisé")}"></label></div>
       <div class="cz-row" style="margin-top:12px"><span>${_t("Dégradé de couleurs{0}",star("accent2","x"))}<br><small class="a">${_t("Une 2e couleur pour les boutons</small>")}</span><span style="display:flex;gap:8px;align-items:center"><label class="acc custom ${u.accent2?"on":""}" style="--c:${esc(u.accent2||"#888888")}">${I("plus",16)}<input type="color" value="${esc(u.accent2||"#ff5fa2")}" onchange="setUI('accent2',this.value)" aria-label="${_t("2e couleur")}"></label>${u.accent2?`<button class="chip" onclick="setUI('accent2','')">${_t("Retirer")}</button>`:""}</span></div>
       ${sw("autoAcc",_t("Couleur de la pochette en cours"),_t("La couleur suit le son que tu écoutes"))}
       ${sw("glow",_t("Lueur des boutons"),_t("Un halo doux à la couleur de l'accent"))}`)+
@@ -1484,10 +1523,10 @@ function pzPanel(tab){
     box(_t("Ambiance"),_t("Quelques particules discrètes derrière l'interface. Elles se mettent en pause quand l'onglet est caché."),`<div class="pzg">${tile("amb","off",`<span class="none">${I("x",18)}</span>`,_t("Aucune"))}${[["stars",_t("Étoiles"),"etoiles"],["petals",_t("Pétales"),"petales"],["snow",_t("Neige"),"neige"],["fireflies",_t("Lucioles"),"lucioles"]].map(([v,l,fx])=>tile("amb",v,`<span class="pzfx"><span class="pfx pfx-${fx}"></span></span>`,l)).join("")}</div>`);
   if(tab==="effets"){
     const trc=u.trc||"";
-    return box(_t("Traînée de souris"),_t("Elle suit ta souris ou ton stylet (pas le doigt)."),`<div class="pzg">${[["off",_t("Aucune")],["spark",_t("Étincelles")],["star",_t("Étoiles")],["flower",_t("Fleurs")],["flame",_t("Flammes")],["bolt",_t("Éclairs")]].map(([v,l])=>tile("trail",v,`<span class="pzic">${trailIcon(v)}</span>`,l)).join("")}</div>
+    return box(_t("Traînée de souris"),_t("Elle suit ta souris ou ton stylet (pas le doigt)."),`<div class="pzg">${[["off",_t("Aucune")],["spark",_t("Étincelles")],["star",_t("Étoiles")],["flower",_t("Fleurs")],["flame",_t("Flammes")],["bolt",_t("Éclairs")],["heart",_t("Cœurs")],["note",_t("Notes de musique")],["bubble",_t("Bulles")]].map(([v,l])=>tile("trail",v,`<span class="pzic">${trailIcon(v)}</span>`,l)).join("")}</div>
       <h4>${_t("Couleur de la traînée")}</h4><div class="pzc"><button class="chip ${!trc?"on":""}" onclick="setUI('trc','')">${_t("D'origine")}</button><button class="chip ${trc==="rainbow"?"on":""}" onclick="setUI('trc','rainbow')">${_t("🌈 Arc-en-ciel{0}",star("trc","rainbow"))}</button>${K.uiColor("trc",_t("Couleur de la traînée"))}<span class="a">${_t("ou la couleur de ton choix")}</span></div>`)+
-    box(_t("Curseur"),_t("Remplace la flèche de la souris sur ordinateur."),`<div class="pzg sm">${tile("cur","def",`<span class="pzic">${curSVG("arrow","#ffffff",26)}</span>`,_t("Par défaut"))}${[["star",_t("Étoile")],["heart",_t("Cœur")],["ring",_t("Anneau")],["arrow",_t("Flèche")],["moon",_t("Lune")]].map(([v,l])=>tile("cur",v,`<span class="pzic">${curSVG(v,uiv("curc")||u.accent,26)}</span>`,l)).join("")}</div>
-      <h4>${_t("Couleur du curseur")}</h4><div class="pzc"><button class="chip ${!u.curc?"on":""}" onclick="setUI('curc','')">${_t("Couleur du thème")}</button>${K.uiColor("curc",_t("Couleur du curseur"))}<span class="a">${_t("indépendante du thème")}</span></div>`);
+    box(_t("Curseur"),_t("Remplace la flèche de la souris sur ordinateur."),`<div class="pzg sm">${tile("cur","def",`<span class="pzic">${curSVG("arrow","#ffffff",26)}</span>`,_t("Par défaut"))}${[["star",_t("Étoile")],["heart",_t("Cœur")],["ring",_t("Anneau")],["arrow",_t("Flèche")],["moon",_t("Lune")],["note",_t("Notes de musique")],["diamond",_t("Diamant")],["bolt",_t("Éclair")],["plus",_t("Croix")]].map(([v,l])=>tile("cur",v,`<span class="pzic">${curSVG(v,uiv("curc")||u.accent,26)}</span>`,l)).join("")}</div>
+      <h4>${_t("Couleur du curseur")}</h4><div class="pzc"><button class="chip ${!u.curc?"on":""}" onclick="setUI('curc','')">${_t("Couleur du thème")}</button>${K.uiColor("curc",_t("Couleur du curseur"))}<span class="a">${_t("indépendante du thème")}</span></div>${K.rng("curw",_t("Épaisseur des bords"),0,30,"")}`);
   }
   if(tab==="ui") return box("Interface","",`${rng("zoom",_t("Taille de l'interface"),85,130," %")}${rng("blur",_t("Effet verre"),0,40," px")}${rng("radius",_t("Arrondis"),4,28," px")}
       <h4>${_t("Style des cartes")}</h4>${seg("card",[["glass",_t("Verre")],["flat",_t("Plein")],["line",_t("Contour")]])}`)+
@@ -1495,10 +1534,10 @@ function pzPanel(tab){
   if(tab==="lecteur") return box(_t("Pochettes"),"",`<h4>${_t("Taille")}</h4>${seg("size",[["s",_t("Petite")],["m",_t("Moyenne")],["l",_t("Grande")]])}<h4>${_t("Forme")}</h4>${seg("cover",[["square",_t("Carrée")],["round",_t("Ronde")],["vinyl",_t("Vinyle qui tourne")]])}`)+
     box(_t("Lecteur plein écran"),"",`<h4>${_t("Fond")}</h4>${seg("npbg",[["cover",_t("Pochette floue")],["accent",_t("Couleur")],["plain",_t("Uni")]])}${sw("viz",_t("Barres animées"),_t("Petit égaliseur qui bouge pendant l'écoute"))}`);
   if(tab==="accueil") return box(_t("Page d'accueil"),_t("Choisis ce qui s'affiche sur l'accueil."),HOME_SECS.map(([k,l])=>sw("home_"+k,l,"",hs(k),`setHome("${k}",${!hs(k)})`)).join(""));
-  return box(_t("Accessibilité"),"",`${sw("_c",_t("Contraste élevé"),"",u.theme==="contraste",`setUI("theme","${u.theme==="contraste"?"dark":"contraste"}")`)}
-      ${sw("_f",_t("Police très lisible"),"Atkinson Hyperlegible",u.font==="atkinson",`setUI("font","${u.font==="atkinson"?"dm":"atkinson"}")`)}
+  return box(_t("Accessibilité"),"",`${sw("_c",_t("Contraste élevé"),"",u.theme==="contraste",`accToggle("_c")`)}
+      ${sw("_f",_t("Police très lisible"),"Atkinson Hyperlegible",u.font==="atkinson",`accToggle("_f")`)}
       ${sw("_m",_t("Réduire les animations"),"",!u.motion,`setUI("motion",${!u.motion})`)}
-      ${sw("_z",_t("Interface plus grande"),"",u.zoom>=115,`setUI("zoom",${u.zoom>=115?100:115})`)}`)+
+      ${sw("_z",_t("Interface plus grande"),"",u.zoom>=115,`accToggle("_z")`)}`)+
     box(_t("Synchronisation"),"",`<div class="cz-row"><span>${_t("Synchroniser avec mon compte")}<br><small class="a">${ME?(syncOn()?_t("Même apparence sur tes appareils"):_t("Cet appareil garde son propre style")):_t("Connecte-toi pour l'activer")}</small></span><button class="sw2 ${syncOn()?"on":""}" role="switch" aria-checked="${syncOn()}" onclick="toggleSyncUI()"><i></i></button></div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px"><button class="btn alt sm" onclick="resetUI()">${_t("Réinitialiser l'apparence")}</button><button class="btn alt sm" onclick="showShortcuts()">${I("kbd",16)} ${_t("Raccourcis clavier")}</button></div>`);
 }
@@ -1507,7 +1546,7 @@ function pzPanel(tab){
 const COSB=[["aurore",_t("Aurore")],["sunset",_t("Coucher de soleil")],["ocean",_t("Océan")],["fleurs",_t("Fleurs")],["neon",_t("Néon")],["etoiles",_t("Étoilé")],["uni",_t("Uni")],["degrade",_t("Dégradé")],["vagues",_t("Vagues")],["points",_t("Points")],["grille",_t("Grille")],["coeurs",_t("Cœurs")],["galaxie",_t("Galaxie")],["lave",_t("Lave")],["holo",_t("Holographique")],["damier",_t("Damier")]];
 const COSF=[["fin",_t("Fin")],["double",_t("Double")],["halo",_t("Halo")],["pulse",_t("Pulsation")],["orbite",_t("Orbite")],["neon",_t("Néon")],["or",_t("Or")],["glace",_t("Glace")],["fleurs",_t("Fleurs")],["etoiles",_t("Étoiles")],["flamme",_t("Flamme")],["coeurs",_t("Cœurs")],["arcenciel",_t("Arc-en-ciel")],["couronne",_t("Couronne")],["notes",_t("Notes de musique")],["eclair",_t("Éclair")],["pixel",_t("Pixel")]];
 const COSE=[["etoiles",_t("Étoiles")],["petales",_t("Pétales")],["neige",_t("Neige")],["bulles",_t("Bulles")],["brillance",_t("Brillance")],["aurore",_t("Aurore")],["confettis",_t("Confettis")],["coeurs",_t("Cœurs")],["lucioles",_t("Lucioles")],["notes",_t("Notes de musique")],["pluie",_t("Pluie")],["paillettes",_t("Paillettes")]];
-const COSN=[["degrade",_t("Dégradé")],["brille",_t("Brillant")],["neon",_t("Néon")],["arcenciel",_t("Arc-en-ciel")],["or",_t("Or")],["glitch",_t("Glitch")]];
+const COSN=[["degrade",_t("Dégradé")],["brille",_t("Brillant")],["neon",_t("Néon")],["arcenciel",_t("Arc-en-ciel")],["or",_t("Or")],["glitch",_t("Glitch")],["ombre",_t("Ombre")],["contour",_t("Contour")],["pastel",_t("Pastel")]];
 const COSG=["⭐","🔥","🌸","⚡","👑","💎","🎧","🌙","🦋","🍒","👾","🪩","🎵","🌈","🚀","🍀","🐉","❄️"];
 const COSPAIR=[["#7c5cff","#ff5fa2"],["#00c6ff","#0072ff"],["#f7971e","#ffd200"],["#11998e","#38ef7d"],["#ee0979","#ff6a00"],["#8e2de2","#4a00e0"],["#ff9a9e","#fad0c4"],["#232526","#757f9a"]];
 const CV={bc1:"--b1",bc2:"--b2",fc:"--fc",t1:"--t1",t2:"--t2"};
@@ -1570,6 +1609,8 @@ function pzProfil(K){
     <h4>${_t("Thème du profil")}</h4><p class="a" style="margin:-2px 0 10px;font-size:13px">${_t("Deux couleurs pour le fond et le contour de ta carte.")}</p>
     <div class="pzc" style="margin-top:0"><button class="chip ${c.t1?"":"on"}" onclick="cosClear('t1','t2')">${_t("Aucun")}</button>${COSPAIR.map(([a,b])=>`<button class="pzpair ${c.t1===a&&c.t2===b?"on":""}" onclick="cosPair('${a}','${b}')" aria-label="${_t("Thème {0} et {1}",a,b)}"><i style="background:${a}"></i><i style="background:${b}"></i></button>`).join("")}${col("t1",_t("Couleur 1 du thème"),"#7c5cff")}${col("t2",_t("Couleur 2 du thème"),"#ff5fa2")}</div>
     <h4>${_t("Style du pseudo")}</h4><div class="pzc" style="margin-top:0"><button class="chip ${c.name?"":"on"}" onclick="pickCos('name','')">${_t("Normal")}</button>${COSN.map(([v,l])=>`<button class="chip ${c.name===v?"on":""}" style="${vars}" onclick="pickCos('name','${v}')"><span class="pznm nf-${v}">${l}</span>${lk}</button>`).join("")}</div>
+    <h4>${_t("Police du pseudo")}</h4><div class="pzc" style="margin-top:0"><button class="chip ${c.nfont?"":"on"}" onclick="pickCos('nfont','')">${_t("Normal")}</button>${Object.entries(FONTS).map(([k,f])=>`<button class="chip ${c.nfont===k?"on":""}" style="font-family:${f.d.replace(/"/g,"'")}" onclick="pickCos('nfont','${k}')">${esc(f.n)}${lk}</button>`).join("")}</div>
+    <h4>${_t("Couleur du pseudo")}</h4><div class="pzc" style="margin-top:0"><button class="chip ${c.nc?"":"on"}" onclick="pickCos('nc','')">${_t("Normal")}</button>${col("nc",_t("Couleur du pseudo"),"#ffffff")}</div>
     <h4>${_t("Badge")}</h4><div class="pzc" style="margin-top:0"><button class="chip ${c.badge?"":"on"}" onclick="pickCos('badge','')">${_t("Aucun")}</button>${COSG.map(e=>`<button class="chip ${c.badge===e?"on":""}" onclick="pickCos('badge','${e}')" aria-label="${_t("Badge {0}",e)}">${e}</button>`).join("")}</div>`);
 }
 function pzPreview(){
@@ -1586,13 +1627,17 @@ function pzPreview(){
 }
 
 // ── Carte de profil commune : mon profil, profil public, aperçu
+function nameStyle(c){                       // police et couleur du pseudo (cosmétiques Premium)
+  const f=c.nfont&&FONTS[c.nfont]; if(f) loadFont(f);
+  return (f?`font-family:${f.d.replace(/"/g,"'")},system-ui,sans-serif;`:"")+(c.nc?`--nc:${c.nc};color:${c.nc};`:"");
+}
 function profCard(u,o={}){
   const c=cosOf(u), vars=[accStyle(u)];
   for(const [k,v] of Object.entries(CV)) if(c[k]) vars.push(`${v}:${c[k]}`);
   return `<div class="pbox gcard ${c.t1?"pth":""} ${o.mini?"mini":""}" style="${vars.join(";")}">
     ${bannerHTML(u)}${c.effect?`<div class="pfx pfx-${c.effect}" aria-hidden="true"></div>`:""}
     <div class="phd"><div class="pav">${avatarHTML(u,o.mini?78:116)}${o.editAv?`<button class="icon-btn ring pav-e" onclick="avatarMenu()" aria-label="${_t("Changer la photo")}">${I("edit",15)}</button>`:""}</div>${o.actions?`<div class="pact">${o.actions}</div>`:""}</div>
-    <div class="pbd"><div class="pname"><span class="disp ${c.name?"nf-"+c.name:""}">@${esc(u.username)}</span>${o.badge||""}${badgeOf(u)}</div>
+    <div class="pbd"><div class="pname"><span class="disp ${c.name?"nf-"+c.name:""}" style="${nameStyle(c)}">@${esc(u.username)}</span>${o.badge||""}${badgeOf(u)}</div>
       ${o.meta?`<div class="a pmeta">${o.meta}</div>`:""}${u.status?`<div class="stt">${esc(u.status)}</div>`:""}${u.bio?`<p class="pbio">${esc(u.bio)}</p>`:""}</div></div>`;
 }
 function profShare(){ if(!ME) return; const url=location.origin+'/?u='+encodeURIComponent(ME.username); showOptions(_t("Partager mon profil"),[
@@ -1610,6 +1655,9 @@ function trailIcon(k){
     else if(k==="star"){ const r=5*s; b+=`<path fill="${c(i,"var(--ac)")}" d="M${x} ${y-r}Q${x+r*.2} ${y-r*.2} ${x+r} ${y}Q${x+r*.2} ${y+r*.2} ${x} ${y+r}Q${x-r*.2} ${y+r*.2} ${x-r} ${y}Q${x-r*.2} ${y-r*.2} ${x} ${y-r}Z"/>`; }
     else if(k==="flower"){ const r=5*s; for(let a=0;a<360;a+=72) b+=`<ellipse cx="${x}" cy="${y-r*.55}" rx="${r*.34}" ry="${r*.55}" fill="${c(i,"#ff9ec4")}" transform="rotate(${a} ${x} ${y})"/>`; b+=`<circle cx="${x}" cy="${y}" r="${r*.22}" fill="#ffd45e"/>`; }
     else if(k==="flame") b+=`<circle cx="${x}" cy="${y}" r="${3.4*s}" fill="${c(i,["#ff3b2f","#ff5a2f","#ff7a2f","#ffa13a","#ffd45e"][i])}" fill-opacity=".9"/>`;
+    else if(k==="heart"){ const r=4*s; b+=`<path fill="${c(i,"#ff6fa5")}" d="M${x} ${y+r*.6}C${x-r*1.6} ${y-r*.4} ${x-r*.6} ${y-r*1.5} ${x} ${y-r*.6}C${x+r*.6} ${y-r*1.5} ${x+r*1.6} ${y-r*.4} ${x} ${y+r*.6}z"/>`; }
+    else if(k==="note") b+=`<text x="${x-4*s}" y="${y+4*s}" font-size="${12*s}" fill="${c(i,"var(--ac)")}">♪</text>`;
+    else if(k==="bubble") b+=`<circle cx="${x}" cy="${y}" r="${3.2*s}" fill="none" stroke="${c(i,"#bfe3ff")}" stroke-width="1.3"/>`;
     else if(k==="bolt"&&i%2===0) b+=`<path d="M${x-6} ${y-7}l5 6-3 2 6 7" fill="none" stroke="${c(i,"#bff0ff")}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
   });
   return `<svg width="78" height="50" viewBox="0 0 78 50" aria-hidden="true">${b}</svg>`;
@@ -1632,6 +1680,12 @@ async function shrink(file,w,h,q,out,crop){
 function pickFile(cb){ const i=document.createElement("input"); i.type="file"; i.accept="image/*"; i.onchange=()=>{ if(i.files[0]) cb(i.files[0]); }; i.click(); }
 function pickBg(){ pickFile(async f=>{ try{ const b=await shrink(f,1600,1600,.8,"blob"); await dbop("put",b,"bgimg"); S.ui.hasBg=true; S.ui.bg="image"; save(); await loadBgImage(); applyUI(); renderCustom(); pushUI(); }catch(e){ toast(_t("Image illisible"),{type:"err"}); } }); }
 async function clearBgImage(){ try{ await dbop("delete","bgimg"); }catch(e){} S.ui.hasBg=false; if(S.ui.bg==="image") S.ui.bg="aurora"; save(); await loadBgImage(); applyUI(); renderCustom(); pushUI(); }
+const ACC_SW={_c:["theme","contraste"],_f:["font","atkinson"],_z:["zoom",115]};
+function accToggle(n){                         // le réglage d'avant est gardé et rendu quand on désactive
+  const [k,on]=ACC_SW[n], prev=S.ui.accPrev||(S.ui.accPrev={}), active=k==="zoom"?S.ui.zoom>=115:S.ui[k]===on;
+  if(active){ const back=prev[k]!=null?prev[k]:UI_DEF[k]; delete prev[k]; setUI(k,back); }
+  else { prev[k]=S.ui[k]; setUI(k,on); }
+}
 function resetUI(){ const keep={view:S.ui.view,sort:S.ui.sort,filter:S.ui.filter,storage:S.ui.storage,syncUI:S.ui.syncUI,hasBg:S.ui.hasBg}; S.ui=Object.assign({},UI_DEF,keep,{home:{}}); ACC_NOW=null; save(); applyUI(); renderCustom(); render(); pushUI(); toast(_t("Apparence réinitialisée")); }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1851,7 +1905,7 @@ function setStorage(sel){
 }
 function updatePremUI(){
   applyUI();
-  const b=$("#premb"); if(b){ b.hidden=!PAYWALL; b.classList.toggle("on",PAYWALL&&premActive()); }
+  const b=$("#premb"); if(b){ b.hidden=!PAYWALL; b.classList.toggle("on",PAYWALL&&premActive()); $("#premt").textContent=PAYWALL&&premActive()?"Premium":_t("S'abonner"); }
   adsenseSync(); pillSync();
   const t=$("#tip-store"); if(t) t.textContent=PAYWALL&&!isPrem()?_t("Avec la version gratuite, les nouveaux sons s'écoutent en ligne. Premium : sons sur ton appareil et mode hors ligne."):_t("Les sons sont stockés sur ton appareil : ils marchent hors ligne.");
 }
@@ -2393,7 +2447,9 @@ function onTime(){
 }
 for(const el of [au1,au2]){                     // les deux lecteurs : seul le lecteur courant compte
   el.onplay=el.onpause=()=>{ if(el===au) onPlayPause(); };
-  el.onseeked=el.onratechange=el.ondurationchange=()=>{ if(el===au) npExpose(); };
+  el.onseeked=el.onratechange=()=>{ if(el===au) npExpose(); };
+  el.ondurationchange=()=>{ if(el!==au) return; npExpose(); const t=curT(), d=au.duration;
+    if(t&&!AD.on&&isFinite(d)&&d>1&&Math.abs((t.duration||0)-d)>1.5){ t.duration=Math.round(d); save(); } };
   el.onended=()=>{ if(el===au) onEnded(); };
   el.ontimeupdate=()=>{ if(el===au) onTime(); };
 }
@@ -2895,7 +2951,15 @@ function row(t, key, i, extra=""){
 }
 function mosFrom(arr){ return `<div class="mos">${[0,1,2,3].map(k=>{ const t=arr[k]; const s=t&&(t.id?cvSrc(t):t.cover); return `<i>${t?esc(initial(t)):""}${s?`<img src="${esc(s)}" alt="" loading="lazy">`:""}</i>`; }).join("")}</div>`; }
 const mos = p => mosFrom(p.ids.map(id=>S.tracks.find(x=>x.id===id)).filter(Boolean));
-function plArt(p,cls=""){ if(p.smart) return smartArt(p); if(p.emoji||p.color) return `<div class="plx ${cls}" style="--pc:${esc(p.color||"var(--ac)")}">${p.emoji?`<span>${esc(p.emoji)}</span>`:mos(p)}</div>`; return mos(p); }
+const PLCOVERS={};                            // couvertures choisies pour les playlists (gardées sur l'appareil)
+async function setPlCover(pid,file){
+  const p=S.pls.find(x=>x.id===pid); if(!p) return;
+  const b=await shrink(file,500,500,.86,"blob",true); await dbop("put",b,"pcv:"+pid);
+  if(PLCOVERS[pid]) URL.revokeObjectURL(PLCOVERS[pid]); PLCOVERS[pid]=URL.createObjectURL(b); p.cover=1; save(); render();
+}
+function rmPlCover(pid){ const p=S.pls.find(x=>x.id===pid); if(!p) return; delete p.cover; delete PLCOVERS[pid]; dbop("delete","pcv:"+pid).catch(()=>{}); save(); render(); }
+(async()=>{ for(const p of S.pls.filter(x=>x.cover)){ try{ const b=await dbop("get","pcv:"+p.id); if(b) PLCOVERS[p.id]=URL.createObjectURL(b); }catch(e){} } if(Object.keys(PLCOVERS).length) render(); })();
+function plArt(p,cls=""){ if(p.smart) return smartArt(p); if(PLCOVERS[p.id]) return `<div class="plx plimg ${cls}"><img src="${PLCOVERS[p.id]}" alt=""></div>`; if(p.emoji||p.color) return `<div class="plx ${cls}" style="--pc:${esc(p.color||"var(--ac)")}">${p.emoji?`<span>${esc(p.emoji)}</span>`:mos(p)}</div>`; return mos(p); }
 const smartArt = p => `<div class="smart sm-${p.id.split(":")[1]}">${I(p.icon,48)}</div>`;
 function bigEmpty(icon, title, text, cta){ return `<div class="big-empty"><div class="ill">${I(icon,44)}</div><h3>${title}</h3><p>${text}</p>${cta||""}</div>`; }
 function skel(n=6, h=220){ return `<div class="grid">${Array.from({length:n},()=>`<div class="skel" style="height:${h}px"></div>`).join("")}</div>`; }
@@ -3051,7 +3115,8 @@ function plLook(pid){
   const p=S.pls.find(x=>x.id===pid); if(!p) return;
   openGen(_t("Personnaliser « {0} »",p.name),`<h4 class="eyebrow">${_t("Emoji")}</h4><div class="emo">${PL_EMOJIS.map(e=>`<button class="${p.emoji===e?"on":""}" onclick="setPlLook('${pid}',{emoji:'${e}'});plLook('${pid}')">${e}</button>`).join("")}</div>
     <h4 class="eyebrow" style="margin-top:14px">${_t("Couleur")}</h4><div class="accs">${ACCENTS.map(([n,c])=>`<button class="acc ${p.color===c?"on":""}" style="--c:${c}" aria-label="${n}" onclick="setPlLook('${pid}',{color:'${c}'});plLook('${pid}')"></button>`).join("")}</div>
-    <div class="nw" style="margin-top:16px"><button class="btn alt" onclick="setPlLook('${pid}',{emoji:'',color:''});closeSh('gen')">${_t("Revenir aux pochettes")}</button><button class="btn" style="flex:1" onclick="closeSh('gen')">${_t("Terminé")}</button></div>`);
+    <h4 class="eyebrow" style="margin-top:14px">${_t("Couverture")}</h4><div class="pzc"><button class="btn alt sm" onclick="pickFile(f=>setPlCover('${pid}',f).then(()=>{ toast(_t('Couverture mise à jour'),{type:'ok'}); plLook('${pid}'); }))">${I("up2",16)}${_t("Choisir une couverture")}</button>${p.cover?`<button class="chip" onclick="rmPlCover('${pid}');plLook('${pid}')">${_t("Retirer la couverture")}</button>`:""}</div>
+    <div class="nw" style="margin-top:16px"><button class="btn alt" onclick="setPlLook('${pid}',{emoji:'',color:''});rmPlCover('${pid}');closeSh('gen')">${_t("Revenir aux pochettes")}</button><button class="btn" style="flex:1" onclick="closeSh('gen')">${_t("Terminé")}</button></div>`);
 }
 function setPlLook(pid,o){ const p=S.pls.find(x=>x.id===pid); if(!p) return; for(const k of ["emoji","color"]) if(k in o){ if(o[k]) p[k]=o[k]; else delete p[k]; } save(); render(); }
 function dupPl(pid){ const p=S.pls.find(x=>x.id===pid); if(!p) return; const c={id:newId("p"),name:(p.name+" (copie)").slice(0,40),ids:p.ids.slice()}; ["emoji","color","folder"].forEach(k=>{ if(p[k]) c[k]=p[k]; }); S.pls.splice(S.pls.indexOf(p)+1,0,c); save(); render(); toast(_t("Playlist dupliquée"),{type:"ok"}); }
@@ -3114,13 +3179,27 @@ const isIOS=()=>/iphone|ipad|ipod/i.test(navigator.userAgent);
 const isStandalone=()=>matchMedia("(display-mode: standalone)").matches||navigator.standalone;
 async function patchMe(body, ok){ try{ const d=await api("/api/auth/me",{method:"PATCH",body}); Object.assign(ME,{username:d.username,color:d.color,bio:d.bio,avatar:d.avatar,pic:d.pic,ban:d.ban,accent:d.accent,status:d.status,cos:d.cos||ME.cos}); renderProf(); renderHome(); renderCustom(); if(ok) toast(ok,{type:"ok"}); return true; }catch(e){ toast(e.message,{type:"err"}); return false; } }
 const EMOJIS=["🎧","🎵","🎶","🔥","✨","🌙","🌈","💜","🖤","🦋","🐱","🐼","🦊","🐸","🚀","👾","🍒","🌸","⚡","😎","🥀","🪩","🎸","🎹"];
+async function useImage(kind,f){               // kind : "pic" (photo) ou "ban" (bannière). Un GIF garde son animation (Premium).
+  const msg=kind==="pic"?_t("Photo mise à jour"):_t("Bannière mise à jour"), extra=kind==="pic"?{avatar:""}:{};
+  try{
+    if(f.type==="image/gif"){
+      if(!isPrem()) return premLock(_t("Les GIF animés"));
+      if(f.size>(kind==="pic"?1e6:1.4e6)) return toast(_t("GIF trop lourd (1 Mo max pour la photo, 1,4 Mo pour la bannière)"),{type:"err"});
+      const d=await new Promise((ok,ko)=>{ const r=new FileReader(); r.onload=()=>ok(r.result); r.onerror=ko; r.readAsDataURL(f); });
+      return patchMe({[kind]:d,...extra},msg);
+    }
+    const [w,h,max,q0]=kind==="pic"?[256,256,200000,.88]:[1200,400,600000,.82]; let q=q0,d;
+    do{ d=await shrink(f,w,h,q,"url",true); q-=.12; }while(d.length>max&&q>.3);
+    patchMe({[kind]:d,...extra},msg);
+  }catch(e){ toast(_t("Image illisible"),{type:"err"}); }
+}
 function avatarMenu(){ if(!ME) return; showOptions(_t("Photo de profil"),[
-  {l:_t("Choisir une photo"),i:"up2",fn:()=>pickFile(async f=>{ try{ let q=.88,d; do{ d=await shrink(f,256,256,q,"url",true); q-=.12; }while(d.length>200000&&q>.3); patchMe({pic:d,avatar:""},_t("Photo mise à jour")); }catch(e){ toast(_t("Image illisible"),{type:"err"}); } })},
+  {l:_t("Choisir une photo"),i:"up2",fn:()=>pickFile(f=>useImage("pic",f))},
   {l:_t("Utiliser un emoji"),i:"spark",fn:()=>openGen(_t("Choisis un emoji"),`<div class="emo">${EMOJIS.map(e=>`<button onclick="setEmoji('${e}')">${e}</button>`).join("")}</div>`)},
   (ME.pic||ME.avatar)&&{l:_t("Revenir à l'initiale"),i:"trash",danger:true,fn:()=>patchMe({pic:null,avatar:""},_t("Photo retirée"))}]); }
 function setEmoji(e){ closeSh("gen"); patchMe({avatar:e,pic:null},_t("Avatar mis à jour")); }
 function bannerMenu(){ if(!ME) return; showOptions(_t("Bannière"),[
-  {l:_t("Choisir une image"),i:"up2",fn:()=>pickFile(async f=>{ try{ let q=.82,d; do{ d=await shrink(f,1200,400,q,"url",true); q-=.12; }while(d.length>600000&&q>.3); patchMe({ban:d},_t("Bannière mise à jour")); }catch(e){ toast(_t("Image illisible"),{type:"err"}); } })},
+  {l:_t("Choisir une image"),i:"up2",fn:()=>pickFile(f=>useImage("ban",f))},
   ME.ban&&{l:_t("Retirer l'image"),i:"trash",danger:true,fn:()=>patchMe({ban:null},_t("Bannière retirée"))}],_t("La couleur du profil sert de fond quand il n'y a pas d'image.")); }
 function saveStatus(){ const v=($("#stt")||{}).value; if(!ME||v==null||v.trim()===(ME.status||"")) return; patchMe({status:v.trim()},_t("Humeur enregistrée")); }
 function setProfAccent(c){ if(!ME) return; patchMe({accent:c}); }
@@ -3617,6 +3696,7 @@ function route(){
   scrollTo(0,0);
 }
 addEventListener("hashchange", route);
+{ const sp=document.getElementById("splash"); if(!isStandalone()) sp.hidden=true; else setTimeout(()=>{ sp.classList.add("out"); setTimeout(()=>sp.hidden=true,400); },700); }
 // La bibliothèque est rangée par adresse : sur l'ancienne, on explique comment l'emporter au lieu de rediriger (sinon elle semblerait vide).
 function showMoved(host){ $("#moved").hidden=!/^tiksound[\w-]*\.onrender\.com$/i.test(host); }
 showMoved(location.hostname);

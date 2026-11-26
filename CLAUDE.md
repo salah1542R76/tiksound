@@ -14,7 +14,7 @@ Le propriétaire n'est pas développeur : il parle français, tutoie, et veut de
 | `i18n_server.py` | Traductions anglaises du serveur (messages d'erreur, e-mails, aperçus de liens) et choix de la langue d'une requête |
 | `index.html` | Toute l'appli front en un seul fichier (HTML + CSS + JS, ~380 Ko) |
 | `lang-en.js` | Traductions anglaises de l'appli (chargé seulement pour les visiteurs en anglais) |
-| `sw.js` | Service worker (cache `tk-vN` : augmenter N à chaque livraison d'`index.html` ou de `lang-en.js`, avec `?v=N` dans `index.html`, et mettre à jour `tests/test_icons.py`). Actuellement `tk-v10` |
+| `sw.js` | Service worker (cache `tk-vN` : augmenter N à chaque livraison d'`index.html` ou de `lang-en.js`, avec `?v=N` dans `index.html`, et mettre à jour `tests/test_icons.py`). Actuellement `tk-v11` |
 | `manifest.webmanifest`, icônes, favicons | PWA installable (le serveur traduit le manifest en anglais) |
 | `conditions.html`, `confidentialite.html`, `signalement.html` + `*.en.html` | Pages légales en français et en anglais (à faire relire) |
 | `guide-premium.html`, `PREMIUM.md` | Guide de configuration Stripe / R2 / AdSense |
@@ -39,9 +39,9 @@ Le compte Stripe est partagé avec un autre projet du propriétaire : ne jamais 
 Lancer chaque groupe séparément (les tests Chrome dans leur propre processus) :
 
 ```
-python3 -m pytest tests -q --ignore=tests/e2e_front.py --ignore=tests/e2e_v2.py   # serveur (182)
+python3 -m pytest tests -q --ignore=tests/e2e_front.py --ignore=tests/e2e_v2.py   # serveur (191)
 python3 -m pytest tests/e2e_front.py -q                                           # appli (50)
-python3 -m pytest tests/e2e_v2.py -q                                              # appli (160)
+python3 -m pytest tests/e2e_v2.py -q                                              # appli (172)
 ```
 
 Dépendances : `pip install -r requirements.txt pytest playwright pillow opencv-python-headless numpy` puis `playwright install chromium` (ou `CHROME_BIN` vers un Chrome installé). Sous Windows : `PYTHONUTF8=1`. `tests/_shims.py` simule sqlalchemy et yt_dlp s'ils manquent : aucun test ne touche Internet. Les navigateurs de test sont en `fr-FR` par défaut (`tests/e2e_front.py`). Méthode : test qui échoue d'abord, puis correction, puis les trois groupes au vert avant de livrer.

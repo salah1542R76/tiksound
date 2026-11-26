@@ -71,4 +71,4 @@ def test_manifest_icons_exist_and_maskable_is_separate(make_client):
 
 def test_service_worker_does_not_swallow_icons():
     sw = open("sw.js").read()
-    assert "tk-v10" in sw   # nouvelle version : vide l'ancien cache où manquait le logo
+    assert "tk-v11" in sw   # nouvelle version : vide l'ancien cache où manquait le logo

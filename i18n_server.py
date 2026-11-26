@@ -60,6 +60,7 @@ EN = {
     "Avatar invalide": "Invalid avatar",
     "Les cosmétiques sont réservés à Premium": "Cosmetics are for Premium members only",
     "Image invalide ou trop lourde": "Invalid image, or too large",
+    "Les GIF animés sont réservés à Premium": "Animated GIFs are for Premium members only",
     "Mot de passe incorrect": "Wrong password",
     "Impossible de résilier ton abonnement pour le moment : ton compte n'a pas été supprimé. Réessaie dans un instant.":
         "We couldn't cancel your subscription right now, so your account was not deleted. Try again in a moment.",

@@ -436,14 +436,14 @@ def username_problem(u, exclude_email=None, exclude_uid=None):
     return None
 
 HEX_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
-IMG_RE = re.compile(r"^data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$")
-UI_KEYS = {"theme": ("dark", "oled", "nuit", "clair", "sepia", "foret", "ocean", "contraste", "bordeaux", "pastel", "synth"),
+IMG_RE = re.compile(r"^data:image/(jpeg|png|webp|gif);base64,[A-Za-z0-9+/=]+$")
+UI_KEYS = {"theme": ("dark", "oled", "nuit", "clair", "sepia", "foret", "ocean", "contraste", "bordeaux", "pastel", "synth", "perso"),
            "bg": ("aurora", "cover", "mesh", "plain", "image", "vagues", "etoiles", "degrade"),
            "cover": ("square", "round", "vinyl"),
            "font": ("dm", "outfit", "space", "nunito", "syne", "mono", "atkinson", "poppins", "lexend", "playfair", "caveat", "pixel"),
            "card": ("glass", "flat", "line"), "npbg": ("cover", "accent", "plain"),
-           "trail": ("off", "spark", "star", "flower", "flame", "bolt"),
-           "cur": ("def", "star", "heart", "ring", "arrow", "moon"),
+           "trail": ("off", "spark", "star", "flower", "flame", "bolt", "heart", "note", "bubble"),
+           "cur": ("def", "star", "heart", "ring", "arrow", "moon", "note", "diamond", "bolt", "plus"),
            "amb": ("off", "stars", "petals", "snow", "fireflies")}
 UI_BOOL = ("grain", "motion", "autoAcc", "viz", "navl", "glow")
 # Cosmétiques de profil (Premium) : bandeau, cadre de l'avatar, badge à côté du pseudo
@@ -452,16 +452,16 @@ COS_BANNER = ("aurore", "sunset", "ocean", "fleurs", "neon", "etoiles", "uni", "
 COS_FRAME = ("fin", "double", "halo", "pulse", "orbite", "neon", "or", "glace", "fleurs", "etoiles", "flamme", "coeurs",
              "arcenciel", "couronne", "notes", "eclair", "pixel")
 COS_EFFECT = ("etoiles", "petales", "neige", "bulles", "brillance", "aurore", "confettis", "coeurs", "lucioles", "notes", "pluie", "paillettes")
-COS_NAME = ("degrade", "brille", "neon", "arcenciel", "or", "glitch")
+COS_NAME = ("degrade", "brille", "neon", "arcenciel", "or", "glitch", "ombre", "contour", "pastel")
 COS_BADGE = ("⭐", "🔥", "🌸", "⚡", "👑", "💎", "🎧", "🌙", "🦋", "🍒", "👾", "🪩", "🎵", "🌈", "🚀", "🍀", "🐉", "❄️")
-COS_COLORS = ("bc1", "bc2", "fc", "t1", "t2")     # couleurs libres : bandeau (2), décoration, thème du profil (2)
+COS_COLORS = ("bc1", "bc2", "fc", "t1", "t2", "nc")     # couleurs libres : bandeau (2), décoration, thème du profil (2)
 
 def clean_cos(d):
     out = {}
     if not isinstance(d, dict):
         return out
     for k, allowed in (("banner", COS_BANNER), ("frame", COS_FRAME), ("badge", COS_BADGE),
-                       ("effect", COS_EFFECT), ("name", COS_NAME)):
+                       ("effect", COS_EFFECT), ("name", COS_NAME), ("nfont", UI_KEYS["font"])):
         if d.get(k) in allowed:
             out[k] = d[k]
     for k in COS_COLORS:
@@ -469,7 +469,7 @@ def clean_cos(d):
         if isinstance(v, str) and HEX_RE.match(v):
             out[k] = v.lower()
     return out
-UI_NUM = {"blur": (0, 40), "radius": (4, 28), "bgo": (5, 100), "bgb": (0, 40), "zoom": (85, 130)}
+UI_NUM = {"blur": (0, 40), "radius": (4, 28), "bgo": (5, 100), "bgb": (0, 40), "zoom": (85, 130), "curw": (0, 30)}
 UI_HOME = ("hello", "hero", "steps", "pins", "day", "resume", "recent", "top", "stats", "goal", "comm", "trend", "tip", "faq")
 
 def clean_ui(d):
@@ -488,8 +488,9 @@ def clean_ui(d):
             if k in d: out[k] = max(lo, min(hi, int(float(d[k]))))
         except Exception:
             pass
-    if isinstance(d.get("accent"), str) and HEX_RE.match(d["accent"]):
-        out["accent"] = d["accent"].lower()
+    for k in ("accent", "tbg"):                                    # tbg : couleur de fond du thème « perso »
+        if isinstance(d.get(k), str) and HEX_RE.match(d[k]):
+            out[k] = d[k].lower()
     for k, extra in (("trc", ("", "rainbow")), ("curc", ("",))):      # couleurs de la traînée / du curseur
         v = d.get(k)
         if isinstance(v, str) and (v in extra or HEX_RE.match(v)):
@@ -804,13 +805,18 @@ def update_me():
         fields.append("cosm=:cosm"); params["cosm"] = json.dumps(cos, ensure_ascii=False)
     if "status" in d:
         fields.append("status=:status"); params["status"] = re.sub(r"\s+", " ", str(d["status"] or "")).strip()[:40]
-    for key, col, limit in (("pic", "avatar_img", 220_000), ("ban", "banner_img", 650_000)):
+    for key, col, limit, glimit in (("pic", "avatar_img", 220_000, 1_400_000), ("ban", "banner_img", 650_000, 1_900_000)):
         if key in d:
             v = d[key]
+            gif = isinstance(v, str) and v.startswith("data:image/gif;")
             if v in (None, "", False):
                 v = ""
-            elif not isinstance(v, str) or len(v) > limit or not IMG_RE.match(v):
+            elif not isinstance(v, str) or len(v) > (glimit if gif else limit) or not IMG_RE.match(v):
                 return err("Image invalide ou trop lourde")
+            elif gif and base64.b64decode(v.split(",", 1)[1][:16] + "==")[:4] != b"GIF8":
+                return err("Image invalide ou trop lourde")
+            elif gif and not premium_state(q1("SELECT * FROM users WHERE id=:id", id=u["sub"]))["premium"]:
+                return err("Les GIF animés sont réservés à Premium", 403)
             fields.append(f"{col}=:{col}"); params[col] = v
             params["imgv"] = f"{time.time():.0f}"
     if "imgv" in params:
@@ -840,9 +846,9 @@ def user_img(username, kind):
     col = {"a": "avatar_img", "b": "banner_img"}.get(kind)
     if not col:
         return "", 404
-    row = q1(f"SELECT {col} AS img FROM users WHERE lower(username)=:u", u=username.lower())
-    m = re.match(r"^data:(image/(?:jpeg|png|webp));base64,(.+)$", (row.img if row else "") or "")
-    if not m:
+    row = q1(f"SELECT {col} AS img, email, premium_until, gift_until FROM users WHERE lower(username)=:u", u=username.lower())
+    m = re.match(r"^data:(image/(?:jpeg|png|webp|gif));base64,(.+)$", (row.img if row else "") or "")
+    if not m or (m.group(1) == "image/gif" and not premium_state(row)["premium"]):   # GIF animé : seulement pendant Premium
         return "", 404
     resp = make_response(base64.b64decode(m.group(2)))
     resp.headers["Content-Type"] = m.group(1)
@@ -2018,6 +2024,16 @@ def audio_from_search(opts, title, author, want):
         if qq and qq.lower() not in [x.lower() for x in queries]:
             queries.append(qq)
     t0, tried, seen, last = time.time(), 0, set(), None
+    tol = max(6, want * 0.05) if want else 0
+    base = str(opts.get("outtmpl", "")).split(".%(")[0]
+    best = None                                  # (écart, info) : la plus proche, gardée de côté si aucune n'a la bonne durée
+
+    def _park(keep):
+        """Met de côté (ou efface) le fichier d'une version à la mauvaise durée avant l'essai suivant."""
+        f = base + ".mp3"
+        if base and os.path.exists(f):
+            if keep: os.replace(f, base + ".alt.mp3")
+            else: os.remove(f)
     for qi_, query in enumerate(queries):
         if time.time() - t0 > 85 or tried >= 7:
             break
@@ -2046,6 +2062,16 @@ def audio_from_search(opts, title, author, want):
                     info = y.extract_info(c["url"], download=True)
                 if info and info.get("entries"):
                     info = info["entries"][0]
+                gap = abs(float(info.get("duration") or 0) - want) if want and info.get("duration") else 0
+                if gap > tol:
+                    log.info("Spotify « %s » : %s a la mauvaise durée (écart %.0f s), on continue", query, c["url"], gap)
+                    if best is None or gap < best[0]:
+                        best = (gap, info); _park(True)
+                    else:
+                        _park(False)
+                    continue
+                if base and os.path.exists(base + ".alt.mp3"):
+                    os.remove(base + ".alt.mp3")
                 log.info("Spotify « %s » → %s (%s) score=%.1f", query, c["src"], c["url"], c["score"])
                 return info
             except Exception as ex:
@@ -2053,6 +2079,11 @@ def audio_from_search(opts, title, author, want):
                 if c["src"] == "ytsearch":
                     _note_yt_error(last)
                 log.warning("Téléchargement %s échoué (%s) : %s", c["src"], c["url"], last)
+    if best:                                     # aucune version exacte : la plus proche plutôt que rien
+        if base and os.path.exists(base + ".alt.mp3"):
+            os.replace(base + ".alt.mp3", base + ".mp3")
+        log.warning("Spotify : « %s - %s » sans version exacte, écart %.0f s", author, title, best[0])
+        return best[1]
     log.warning("Spotify : aucune version trouvée pour « %s - %s » (%d essais)", author, title, tried)
     return None
 
@@ -2125,9 +2156,23 @@ def _find_items(entries, src):
         author = re.sub(r"\s*-\s*Topic$", "", str(e.get("uploader") or e.get("channel") or ""))[:60]
         out.append({"src": src, "url": url, "title": str(e.get("title") or "")[:120], "author": author,
                     "duration": d, "cover": _cover(e, src)})
-        if len(out) >= FIND_N:
+        if len(out) >= 12:
             break
     return out
+
+def _rank(q, items):
+    """Le plus ressemblant d'abord : mots de la recherche retrouvés dans titre + artiste, phrase exacte en bonus,
+    reprises / versions modifiées (cover, sped up, lyrics…) en dernier sauf si on les a demandées."""
+    want, qn = _tokens(q), _norm(q)
+    def score(it):
+        t = _norm(it["title"] + " " + it["author"])
+        s = sum(1 for w in want if w in t) / len(want) if want else 0
+        s += 0.5 if qn and qn in _norm(it["title"]) else 0
+        raw = (it["title"] + " " + it["author"]).lower()          # avec les parenthèses : « (cover) », « [sped up] »
+        s -= sum(0.6 for w in BAD_WORDS + ("lyrics",) if w in raw and w not in q.lower())
+        s += 0.3 if "official" in t or "topic" in it["author"].lower() else 0
+        return s
+    return sorted(items, key=score, reverse=True)
 
 def _find_yd(prefix, q, n):
     o = {"quiet": True, "extract_flat": True, "skip_download": True, "socket_timeout": 12}
@@ -2182,7 +2227,7 @@ def find():
         futs = {k: ex.submit(f, q) for k, f in jobs.items()}
         for k, f in futs.items():
             try:
-                out[k] = f.result(timeout=25)
+                out[k] = _rank(q, f.result(timeout=25))[:FIND_N]
             except Exception as e:
                 log.warning("Recherche %s échouée pour « %s » : %s", k, q, str(e)[:200])
                 out[k] = []
