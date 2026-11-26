@@ -1318,7 +1318,16 @@ def stripe_checkout():
         if not cid:
             cid = stripe_create_customer(row.email, row.id)
             x("UPDATE users SET stripe_customer_id=:c WHERE id=:u", c=cid, u=row.id)
-        return jsonify(client_secret=stripe_create_checkout(cid, row.id, public_base()))
+        try:
+            secret = stripe_create_checkout(cid, row.id, public_base())
+        except Exception as ex:
+            # Client inconnu de Stripe : créé en mode test, puis passage au mode réel. On en crée un nouveau.
+            if (getattr(ex, "code", ""), getattr(ex, "param", "")) != ("resource_missing", "customer"):
+                raise
+            cid = stripe_create_customer(row.email, row.id)
+            x("UPDATE users SET stripe_customer_id=:c WHERE id=:u", c=cid, u=row.id)
+            secret = stripe_create_checkout(cid, row.id, public_base())
+        return jsonify(client_secret=secret)
     except Exception as ex:
         log.error("Stripe checkout : %s", ex)
         return err("Le paiement est momentanément indisponible, réessaie dans un instant", 502)

@@ -461,3 +461,38 @@ def test_plain_accepts_sdk_objects_that_are_not_dicts(app):
         def to_dict(self):
             return {"id": "sub_1", "items": {"data": []}}
     assert app._plain(Obj()) == {"id": "sub_1", "items": {"data": []}}
+
+
+class _NoSuchCustomer(Exception):
+    """Comme stripe.InvalidRequestError quand le client n'existe pas (créé en mode test, utilisé en mode réel)."""
+    code, param = "resource_missing", "customer"
+
+
+def test_checkout_replaces_a_customer_from_test_mode(app, S, pay, make_client, signup, monkeypatch):
+    c = make_client()
+    signup(c, "a@example.com", "alice")
+    set_user(app, "a@example.com", stripe_customer_id="cus_from_test_mode")
+    ok = pay["checkout"]
+
+    def checkout(customer_id, user_id, base_url):
+        if customer_id == "cus_from_test_mode":
+            raise _NoSuchCustomer("No such customer: 'cus_from_test_mode'")
+        ok.append(customer_id)
+        return "cs_live_secret"
+    monkeypatch.setattr(app, "stripe_create_checkout", checkout)
+    r = c.post("/api/stripe/checkout")
+    assert r.status_code == 200 and r.get_json() == {"client_secret": "cs_live_secret"}
+    assert ok == ["cus_new"]
+    assert app.q1("SELECT stripe_customer_id FROM users WHERE email='a@example.com'").stripe_customer_id == "cus_new"
+
+
+def test_checkout_other_stripe_errors_still_fail_cleanly(app, S, pay, make_client, signup, monkeypatch):
+    c = make_client()
+    signup(c, "a@example.com", "alice")
+    set_user(app, "a@example.com", stripe_customer_id="cus_ok")
+
+    class Declined(Exception):
+        code, param = "card_declined", ""
+    monkeypatch.setattr(app, "stripe_create_checkout", lambda *a: (_ for _ in ()).throw(Declined("non")))
+    assert c.post("/api/stripe/checkout").status_code == 502
+    assert pay["customer"] == []
