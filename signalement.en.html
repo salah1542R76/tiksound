@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Report content · TikWave</title>
+<style>body{font:16px/1.6 system-ui,sans-serif;max-width:640px;margin:0 auto;padding:32px 20px 60px;background:#0b0b0c;color:#ececee}h1{font-size:30px}a{color:#b9a4ff}
+label{display:block;margin-top:16px;font-size:14px;color:#b5b5bd}input,select,textarea{display:block;width:100%;box-sizing:border-box;margin-top:6px;padding:12px 14px;border-radius:12px;border:1px solid #333;background:#151517;color:#ececee;font:inherit}
+button{margin-top:20px;padding:14px 22px;border:0;border-radius:12px;background:#dcdce0;color:#0b0b0c;font:600 16px system-ui;cursor:pointer}#msg{margin-top:16px}.ok{color:#6fe3a4}.ko{color:#ff7a7a}.n{color:#8b8b95;font-size:14px}</style></head>
+<body>
+<p><a href="/">← Back to TikWave</a></p>
+<h1>Report content</h1>
+<p>Are you a rights holder (artist, label, publisher), or have you spotted content that is a problem? Tell us here: it will be reviewed and removed if needed.</p>
+<form id="f">
+  <label>Link to the content on TikWave (playlist, profile or sound)<input name="url" type="url" required placeholder="https://…"></label>
+  <label>Reason<select name="reason"><option value="copyright">Copyright</option><option value="other">Another problem</option></select></label>
+  <label>Your name or company<input name="name" maxlength="120"></label>
+  <label>Your email address (so we can reply)<input name="email" type="email" required maxlength="120"></label>
+  <label>Details<textarea name="details" rows="5" maxlength="2000" placeholder="What the problem is and, for copyright, the work concerned."></textarea></label>
+  <button>Send report</button>
+  <p id="msg" role="status"></p>
+</form>
+<p class="n">You can also write to: {{CONTACT}}</p>
+<script>
+document.getElementById("f").onsubmit=async e=>{ e.preventDefault(); const m=document.getElementById("msg"), d=Object.fromEntries(new FormData(e.target));
+  try{ const r=await fetch("/api/report",{method:"POST",headers:{"Content-Type":"application/json","X-Lang":"en"},body:JSON.stringify(d)}); const j=await r.json().catch(()=>({}));
+    if(r.ok){ e.target.reset(); m.className="ok"; m.textContent="Thank you, your report has been sent."; } else { m.className="ko"; m.textContent=j.error||"Couldn't send it, please try again."; } }
+  catch(x){ m.className="ko"; m.textContent="No connection, please try again."; } };
+</script>
+</body></html>

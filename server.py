@@ -6,6 +6,7 @@ from email.utils import parseaddr, formataddr
 from flask import Flask, request, jsonify, send_from_directory, make_response
 from werkzeug.middleware.proxy_fix import ProxyFix
 import yt_dlp
+from i18n_server import T, lang
 from sqlalchemy import create_engine, text, inspect, bindparam
 from sqlalchemy.exc import IntegrityError
 
@@ -72,7 +73,7 @@ ADMIN_EMAILS = parse_admin_emails(os.environ.get("ADMIN_EMAIL", ""))
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
       "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36")
 STATIQUE = {
-    "manifest.webmanifest": "application/manifest+json",
+    "lang-en.js":           "text/javascript",
     "sw.js":                "text/javascript",
     "icon-192.png":         "image/png",
     "icon-512.png":         "image/png",
@@ -84,7 +85,7 @@ STATIQUE = {
     "favicon.svg":          "image/svg+xml",
 }
 COLORS = 10
-RESERVED = {"admin", "administrateur", "root", "support", "moderator", "moderateur", "modo", "tiksound",
+RESERVED = {"admin", "administrateur", "root", "support", "moderator", "moderateur", "modo", "tiksound", "tikwave", "tikwav",
             "api", "system", "systeme", "staff", "help", "aide", "contact", "null", "undefined",
             "anonymous", "anonyme", "official", "officiel", "tiktok", "me", "moi"}
 USER_RE = re.compile(r"^[A-Za-z0-9_-]{3,24}$")
@@ -105,7 +106,7 @@ SMTP_HOST  = os.environ.get("SMTP_HOST", "")
 SMTP_PORT  = int(os.environ.get("SMTP_PORT", "587") or 587)
 SMTP_USER  = os.environ.get("SMTP_USER", "")
 SMTP_PASS  = os.environ.get("SMTP_PASS", "")
-MAIL_FROM  = os.environ.get("MAIL_FROM") or (f"Tiksound <{SMTP_USER}>" if SMTP_USER else "Tiksound <no-reply@tiksound.app>")
+MAIL_FROM  = os.environ.get("MAIL_FROM") or (f"TikWave <{SMTP_USER}>" if SMTP_USER else "TikWave <no-reply@tikwave.fr>")
 MAIL_ON    = bool(RESEND_KEY or BREVO_KEY or SMTP_HOST)
 if not MAIL_ON:
     log.warning("Aucun service email configuré : les codes seront affichés dans les logs du serveur.")
@@ -115,7 +116,7 @@ def send_mail(to, subject, html_body, text_body):
     name, addr = parseaddr(MAIL_FROM)
     try:
         if BREVO_KEY:
-            payload = {"sender": {"name": name or "Tiksound", "email": addr}, "to": [{"email": to}],
+            payload = {"sender": {"name": name or "TikWave", "email": addr}, "to": [{"email": to}],
                        "subject": subject, "htmlContent": html_body, "textContent": text_body}
             req = urllib.request.Request("https://api.brevo.com/v3/smtp/email", data=json.dumps(payload).encode(),
                                          headers={"api-key": BREVO_KEY, "Content-Type": "application/json",
@@ -126,13 +127,13 @@ def send_mail(to, subject, html_body, text_body):
             payload = {"from": MAIL_FROM, "to": [to], "subject": subject, "html": html_body, "text": text_body}
             req = urllib.request.Request("https://api.resend.com/emails", data=json.dumps(payload).encode(),
                                          headers={"Authorization": f"Bearer {RESEND_KEY}",
-                                                  "Content-Type": "application/json", "User-Agent": "tiksound/2"},
+                                                  "Content-Type": "application/json", "User-Agent": "tikwave/2"},
                                          method="POST")
             with urllib.request.urlopen(req, timeout=15) as r:
                 return 200 <= r.status < 300
         if SMTP_HOST:
             msg = EmailMessage()
-            msg["From"] = formataddr((name or "Tiksound", addr))
+            msg["From"] = formataddr((name or "TikWave", addr))
             msg["To"] = to
             msg["Subject"] = subject
             msg.set_content(text_body)
@@ -160,22 +161,22 @@ def send_mail(to, subject, html_body, text_body):
 def mail_code(to, code, purpose, username=""):
     u = _html.escape(username or "")
     if purpose == "register":
-        subject = f"{code} est ton code Tiksound"
-        title = f"Bienvenue{(' ' + u) if u else ''}"
-        intro = "Voici ton code pour vérifier ton adresse email et activer ton compte Tiksound :"
+        subject = T("{code} est ton code TikWave", code=code)
+        title = T("Bienvenue {pseudo}", pseudo=u) if u else T("Bienvenue")
+        intro = T("Voici ton code pour vérifier ton adresse email et activer ton compte TikWave :")
     else:
-        subject = f"{code} : réinitialise ton mot de passe Tiksound"
-        title = "Mot de passe oublié ?"
-        intro = "Voici ton code pour choisir un nouveau mot de passe :"
-    outro = (f"Ce code expire dans {CODE_TTL // 60} minutes. Si tu n'es pas à l'origine de cette demande, "
-             "ignore simplement cet email.")
+        subject = T("{code} : réinitialise ton mot de passe TikWave", code=code)
+        title = T("Mot de passe oublié ?")
+        intro = T("Voici ton code pour choisir un nouveau mot de passe :")
+    outro = T("Ce code expire dans {min} minutes. Si tu n'es pas à l'origine de cette demande, ignore simplement cet email.",
+              min=CODE_TTL // 60)
     digits = "".join(
         f'<span style="display:inline-block;width:40px;height:52px;line-height:52px;margin:0 3px;border-radius:12px;'
         f'background:#202026;color:#ffffff;font:700 26px/52px Arial,sans-serif;text-align:center">{c}</span>' for c in code)
     html_body = f"""<!doctype html><html><body style="margin:0;background:#0b0b0c;padding:32px 12px;font-family:Arial,Helvetica,sans-serif;color:#ececee">
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center">
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:460px;background:#151517;border:1px solid #26262a;border-radius:22px"><tr><td style="padding:32px">
-<div style="font:800 22px Arial,sans-serif;letter-spacing:-.5px;margin-bottom:22px">Tiksound</div>
+<div style="font:800 22px Arial,sans-serif;letter-spacing:-.5px;margin-bottom:22px">TikWave</div>
 <div style="font:700 20px Arial,sans-serif;margin-bottom:10px;color:#ffffff">{title}</div>
 <p style="color:#a0a0aa;font-size:15px;line-height:1.55;margin:0 0 24px">{intro}</p>
 <div style="text-align:center;margin:0 0 24px;white-space:nowrap">{digits}</div>
@@ -309,7 +310,7 @@ def current_user():
 def require_auth():
     u = current_user()
     if not u or not q1("SELECT id FROM users WHERE id=:id", id=u["sub"]):
-        return None, (jsonify(error="Non authentifié"), 401)
+        return None, err("Non authentifié", 401)
     return u, None
 
 
@@ -390,7 +391,7 @@ def body():
     return d if isinstance(d, dict) else {}
 
 def err(msg, code=400, **extra):
-    return jsonify(error=msg, **extra), code
+    return jsonify(error=T(msg), **extra), code
 
 def new_code():
     return f"{secrets.randbelow(1_000_000):06d}"
@@ -408,30 +409,30 @@ def store_code(email, purpose, code, ukey=None, payload=None):
 
 def check_code(row, email, purpose, code):
     if not row:
-        return "Aucun code en attente. Demande un nouveau code."
+        return T("Aucun code en attente. Demande un nouveau code.")
     if row.expires < time.time():
-        return "Ce code a expiré. Demande un nouveau code."
+        return T("Ce code a expiré. Demande un nouveau code.")
     if row.attempts >= MAX_ATTEMPTS:
-        return "Trop d'essais. Demande un nouveau code."
+        return T("Trop d'essais. Demande un nouveau code.")
     if not re.fullmatch(r"\d{6}", code or "") or not hmac.compare_digest(row.code_hash, code_hash(email, purpose, code)):
         x("UPDATE codes SET attempts=attempts+1 WHERE email=:e AND purpose=:p", e=email, p=purpose)
         left = MAX_ATTEMPTS - row.attempts - 1
         if left <= 0:
-            return "Trop d'essais. Demande un nouveau code."
-        return f"Code incorrect ({left} essai{'s' if left > 1 else ''} restant{'s' if left > 1 else ''})"
+            return T("Trop d'essais. Demande un nouveau code.")
+        return T("Code incorrect ({n} essais restants)", n=left) if left > 1 else T("Code incorrect (1 essai restant)")
     return None
 
 def username_problem(u, exclude_email=None, exclude_uid=None):
     if not USER_RE.fullmatch(u or ""):
-        return "3 à 24 caractères : lettres, chiffres, _ ou -"
+        return T("3 à 24 caractères : lettres, chiffres, _ ou -")
     if u.lower() in RESERVED:
-        return "Ce pseudo est réservé"
+        return T("Ce pseudo est réservé")
     row = q1("SELECT id FROM users WHERE lower(username)=:u", u=u.lower())
     if row and row.id != exclude_uid:
-        return "Ce pseudo est déjà pris"
+        return T("Ce pseudo est déjà pris")
     p = q1("SELECT email FROM codes WHERE purpose='register' AND ukey=:u AND expires>:n", u=u.lower(), n=time.time())
     if p and p.email != exclude_email:
-        return "Ce pseudo est déjà pris"
+        return T("Ce pseudo est déjà pris")
     return None
 
 HEX_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
@@ -446,11 +447,13 @@ UI_KEYS = {"theme": ("dark", "oled", "nuit", "clair", "sepia", "foret", "ocean",
            "amb": ("off", "stars", "petals", "snow", "fireflies")}
 UI_BOOL = ("grain", "motion", "autoAcc", "viz", "navl", "glow")
 # Cosmétiques de profil (Premium) : bandeau, cadre de l'avatar, badge à côté du pseudo
-COS_BANNER = ("aurore", "sunset", "ocean", "fleurs", "neon", "etoiles", "uni", "degrade", "vagues", "points", "grille", "coeurs")
-COS_FRAME = ("fin", "double", "halo", "pulse", "orbite", "neon", "or", "glace", "fleurs", "etoiles", "flamme", "coeurs")
-COS_EFFECT = ("etoiles", "petales", "neige", "bulles", "brillance", "aurore", "confettis", "coeurs", "lucioles")
-COS_NAME = ("degrade", "brille", "neon")
-COS_BADGE = ("⭐", "🔥", "🌸", "⚡", "👑", "💎", "🎧", "🌙", "🦋", "🍒", "👾", "🪩")
+COS_BANNER = ("aurore", "sunset", "ocean", "fleurs", "neon", "etoiles", "uni", "degrade", "vagues", "points", "grille", "coeurs",
+              "galaxie", "lave", "holo", "damier")
+COS_FRAME = ("fin", "double", "halo", "pulse", "orbite", "neon", "or", "glace", "fleurs", "etoiles", "flamme", "coeurs",
+             "arcenciel", "couronne", "notes", "eclair", "pixel")
+COS_EFFECT = ("etoiles", "petales", "neige", "bulles", "brillance", "aurore", "confettis", "coeurs", "lucioles", "notes", "pluie", "paillettes")
+COS_NAME = ("degrade", "brille", "neon", "arcenciel", "or", "glitch")
+COS_BADGE = ("⭐", "🔥", "🌸", "⚡", "👑", "💎", "🎧", "🌙", "🦋", "🍒", "👾", "🪩", "🎵", "🌈", "🚀", "🍀", "🐉", "❄️")
 COS_COLORS = ("bc1", "bc2", "fc", "t1", "t2")     # couleurs libres : bandeau (2), décoration, thème du profil (2)
 
 def clean_cos(d):
@@ -497,6 +500,14 @@ def clean_ui(d):
         home = {k: v for k, v in d["home"].items() if k in UI_HOME and isinstance(v, bool)}
         if home: out["home"] = home
     return out
+
+def list_badge(r):
+    """Dans les listes (Explorer, recherche) : membre Premium ou non, et sa décoration d'avatar s'il l'est."""
+    if not premium_state(r)["premium"]:
+        return {"premium": False}
+    try: c = clean_cos(json.loads(getattr(r, "cosm", "") or "{}"))
+    except Exception: c = {}
+    return {"premium": True, "cos": {k: c[k] for k in ("frame", "fc", "badge") if k in c}}
 
 def pic_url_ver(row, col="avatar_img"):
     return (getattr(row, "imgv", "") or "1") if getattr(row, col, "") else ""
@@ -547,7 +558,7 @@ def clean_tracks(lst):
             dur = max(0, min(int(float(t.get("duration") or 0)), 36000))
         except Exception:
             dur = 0
-        out.append({"url": url, "title": str(t.get("title") or "Son TikTok")[:120],
+        out.append({"url": url, "title": str(t.get("title") or T("Son TikTok"))[:120],
                     "author": str(t.get("author") or "")[:60], "cover": cover, "duration": dur})
     return out
 
@@ -561,9 +572,9 @@ def pl_summary(p, liked=frozenset()):
     return {"id": p.id, "name": p.name, "count": len(tr),
             "preview": [{"title": t.get("title", ""), "cover": t.get("cover", "")} for t in tr[:4]],
             "username": p.username, "color": p.color or 0, "avatar": p.avatar or "", "pic": p.pic or "",
-            "likes": int(p.likes or 0), "liked": p.id in liked, "updated": p.updated}
+            "likes": int(p.likes or 0), "liked": p.id in liked, "updated": p.updated, **list_badge(p)}
 
-PL_SELECT = ("SELECT p.id,p.name,p.tracks,p.updated,p.user_id,u.username,u.color,u.avatar,(CASE WHEN COALESCE(u.avatar_img,'')<>'' THEN COALESCE(NULLIF(u.imgv,''),'1') ELSE '' END) AS pic,"
+PL_SELECT = ("SELECT p.id,p.name,p.tracks,p.updated,p.user_id,u.username,u.color,u.avatar,u.email,u.premium_until,u.gift_until,u.cosm,(CASE WHEN COALESCE(u.avatar_img,'')<>'' THEN COALESCE(NULLIF(u.imgv,''),'1') ELSE '' END) AS pic,"
              "(SELECT COUNT(*) FROM playlist_likes l WHERE l.playlist_id=p.id) AS likes "
              "FROM public_playlists p JOIN users u ON u.id=p.user_id ")
 
@@ -609,7 +620,7 @@ def register():
     row = q1("SELECT last_sent FROM codes WHERE email=:e AND purpose='register'", e=email)
     if row and time.time() - row.last_sent < RESEND_COOLDOWN:
         wait = int(RESEND_COOLDOWN - (time.time() - row.last_sent)) + 1
-        return err(f"Patiente {wait} s avant de redemander un code", 429, wait=wait)
+        return err(T("Patiente {s} s avant de redemander un code", s=wait), 429, wait=wait)
     if limited("reg:" + ip(), 8, 3600):
         return err("Trop de tentatives, réessaie plus tard", 429)
     if not MAIL_ON:
@@ -664,7 +675,7 @@ def resend():
         return err("Aucune inscription en attente pour cet email. Recommence l'inscription.", 404)
     if time.time() - row.last_sent < RESEND_COOLDOWN:
         wait = int(RESEND_COOLDOWN - (time.time() - row.last_sent)) + 1
-        return err(f"Patiente {wait} s avant de redemander un code", 429, wait=wait)
+        return err(T("Patiente {s} s avant de redemander un code", s=wait), 429, wait=wait)
     if limited("resend:" + ip(), 10, 3600):
         return err("Trop de demandes, réessaie plus tard", 429)
     code = new_code()
@@ -880,9 +891,9 @@ def delete_me():
 def search_users():
     s = (request.args.get("q") or "").strip()
     if len(s) < 2: return jsonify(users=[])
-    rows = q("SELECT id,username,color,avatar," + "(CASE WHEN COALESCE(avatar_img,'')<>'' THEN COALESCE(NULLIF(imgv,''),'1') ELSE '' END) AS pic" + " FROM users WHERE lower(username) LIKE :q ESCAPE '\\' LIMIT 20",
+    rows = q("SELECT id,username,color,avatar,email,premium_until,gift_until,cosm," + "(CASE WHEN COALESCE(avatar_img,'')<>'' THEN COALESCE(NULLIF(imgv,''),'1') ELSE '' END) AS pic" + " FROM users WHERE lower(username) LIKE :q ESCAPE '\\' LIMIT 20",
              q=f"%{like_escape(s.lower())}%")
-    return jsonify(users=[{"id": r.id, "username": r.username, "color": r.color or 0, "avatar": r.avatar or "", "pic": r.pic or ""} for r in rows])
+    return jsonify(users=[{"id": r.id, "username": r.username, "color": r.color or 0, "avatar": r.avatar or "", "pic": r.pic or "", **list_badge(r)} for r in rows])
 
 
 @app.get("/api/search")
@@ -890,14 +901,14 @@ def search_all():
     s = (request.args.get("q") or "").strip()[:60]
     if len(s) < 2: return jsonify(users=[], playlists=[])
     pat = f"%{like_escape(s.lower())}%"
-    users = q("SELECT id,username,color,avatar,bio,(CASE WHEN COALESCE(avatar_img,'')<>'' THEN COALESCE(NULLIF(imgv,''),'1') ELSE '' END) AS pic,"
+    users = q("SELECT id,username,color,avatar,bio,email,premium_until,gift_until,cosm,(CASE WHEN COALESCE(avatar_img,'')<>'' THEN COALESCE(NULLIF(imgv,''),'1') ELSE '' END) AS pic,"
               "(SELECT COUNT(*) FROM public_playlists p WHERE p.user_id=users.id AND p.tracks <> '[]') AS n "
               "FROM users WHERE lower(username) LIKE :q ESCAPE '\\' ORDER BY length(username) LIMIT 20", q=pat)
     pls = q(PL_SELECT + "WHERE lower(p.name) LIKE :q ESCAPE '\\' AND p.tracks <> '[]' ORDER BY likes DESC, p.updated DESC LIMIT 24", q=pat)
     cu = current_user()
     lk = liked_set(cu["sub"] if cu else None)
     return jsonify(users=[{"id": r.id, "username": r.username, "color": r.color or 0, "avatar": r.avatar or "", "pic": r.pic or "",
-                           "bio": r.bio or "", "playlists": int(r.n or 0)} for r in users],
+                           "bio": r.bio or "", "playlists": int(r.n or 0), **list_badge(r)} for r in users],
                    playlists=[pl_summary(p, lk) for p in pls])
 
 
@@ -907,12 +918,12 @@ def feed():
     lk = liked_set(cu["sub"] if cu else None)
     top = q(PL_SELECT + "WHERE p.tracks <> '[]' ORDER BY likes DESC, p.updated DESC LIMIT 12")
     recent = q(PL_SELECT + "WHERE p.tracks <> '[]' ORDER BY p.updated DESC LIMIT 12")
-    users = q("SELECT id,username,color,avatar,bio,(CASE WHEN COALESCE(avatar_img,'')<>'' THEN COALESCE(NULLIF(imgv,''),'1') ELSE '' END) AS pic,"
+    users = q("SELECT id,username,color,avatar,bio,email,premium_until,gift_until,cosm,(CASE WHEN COALESCE(avatar_img,'')<>'' THEN COALESCE(NULLIF(imgv,''),'1') ELSE '' END) AS pic,"
               "(SELECT COUNT(*) FROM public_playlists p WHERE p.user_id=users.id AND p.tracks <> '[]') AS n "
               "FROM users ORDER BY COALESCE(created,'') DESC LIMIT 12")
     stats = q1("SELECT (SELECT COUNT(*) FROM users) AS u, (SELECT COUNT(*) FROM public_playlists WHERE tracks <> '[]') AS p")
     since = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(time.time() - 7 * 86400))
-    hot = q("SELECT * FROM (SELECT p.id,p.name,p.tracks,p.updated,p.user_id,u.username,u.color,u.avatar,"
+    hot = q("SELECT * FROM (SELECT p.id,p.name,p.tracks,p.updated,p.user_id,u.username,u.color,u.avatar,u.email,u.premium_until,u.gift_until,u.cosm,"
             "(CASE WHEN COALESCE(u.avatar_img,'')<>'' THEN COALESCE(NULLIF(u.imgv,''),'1') ELSE '' END) AS pic,"
             "(SELECT COUNT(*) FROM playlist_likes l WHERE l.playlist_id=p.id) AS likes,"
             "(SELECT COUNT(*) FROM playlist_likes l WHERE l.playlist_id=p.id AND l.created>=:s) AS week "
@@ -921,7 +932,7 @@ def feed():
     trend = [dict(pl_summary(p, lk), week=int(p.week or 0)) for p in hot]
     return jsonify(top=[pl_summary(p, lk) for p in top], recent=[pl_summary(p, lk) for p in recent], trend=trend,
                    users=[{"id": r.id, "username": r.username, "color": r.color or 0, "avatar": r.avatar or "", "pic": r.pic or "",
-                           "bio": r.bio or "", "playlists": int(r.n or 0)} for r in users],
+                           "bio": r.bio or "", "playlists": int(r.n or 0), **list_badge(r)} for r in users],
                    stats={"users": int(stats.u or 0), "playlists": int(stats.p or 0)})
 
 
@@ -962,7 +973,7 @@ def create_playlist():
     if not nm: return err("Nom requis")
     n = q1("SELECT COUNT(*) AS n FROM public_playlists WHERE user_id=:u", u=u["sub"]).n
     if n >= MAX_PUBLIC_PLAYLISTS:
-        return err(f"Maximum {MAX_PUBLIC_PLAYLISTS} playlists publiques", 400)
+        return err(T("Maximum {n} playlists publiques", n=MAX_PUBLIC_PLAYLISTS), 400)
     tracks = clean_tracks(d.get("tracks"))
     pid = uuid.uuid4().hex
     x("INSERT INTO public_playlists (id,user_id,name,tracks,updated) VALUES (:id,:uid,:n,:t,:up)",
@@ -1066,7 +1077,7 @@ def like_track():
 
 
 # ── Sons publiés (indépendants, hors playlists) ──────────────────────────────
-POST_SELECT = ("SELECT p.id,p.url,p.title,p.author,p.cover,p.duration,p.created,u.username,u.color,u.avatar,(CASE WHEN COALESCE(u.avatar_img,'')<>'' THEN COALESCE(NULLIF(u.imgv,''),'1') ELSE '' END) AS pic,"
+POST_SELECT = ("SELECT p.id,p.user_id,p.url,p.title,p.author,p.cover,p.duration,p.created,u.username,u.color,u.avatar,u.email,u.premium_until,u.gift_until,u.cosm,(CASE WHEN COALESCE(u.avatar_img,'')<>'' THEN COALESCE(NULLIF(u.imgv,''),'1') ELSE '' END) AS pic,"
                "(SELECT COUNT(*) FROM post_likes l WHERE l.post_id=p.id) AS likes "
                "FROM posts p JOIN users u ON u.id=p.user_id ")
 
@@ -1086,9 +1097,9 @@ def list_posts():
                                .bindparams(bindparam("ids", expanding=True)), {"u": cu["sub"], "ids": [r.id for r in rows]}):
                 mine.add(r[0])
     return jsonify(more=more, posts=[{
-        "id": r.id, "url": r.url, "title": r.title or "Son TikTok", "author": r.author or "", "cover": r.cover or "",
+        "id": r.id, "url": r.url, "title": r.title or T("Son TikTok"), "author": r.author or "", "cover": r.cover or "",
         "duration": r.duration or 0, "created": r.created, "username": r.username, "color": r.color or 0, "pic": r.pic or "",
-        "likes": int(r.likes or 0), "liked": r.id in mine, "mine": bool(cu and cu["sub"] == r.user_id)} for r in rows])
+        "likes": int(r.likes or 0), "liked": r.id in mine, "mine": bool(cu and cu["sub"] == r.user_id), **list_badge(r)} for r in rows])
 
 
 @app.post("/api/posts")
@@ -1432,7 +1443,7 @@ def stripe_webhook():
 KEY_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"      # sans 0 O 1 I L : pas de confusion à la dictée
 
 def new_access_key():
-    return "TKS-" + "-".join("".join(secrets.choice(KEY_ALPHABET) for _ in range(4)) for _ in range(3))
+    return "TKW-" + "-".join("".join(secrets.choice(KEY_ALPHABET) for _ in range(4)) for _ in range(3))
 
 def key_norm(k):
     return re.sub(r"[^A-Z0-9]", "", str(k or "").upper())
@@ -1449,7 +1460,7 @@ def require_admin():
     if e: return None, e
     row = q1("SELECT * FROM users WHERE id=:id", id=u["sub"])
     if not is_admin(row):
-        return None, (jsonify(error="Réservé à l'administrateur"), 403)
+        return None, err("Réservé à l'administrateur", 403)
     return row, None
 
 def key_json(r, users=()):
@@ -1535,7 +1546,7 @@ def index_html():
 def og_tags(title, desc, image="", url=""):
     e = lambda s: _html.escape(str(s or ""), quote=True)
     t = [f'<meta property="og:title" content="{e(title)}">', f'<meta property="og:description" content="{e(desc)}">',
-         '<meta property="og:type" content="website">', '<meta property="og:site_name" content="Tiksound">',
+         '<meta property="og:type" content="website">', '<meta property="og:site_name" content="TikWave">',
          f'<meta name="twitter:card" content="{"summary_large_image" if image else "summary"}">']
     if image: t.append(f'<meta property="og:image" content="{e(image)}">')
     if url: t.append(f'<meta property="og:url" content="{e(url)}">')
@@ -1550,14 +1561,15 @@ def preview_for(args):
         if p:
             tr = json.loads(p.tracks or "[]")
             cov = next((t.get("cover") for t in tr if str(t.get("cover", "")).startswith("https://")), "")
-            return og_tags(f"{p.name} · Tiksound", f"Playlist de {len(tr)} son{'s' if len(tr) > 1 else ''} par @{p.username}. Écoute-la sur Tiksound.",
-                           cov, f"{base}/?pl={pid}")
+            desc = (T("Playlist de {n} sons par @{pseudo}. Écoute-la sur TikWave.", n=len(tr), pseudo=p.username) if len(tr) != 1
+                    else T("Playlist de 1 son par @{pseudo}. Écoute-la sur TikWave.", pseudo=p.username))
+            return og_tags(f"{p.name} · TikWave", desc, cov, f"{base}/?pl={pid}")
     if uname:
         u = q1("SELECT username,bio,avatar_img,imgv FROM users WHERE lower(username)=:u", u=uname.lower())
         if u:
             img = f"{base}/api/img/{u.username}/a" if getattr(u, "avatar_img", "") else ""
-            return og_tags(f"@{u.username} sur Tiksound", u.bio or "Ses playlists de sons TikTok.", img, f"{base}/?u={u.username}")
-    return og_tags("Tiksound · les sons TikTok, sans la vidéo", "Colle un lien TikTok, garde uniquement le son et écoute-le en playlist, écran éteint.")
+            return og_tags(T("@{pseudo} sur TikWave", pseudo=u.username), u.bio or T("Ses playlists de sons TikTok."), img, f"{base}/?u={u.username}")
+    return og_tags(T("TikWave · les sons TikTok, sans la vidéo"), T("Colle un lien TikTok, garde uniquement le son et écoute-le en playlist, écran éteint."))
 
 @app.get("/")
 def accueil():
@@ -1567,6 +1579,25 @@ def accueil():
     r = make_response(index_html().replace("<!--og-->", tags, 1))
     r.mimetype = "text/html"
     r.headers["Cache-Control"] = "no-cache"
+    r.headers["Vary"] = "Accept-Language, Cookie"
+    return r
+
+# Le navigateur choisit la langue de l'appli installée (nom des raccourcis, description)
+MANIFEST_EN = {"lang": "en", "description": "Your TikTok sounds in playlists, without the video."}
+SHORTCUTS_EN = ["Add a sound", "My sounds", "Explore"]
+
+@app.get("/manifest.webmanifest")
+def manifest():
+    with open(os.path.join(app.root_path, "manifest.webmanifest"), encoding="utf-8") as f:
+        m = json.load(f)
+    if lang() == "en":
+        m.update(MANIFEST_EN)
+        for sc, name in zip(m.get("shortcuts", []), SHORTCUTS_EN):
+            sc["name"] = name
+    r = make_response(json.dumps(m, ensure_ascii=False, indent=2))
+    r.mimetype = "application/manifest+json"
+    r.headers["Cache-Control"] = "no-cache"
+    r.headers["Vary"] = "Accept-Language, Cookie"
     return r
 
 @app.get("/api/health")
@@ -1602,28 +1633,23 @@ def ads_txt():
     r.headers["Cache-Control"] = "public, max-age=300"
     return r
 
-@app.get("/confidentialite")
-def confidentialite():
-    with open(os.path.join(app.root_path, "confidentialite.html"), encoding="utf-8") as f:
-        html = f.read()
-    mail = os.environ.get("CONTACT_EMAIL", "").strip()
-    contact = (f'<a href="mailto:{mail}">{mail}</a>' if CONTACT_RE.fullmatch(mail)
-               else "l'adresse de l'éditeur n'est pas encore renseignée.")
-    r = make_response(html.replace("{{CONTACT}}", contact))
-    r.mimetype = "text/html"
-    r.headers["Cache-Control"] = "no-cache"
-    return r
-
 def legal_page(name):
+    if lang() == "en":
+        name = name.replace(".html", ".en.html")
     with open(os.path.join(app.root_path, name), encoding="utf-8") as f:
         html = f.read()
     mail = os.environ.get("CONTACT_EMAIL", "").strip()
     contact = (f'<a href="mailto:{mail}">{mail}</a>' if CONTACT_RE.fullmatch(mail)
-               else "l'adresse de l'éditeur n'est pas encore renseignée.")
+               else T("l'adresse de l'éditeur n'est pas encore renseignée."))
     r = make_response(html.replace("{{CONTACT}}", contact))
     r.mimetype = "text/html"
     r.headers["Cache-Control"] = "no-cache"
+    r.headers["Vary"] = "Accept-Language, Cookie"
     return r
+
+@app.get("/confidentialite")
+def confidentialite():
+    return legal_page("confidentialite.html")
 
 @app.get("/conditions")
 def conditions():
@@ -1802,7 +1828,7 @@ def titre(info):
     if not t:
         t = info.get("track") or ""
         if t.lower().startswith(("original sound", "son original", "sonido original")): t = ""
-    return t[:80] or "Son TikTok"
+    return t[:80] or T("Son TikTok")
 
 def fetch_thumb(url):
     """Télécharge la miniature (les liens TikTok expirent) pour la stocker côté appareil."""
@@ -2203,7 +2229,7 @@ def extract():
         except Exception: want = 0
         info = audio_from_search(opts, title_in, author_in, want)
         if not info:
-            return err(f"Aucune version audio trouvée pour « {title_in[:50]} ».", 502, retry=True)
+            return err(T("Aucune version audio trouvée pour « {titre} ».", titre=title_in[:50]), 502, retry=True)
     elif found:
         yt = _is_yt(url)
         if not (yt and yt_blocked()):

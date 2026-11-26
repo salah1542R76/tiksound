@@ -1,8 +1,9 @@
 {
-  "name": "Tiksound",
-  "short_name": "Tiksound",
+  "name": "TikWave",
+  "short_name": "TikWave",
   "description": "Tes sons TikTok en playlist, sans la vidéo.",
   "lang": "fr",
+  "id": "/",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

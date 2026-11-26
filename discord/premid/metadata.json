@@ -1,0 +1,15 @@
+{
+  "author": { "name": "REMPLACER_PAR_TON_PSEUDO_DISCORD", "id": "REMPLACER_PAR_TON_ID_DISCORD" },
+  "service": "TikWave",
+  "description": {
+    "en": "TikWave keeps only the sound of TikTok videos and lets you listen to them in playlists, even with the screen off.",
+    "fr": "TikWave garde uniquement le son des vidéos TikTok et te permet de les écouter en playlist, même écran éteint."
+  },
+  "url": "tikwave.fr",
+  "version": "1.0.0",
+  "logo": "https://tikwave.fr/icon-512.png",
+  "thumbnail": "https://tikwave.fr/icon-512.png",
+  "color": "#b9a4ff",
+  "category": "music",
+  "tags": ["music", "tiktok", "playlist"]
+}

@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Guide Premium TikWave</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Mise en page : rail d'étapes collant à gauche, cartes numérotées à droite ; le verdict AdSense en feu tricolore. */
+:root{
+  --bg:#f3f4f8; --surface:#ffffff; --ink:#14141a; --mut:#585968; --line:#dcdde6;
+  --acc:#5a3fd6; --acc-ink:#ffffff; --ok:#17704c; --warn:#9a5b06; --bad:#b3261e;
+  --fd:"Bricolage Grotesque","DM Sans",system-ui,sans-serif;
+  --fb:"DM Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --fm:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --r:16px; color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0b0b0e; --surface:#15151a; --ink:#ececf2; --mut:#a2a3b0; --line:#272730;
+    --acc:#b9a4ff; --acc-ink:#17102f; --ok:#5fd3a0; --warn:#f0b45a; --bad:#ff8a80; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0b0b0e; --surface:#15151a; --ink:#ececf2; --mut:#a2a3b0; --line:#272730;
+  --acc:#b9a4ff; --acc-ink:#17102f; --ok:#5fd3a0; --warn:#f0b45a; --bad:#ff8a80; color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:20px}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.6 var(--fb)}
+a{color:var(--acc)}
+code,.mono{font-family:var(--fm);font-size:.88em}
+code{background:color-mix(in oklab,var(--ink) 8%,transparent);padding:1px 6px;border-radius:6px;overflow-wrap:anywhere}
+h1,h2,h3{font-family:var(--fd);text-wrap:balance;margin:0}
+p{margin:0 0 10px;max-width:68ch}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:6px}
+.wrap{max-width:1120px;margin:0 auto;padding:0 20px}
+
+/* ── Haut de page ── */
+.top{padding:44px 0 26px;border-bottom:1px solid var(--line)}
+.eyebrow{display:flex;align-items:center;gap:10px;color:var(--mut);font-size:14px;font-weight:500}
+.eq{display:inline-flex;align-items:flex-end;gap:3px;height:18px}
+.eq i{width:4px;background:var(--acc);border-radius:2px;animation:eq 1s ease-in-out infinite}
+.eq i:nth-child(1){height:60%}.eq i:nth-child(2){height:100%;animation-delay:.2s}.eq i:nth-child(3){height:40%;animation-delay:.4s}
+@keyframes eq{50%{transform:scaleY(.45)}}
+h1{font-size:clamp(34px,5.4vw,56px);line-height:1.04;font-weight:800;letter-spacing:-.03em;margin:14px 0 12px;max-width:16ch}
+.lead{font-size:18px;color:var(--mut)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:5px 14px;font-size:14px;font-weight:500}
+.prog{margin-top:22px;max-width:420px}
+.prog-h{display:flex;justify-content:space-between;font-size:14px;color:var(--mut);margin-bottom:6px;font-variant-numeric:tabular-nums}
+.bar{height:8px;border-radius:99px;background:color-mix(in oklab,var(--ink) 10%,transparent);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--acc);border-radius:99px;transition:width .3s}
+
+/* ── Rail + contenu ── */
+.cols{display:grid;grid-template-columns:200px minmax(0,1fr);gap:44px;padding-top:30px;padding-bottom:80px}
+.rail{position:sticky;top:20px;align-self:start}
+.rail ol{list-style:none;margin:0;padding:0;display:grid;gap:2px;counter-reset:s}
+.rail a{display:flex;gap:10px;align-items:baseline;padding:7px 10px;border-radius:10px;color:var(--mut);text-decoration:none;font-size:15px;font-weight:500}
+.rail a:hover{color:var(--ink)}
+.rail a[aria-current="true"]{background:color-mix(in oklab,var(--acc) 14%,transparent);color:var(--ink)}
+.rail .n{font-family:var(--fm);font-size:12px;color:var(--acc);min-width:18px}
+@media (max-width:860px){.cols{grid-template-columns:minmax(0,1fr);gap:0}.rail{display:none}}
+
+section{padding:26px 0 8px;border-top:1px solid var(--line)}
+section:first-child{border-top:0;padding-top:0}
+.sh{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+.num{flex:none;width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:var(--acc);color:var(--acc-ink);font:800 18px var(--fd)}
+h2{font-size:clamp(24px,3.4vw,32px);line-height:1.15;letter-spacing:-.02em}
+h3{font-size:18px;margin:20px 0 8px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px}
+.grid{display:grid;gap:14px}
+.g3{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.g2{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.plan h3{margin:0 0 2px}
+.plan .pr{color:var(--mut);font-size:14px;margin-bottom:10px}
+.plan.hl{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset}
+.plan ul{list-style:none;padding:0;margin:0;display:grid;gap:7px;font-size:15px}
+.plan li{display:flex;gap:9px;align-items:flex-start}
+.plan svg{flex:none;margin-top:3px}
+.y{color:var(--ok)}.n_{color:var(--mut)}
+.note{border-left:3px solid var(--acc);padding:6px 0 6px 14px;color:var(--mut);margin:14px 0}
+
+/* ── Cases à cocher ── */
+.todo{display:grid;gap:8px;margin:12px 0}
+.chk{display:flex;gap:12px;align-items:flex-start;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;cursor:pointer}
+.chk input{margin-top:5px;width:18px;height:18px;accent-color:var(--acc);flex:none}
+.chk:has(input:checked){border-color:color-mix(in oklab,var(--ok) 55%,var(--line))}
+.chk:has(input:checked) .t{color:var(--mut)}
+.chk .t{display:block;min-width:0}
+.chk b{font-weight:700}
+.cp{font:500 13px var(--fb);color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:8px;padding:2px 9px;margin-left:6px;cursor:pointer;vertical-align:baseline}
+.cp:hover{border-color:var(--acc);color:var(--acc)}
+
+/* ── Tableaux ── */
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:560px;font-size:15px}
+th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+th{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);font-weight:700}
+.pill{display:inline-block;border-radius:99px;padding:1px 10px;font-size:12px;font-weight:700;white-space:nowrap}
+.p-req{background:color-mix(in oklab,var(--bad) 16%,transparent);color:var(--bad)}
+.p-rec{background:color-mix(in oklab,var(--warn) 18%,transparent);color:var(--warn)}
+.p-opt{background:color-mix(in oklab,var(--ink) 9%,transparent);color:var(--mut)}
+.p-ads{background:color-mix(in oklab,var(--acc) 18%,transparent);color:var(--acc)}
+
+/* ── Verdict AdSense ── */
+.verdict{display:grid;gap:12px;margin:14px 0}
+.lamp{display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px;align-items:start;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px}
+.dot{width:14px;height:14px;border-radius:50%;margin-top:6px}
+.red .dot{background:var(--bad)}.amber .dot{background:var(--warn)}.green .dot{background:var(--ok)}
+.red{border-color:color-mix(in oklab,var(--bad) 50%,var(--line))}
+.lamp h3{margin:0 0 4px;font-size:17px}
+.lamp p{margin:0 0 6px;font-size:15px}
+.steps{counter-reset:st;list-style:none;margin:12px 0;padding:0;display:grid;gap:10px}
+.steps li{counter-increment:st;display:grid;grid-template-columns:30px minmax(0,1fr);gap:12px}
+.steps li::before{content:counter(st);width:30px;height:30px;border-radius:50%;display:grid;place-items:center;border:1.5px solid var(--acc);color:var(--acc);font:700 14px var(--fm)}
+.steps b{display:block}
+.src{font-size:13px;color:var(--mut)}
+.foot{border-top:1px solid var(--line);padding:22px 0 48px;color:var(--mut);font-size:14px}
+@media (prefers-reduced-motion:reduce){.eq i{animation:none}html{scroll-behavior:auto}.bar i{transition:none}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="ok" viewBox="0 0 20 20"><path d="M4 10.5l4 4 8-9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="no" viewBox="0 0 20 20"><path d="M5 5l10 10M15 5L5 15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+</svg>
+
+<header class="top"><div class="wrap">
+  <div class="eyebrow"><span class="eq" aria-hidden="true"><i></i><i></i><i></i></span>TikWave · mise en route de l'abonnement</div>
+  <h1>Passer TikWave en mode Premium</h1>
+  <p class="lead">Cinq étapes pour brancher Stripe, offrir le Premium à tes amis et afficher des pubs. Coche au fur et à mesure : ta progression reste sur cet appareil.</p>
+  <div class="chips"><span class="chip">2,99 € par mois</span><span class="chip">Stripe + Render</span><span class="chip">Environ 30 minutes</span><span class="chip">Aucune clé dans le code</span></div>
+  <div class="prog" aria-live="polite"><div class="prog-h"><span>Ta progression</span><span id="pt">0 / 0</span></div><div class="bar"><i id="pb"></i></div></div>
+</div></header>
+
+<div class="wrap cols">
+<nav class="rail" aria-label="Étapes"><ol id="rail">
+  <li><a href="#apercu"><span class="n">00</span>Aperçu</a></li>
+  <li><a href="#stripe"><span class="n">01</span>Stripe</a></li>
+  <li><a href="#render"><span class="n">02</span>Render</a></li>
+  <li><a href="#test"><span class="n">03</span>Tester</a></li>
+  <li><a href="#cles"><span class="n">04</span>Tes clés</a></li>
+  <li><a href="#pubs"><span class="n">05</span>Les pubs</a></li>
+  <li><a href="#adsense"><span class="n">05b</span>Google AdSense</a></li>
+  <li><a href="#depannage"><span class="n">06</span>Dépannage</a></li>
+</ol></nav>
+
+<main>
+<section id="apercu">
+  <div class="sh"><h2>Ce que fait le code</h2></div>
+  <div class="grid g3">
+    <div class="card plan"><h3>Gratuit</h3><div class="pr">0 €</div><ul>
+      <li><svg class="y" width="18" height="18"><use href="#ok"/></svg><span>Tous les sons déjà enregistrés restent lisibles</span></li>
+      <li><svg class="y" width="18" height="18"><use href="#ok"/></svg><span>Playlists, découverte, profil</span></li>
+      <li><svg class="n_" width="18" height="18"><use href="#no"/></svg><span>Une pub tous les 5 sons + un bandeau</span></li>
+      <li><svg class="n_" width="18" height="18"><use href="#no"/></svg><span>Nouveaux sons écoutés en ligne seulement</span></li></ul></div>
+    <div class="card plan hl"><h3>Premium</h3><div class="pr">2,99 € par mois, via Stripe</div><ul>
+      <li><svg class="y" width="18" height="18"><use href="#ok"/></svg><span>Zéro pub</span></li>
+      <li><svg class="y" width="18" height="18"><use href="#ok"/></svg><span>Sons sur l'appareil et mode hors ligne</span></li>
+      <li><svg class="y" width="18" height="18"><use href="#ok"/></svg><span>Enregistrement MP3</span></li>
+      <li><svg class="y" width="18" height="18"><use href="#ok"/></svg><span>Résiliation depuis le portail Stripe</span></li></ul></div>
+    <div class="card plan"><h3>Clé d'accès</h3><div class="pr">Pour toi et tes amis, sans payer</div><ul>
+      <li><svg class="y" width="18" height="18"><use href="#ok"/></svg><span>Ton compte (<code>ADMIN_EMAIL</code>) est Premium à vie</span></li>
+      <li><svg class="y" width="18" height="18"><use href="#ok"/></svg><span>Tu crées des clés <code>TKS-XXXX-XXXX-XXXX</code></span></li>
+      <li><svg class="y" width="18" height="18"><use href="#ok"/></svg><span>Durée et nombre d'utilisations au choix</span></li>
+      <li><svg class="y" width="18" height="18"><use href="#ok"/></svg><span>Révocable à tout moment</span></li></ul></div>
+  </div>
+  <p class="note">Le statut Premium est décidé par le serveur. Le navigateur n'en garde qu'une échéance en cache pour le hors ligne. <b>Tant que Stripe et le stockage R2 ne sont pas configurés, rien ne change</b> : pas de pub, pas de bouton Premium, hors ligne pour tout le monde.</p>
+</section>
+
+<section id="stripe">
+  <div class="sh"><span class="num">1</span><h2>Stripe, en mode test</h2></div>
+  <p>Dans le tableau de bord Stripe, active le <b>mode test</b> (en haut à droite). Les noms des menus changent parfois : cherche le même mot-clé.</p>
+  <div class="todo">
+    <label class="chk"><input type="checkbox" data-k="s1"><span class="t"><b>Produit et tarif.</b> Catalogue de produits, Ajouter un produit, « TikWave Premium », tarif <b>récurrent, 2,99 €, mensuel</b>. Copie l'identifiant du tarif (<code>price_…</code>) : c'est <code>STRIPE_PRICE_ID</code>.</span></label>
+    <label class="chk"><input type="checkbox" data-k="s2"><span class="t"><b>Clé secrète.</b> Développeurs, Clés API, clé secrète (<code>sk_test_…</code>) : c'est <code>STRIPE_SECRET_KEY</code>. Ne la colle jamais dans le code ni dans un message.</span></label>
+    <label class="chk"><input type="checkbox" data-k="s2b"><span class="t"><b>Clé publique.</b> Même page : la clé « publiable » (<code>pk_test_…</code>) est <code>STRIPE_PUBLISHABLE_KEY</code>. Elle n'est pas secrète : le navigateur s'en sert pour afficher le formulaire de paiement, qui s'ouvre directement dans TikWave.</span></label>
+    <label class="chk"><input type="checkbox" data-k="s3"><span class="t"><b>Portail client.</b> Paramètres, Facturation, Portail client, <b>Activer</b>. Autorise « Résilier les abonnements » et « Mettre à jour le moyen de paiement ».</span></label>
+    <label class="chk"><input type="checkbox" data-k="s4"><span class="t"><b>Webhook.</b> Développeurs, Webhooks, Ajouter un endpoint. Adresse :
+      <code id="wh">https://tikwave.fr/api/stripe/webhook</code><button class="cp" data-copy="#wh">Copier</button><br>
+      Coche ces 5 événements, pas un de plus : <code>checkout.session.completed</code> <code>invoice.paid</code> <code>invoice.payment_failed</code> <code>customer.subscription.updated</code> <code>customer.subscription.deleted</code>.
+      Copie ensuite la clé de signature (<code>whsec_…</code>) : c'est <code>STRIPE_WEBHOOK_SECRET</code>.</span></label>
+  </div>
+</section>
+
+<section id="render">
+  <div class="sh"><span class="num">2</span><h2>Variables sur Render</h2></div>
+  <p>Render, ton service, <b>Environment</b>. Chaque ajout redéploie le site tout seul.</p>
+  <div class="tw"><table>
+    <thead><tr><th>Variable</th><th>Où la trouver</th><th>Statut</th></tr></thead>
+    <tbody>
+    <tr><td><code>STRIPE_SECRET_KEY</code></td><td>Stripe, clés API (<code>sk_test_…</code>)</td><td><span class="pill p-req">Obligatoire</span></td></tr>
+    <tr><td><code>STRIPE_PUBLISHABLE_KEY</code></td><td>Stripe, clés API, clé publiable (<code>pk_test_…</code>)</td><td><span class="pill p-req">Obligatoire</span></td></tr>
+    <tr><td><code>STRIPE_PRICE_ID</code></td><td>Le tarif du produit (<code>price_…</code>)</td><td><span class="pill p-req">Obligatoire</span></td></tr>
+    <tr><td><code>STRIPE_WEBHOOK_SECRET</code></td><td>L'endpoint webhook (<code>whsec_…</code>)</td><td><span class="pill p-req">Obligatoire</span></td></tr>
+    <tr><td><code>R2_ACCOUNT_ID</code> <code>R2_ACCESS_KEY_ID</code> <code>R2_SECRET_ACCESS_KEY</code> <code>R2_BUCKET</code> <code>R2_PUBLIC_URL</code></td><td>Ton stockage Cloudflare R2. Sans lui, l'abonnement reste désactivé.</td><td><span class="pill p-req">Obligatoire</span></td></tr>
+    <tr><td><code>ADMIN_EMAIL</code></td><td>L'e-mail de ton compte TikWave (plusieurs possibles, séparés par des virgules)</td><td><span class="pill p-rec">Conseillé</span></td></tr>
+    <tr><td><code>PUBLIC_URL</code></td><td>L'adresse du site, sans « / » final, si les retours de paiement pointent au mauvais endroit</td><td><span class="pill p-opt">Facultatif</span></td></tr>
+    <tr><td><code>ADSENSE_CLIENT</code></td><td>Ton ID éditeur Google (<code>ca-pub-…</code>)</td><td><span class="pill p-ads">Pubs Google</span></td></tr>
+    <tr><td><code>ADSENSE_SLOT</code></td><td>Le numéro de ton unité d'annonce (chiffres)</td><td><span class="pill p-ads">Pubs Google</span></td></tr>
+    <tr><td><code>CONTACT_EMAIL</code></td><td>Adresse affichée sur la page de confidentialité</td><td><span class="pill p-rec">Conseillé avec les pubs</span></td></tr>
+    </tbody></table></div>
+  <div class="todo">
+    <label class="chk"><input type="checkbox" data-k="r1"><span class="t">Variables ajoutées sur Render.</span></label>
+    <label class="chk"><input type="checkbox" data-k="r2"><span class="t">Vérification : ouvre <code>https://ton-site/api/health</code>. Tu dois voir <code>"paywall": true</code>.</span></label>
+  </div>
+</section>
+
+<section id="test">
+  <div class="sh"><span class="num">3</span><h2>Tester sans dépenser un centime</h2></div>
+  <div class="todo">
+    <label class="chk"><input type="checkbox" data-k="t1"><span class="t">Crée un compte TikWave qui n'est <b>pas</b> celui de <code>ADMIN_EMAIL</code>.</span></label>
+    <label class="chk"><input type="checkbox" data-k="t2"><span class="t">Touche l'étoile, <b>Passer Premium</b>. Le formulaire Stripe s'affiche dans la fenêtre : carte <code>4242 4242 4242 4242</code>, une date future, n'importe quel CVC. Carte avec validation 3D Secure : <code>4000 0025 0000 3155</code>.<button class="cp" data-copy="4242 4242 4242 4242">Copier la carte</button></span></label>
+    <label class="chk"><input type="checkbox" data-k="t3"><span class="t">Tu reviens sur TikWave : « Bienvenue dans Premium ». Si ça tarde, regarde le dépannage (webhook).</span></label>
+    <label class="chk"><input type="checkbox" data-k="t4"><span class="t">Profil, Premium, <b>Gérer mon abonnement</b> : résilie. Le Premium reste actif jusqu'à la fin de la période payée.</span></label>
+    <label class="chk"><input type="checkbox" data-k="t5"><span class="t">Paiement refusé : carte <code>4000 0000 0000 0341</code> (elle s'enregistre, mais le débit échoue).</span></label>
+    <label class="chk"><input type="checkbox" data-k="t6"><span class="t"><b>Passer en vrai</b> : désactive le mode test, recrée produit, tarif et webhook en mode réel, puis remplace les trois variables Stripe sur Render.</span></label>
+  </div>
+</section>
+
+<section id="cles">
+  <div class="sh"><span class="num">4</span><h2>Ta clé et celles de tes amis</h2></div>
+  <div class="todo">
+    <label class="chk"><input type="checkbox" data-k="k1"><span class="t">Connecte-toi avec l'e-mail de <code>ADMIN_EMAIL</code> : tu es Premium à vie.</span></label>
+    <label class="chk"><input type="checkbox" data-k="k2"><span class="t">Profil, carte <b>Clés d'accès</b> : un nom (« Marie »), le nombre de personnes, la durée, <b>Créer</b>.</span></label>
+    <label class="chk"><input type="checkbox" data-k="k3"><span class="t">La clé s'affiche <b>une seule fois</b> : copie-la tout de suite. Seule son empreinte est stockée, personne ne peut la relire après.</span></label>
+    <label class="chk"><input type="checkbox" data-k="k4"><span class="t">Ton ami la saisit : étoile, <b>J'ai une clé d'accès</b>, <b>Activer</b>. <b>Révoquer</b> retire le Premium offert à tous ceux qui l'ont utilisée.</span></label>
+  </div>
+</section>
+
+<section id="pubs">
+  <div class="sh"><span class="num">5</span><h2>Les pubs : les tiennes, et celles de Google</h2></div>
+  <div class="grid g2">
+    <div class="card"><h3 style="margin-top:0">Tes pubs (annonceurs, dons, auto-promo)</h3>
+      <p>Réglage en haut du script de <code>index.html</code>, liste <code>ADS</code>. Elles passent <b>entre deux sons</b> (écran, ou audio qui continue écran éteint) et dans les bandeaux.</p>
+      <p>Tes fichiers vont dans le dossier <code>ads/</code>. Liste vide = aucune pub.</p></div>
+    <div class="card"><h3 style="margin-top:0">Pubs rémunérées Google AdSense</h3>
+      <p>Un <b>bandeau fixe en haut</b> des pages, pour les comptes gratuits seulement. Le script de Google n'est même pas téléchargé pour un Premium.</p>
+      <p>Si AdSense est branché, il remplace tes bandeaux ; tes pubs entre deux sons restent. <a href="#adsense">Lis d'abord le verdict.</a></p></div>
+  </div>
+</section>
+
+<section id="adsense">
+  <div class="sh"><h2>AdSense : le verdict honnête</h2></div>
+  <p>Le branchement est prêt et testé. Mais Google décide si ton site est accepté, et trois points risquent de bloquer.</p>
+  <div class="verdict">
+    <div class="lamp red"><span class="dot" aria-hidden="true"></span><div><h3>Droits d'auteur : risque élevé de refus</h3>
+      <p>Google interdit d'afficher ses annonces à côté de contenus protégés que tu n'as pas l'autorisation d'utiliser, et sa politique de droits d'auteur cite les sites qui permettent de copier ou télécharger de la musique. TikWave sert à extraire le son de vidéos TikTok et à l'enregistrer en MP3. Un refus, voire une fermeture du compte, est une issue réaliste.</p>
+      <p class="src">Sources : <a href="https://adsense.googleblog.com/2012/08/" target="_blank" rel="noopener">blog AdSense, copyright</a> · <a href="https://support.google.com/adspolicy/answer/6018015" target="_blank" rel="noopener">politique Google sur les droits d'auteur</a></p></div></div>
+    <div class="lamp amber"><span class="dot" aria-hidden="true"></span><div><h3>Adresse du site : prends un domaine à toi</h3>
+      <p>Google vérifie que tu contrôles le site. Les adresses gratuites d'hébergeur (<code>….onrender.com</code>) passent plus difficilement, d'après des retours d'éditeurs ; je n'ai pas trouvé de règle officielle qui l'interdise. Render permet d'ajouter ton propre nom de domaine.</p></div></div>
+    <div class="lamp amber"><span class="dot" aria-hidden="true"></span><div><h3>Consentement obligatoire en Europe</h3>
+      <p>Pour l'Espace économique européen, le Royaume-Uni et la Suisse, Google exige un message de consentement certifié. Google propose le sien, et il demande l'adresse d'une page de confidentialité : TikWave en fournit une (<code>/confidentialite</code>).</p>
+      <p class="src">Source : <a href="https://support.google.com/adsense/answer/10960768" target="_blank" rel="noopener">message sur les réglementations européennes</a></p></div></div>
+  </div>
+
+  <h3>Si tu tentes quand même</h3>
+  <ol class="steps">
+    <li><div><b>Domaine</b>Ajoute ton nom de domaine dans Render (recommandé).</div></li>
+    <li><div><b>Compte AdSense</b>Crée-le avec ton identité réelle. Google demande une vérification d'identité avant d'afficher des pubs et de payer.</div></li>
+    <li><div><b><code>ADSENSE_CLIENT</code> sur Render</b>Colle ton ID éditeur. Le site publie alors tout seul <code>/ads.txt</code> (<code>google.com, pub-…, DIRECT, …</code>).</div></li>
+    <li><div><b>Ajouter le site dans AdSense</b>Rubrique Sites, vérification par ads.txt. Statut « Requires review » : attends la décision de Google.<br><span class="src"><a href="https://support.google.com/adsense/answer/12171612" target="_blank" rel="noopener">ads.txt</a> · <a href="https://support.google.com/adsense/answer/12169212" target="_blank" rel="noopener">ajouter un site</a></span></div></li>
+    <li><div><b>Message de consentement</b>AdSense, Privacy &amp; messaging, message « European regulations ». Adresse de confidentialité : <code>https://ton-site/confidentialite</code>. Renseigne aussi <code>CONTACT_EMAIL</code> sur Render.</div></li>
+    <li><div><b>Unité d'annonce</b>Crée une annonce display adaptative et copie son numéro dans <code>ADSENSE_SLOT</code>. Le bandeau apparaît chez les comptes gratuits, une fois Google prêt.</div></li>
+  </ol>
+  <p class="note">Google ne verse l'argent qu'à partir de 70 € de gains cumulés. <a href="https://support.google.com/adsense/answer/1709871" target="_blank" rel="noopener">Détail des seuils de paiement</a>.</p>
+
+  <h3>Ce que TikWave respecte pour toi</h3>
+  <div class="grid g2">
+    <div class="card"><ul style="margin:0;padding-left:18px">
+      <li>Libellé « Publicité », comme l'exigent les règles de Google.</li>
+      <li>Aucune phrase qui pousse à cliquer.</li>
+      <li>Une seule demande de pub par visite, jamais de rafraîchissement automatique.</li>
+      <li>Rien pour les comptes Premium.</li></ul></div>
+    <div class="card"><ul style="margin:0;padding-left:18px">
+      <li><b>Pas d'AdSense entre deux sons</b> : Google interdit ses annonces sur les écrans intermédiaires, même fermables.</li>
+      <li><b>Pas de pub audio AdSense</b> : il n'est pas fait pour ça. Garde tes pubs audio maison pour les pauses.</li>
+      <li>Si Google refuse : ne contourne pas la règle. Tes pubs maison, Premium et les dons restent là.</li></ul></div>
+  </div>
+</section>
+
+<section id="depannage">
+  <div class="sh"><span class="num">6</span><h2>Dépannage</h2></div>
+  <div class="tw"><table>
+    <thead><tr><th>Symptôme</th><th>Où regarder</th></tr></thead>
+    <tbody>
+    <tr><td>Pas d'étoile, pas de pub</td><td><code>/api/health</code> doit afficher <code>"paywall": true</code>. Il manque <code>STRIPE_SECRET_KEY</code>, <code>STRIPE_PUBLISHABLE_KEY</code>, <code>STRIPE_PRICE_ID</code> ou une variable R2.</td></tr>
+    <tr><td>Paiement réussi, Premium qui n'arrive pas</td><td>Stripe, Webhooks, ton endpoint, Événements récents. <code>400</code> : mauvaise <code>STRIPE_WEBHOOK_SECRET</code>. <code>500</code> : logs Render, Stripe réessaie tout seul.</td></tr>
+    <tr><td>« Le paiement est momentanément indisponible »</td><td>Clé ou tarif du mauvais mode (test ou réel), ou <code>STRIPE_PRICE_ID</code> qui ne correspond pas à la clé. Vérifie aussi que la version de la bibliothèque Stripe est bien la 15 ou plus (<code>stripe&gt;=15.0.0</code> dans <code>requirements.txt</code>).</td></tr>
+    <tr><td>Le formulaire de paiement ne s'affiche pas</td><td>« Sans connexion » : le script de Stripe n'a pas pu se charger (réseau, bloqueur de pub). Sinon regarde la console du navigateur et les logs Render (« Stripe checkout »).</td></tr>
+    <tr><td>Le prix ne s'affiche pas</td><td>Même cause : le prix est lu chez Stripe, il n'est écrit nulle part dans le code.</td></tr>
+    <tr><td>Une pub image ne s'affiche pas</td><td>Chemin (<code>ads/…</code>) et présence du fichier dans le déploiement.</td></tr>
+    <tr><td><code>/ads.txt</code> introuvable</td><td><code>ADSENSE_CLIENT</code> absent ou mal écrit : il doit ressembler à <code>ca-pub-</code> suivi de chiffres.</td></tr>
+    <tr><td>Aucun bandeau Google</td><td>Normal tant que Google n'a pas approuvé le site. Sinon : <code>/api/health</code> doit montrer un bloc <code>adsense</code> (il faut <code>paywall</code>, <code>ADSENSE_CLIENT</code> et <code>ADSENSE_SLOT</code>), le compte doit être gratuit, et aucun bloqueur de pub ne doit être actif.</td></tr>
+    </tbody></table></div>
+
+  <h3>À savoir</h3>
+  <ul>
+    <li>Les adresses des fichiers R2 sont publiques : quelqu'un qui connaît l'adresse d'un son peut le lire sans pub. Il n'y a pas de DRM.</li>
+    <li>« Je paie un mois, je télécharge tout, je résilie » est possible, puisque les sons déjà sur l'appareil restent lisibles. Si ça te gêne, il faudra limiter les téléchargements locaux.</li>
+    <li>Un Premium qui perd le réseau garde ses avantages jusqu'à l'échéance en cache. Un compte gratuit hors ligne ne voit pas de pub.</li>
+    <li>Un paiement refusé retire le Premium tout de suite. Les clés d'accès ne sont jamais touchées par Stripe.</li>
+    <li>Supprimer son compte résilie d'abord l'abonnement Stripe ; s'il ne peut pas l'être, le compte reste et la personne est prévenue.</li>
+  </ul>
+</section>
+
+<footer class="foot">
+  <p><b>Vérifié</b> : 97 tests serveur et 42 tests dans un vrai Chrome (formulaire de paiement, clés, pubs entre sons, bandeau Google).</p>
+  <p><b>Pas vérifié</b> : les appels réels à Stripe et le vrai formulaire de paiement sont simulés dans les tests ; seul le mode test de Stripe peut les confirmer (étape 3). Le vrai script de Google n'a pas pu être chargé ici non plus ; il est remplacé par une copie de test. Vérifie le bandeau sur ton site une fois AdSense approuvé.</p>
+</footer>
+</main>
+</div>
+
+<script>
+(function(){
+  var KEY="tiksound-guide", boxes=[].slice.call(document.querySelectorAll(".chk input")), done={};
+  try{ done=JSON.parse(localStorage.getItem(KEY)||"{}")||{}; }catch(e){ done={}; }
+  function draw(){
+    var n=boxes.filter(function(b){return b.checked}).length;
+    document.getElementById("pt").textContent=n+" / "+boxes.length;
+    document.getElementById("pb").style.width=(boxes.length?100*n/boxes.length:0)+"%";
+  }
+  boxes.forEach(function(b){
+    b.checked=!!done[b.dataset.k];
+    b.addEventListener("change",function(){
+      done[b.dataset.k]=b.checked;
+      try{ localStorage.setItem(KEY,JSON.stringify(done)); }catch(e){}
+      draw();
+    });
+  });
+  draw();
+
+  document.addEventListener("click",function(e){
+    var b=e.target.closest(".cp"); if(!b) return;
+    e.preventDefault(); e.stopPropagation();
+    var src=b.dataset.copy, el=src.charAt(0)==="#"?document.querySelector(src):null, txt=el?el.textContent:src, old=b.textContent;
+    function ok(){ b.textContent="Copié"; setTimeout(function(){ b.textContent=old; },1400); }
+    function fail(){ b.textContent="Sélectionne et copie"; setTimeout(function(){ b.textContent=old; },2200); }
+    try{ navigator.clipboard.writeText(txt).then(ok,fail); }catch(err){ fail(); }
+  });
+
+  var links=[].slice.call(document.querySelectorAll("#rail a")), secs=links.map(function(a){return document.querySelector(a.getAttribute("href"))});
+  function mark(id){ links.forEach(function(a){ a.setAttribute("aria-current",a.getAttribute("href")==="#"+id?"true":"false"); }); }
+  mark("apercu");
+  if("IntersectionObserver" in window){
+    var io=new IntersectionObserver(function(es){ es.forEach(function(en){ if(en.isIntersecting) mark(en.target.id); }); },{rootMargin:"-20% 0px -70% 0px"});
+    secs.forEach(function(s){ if(s) io.observe(s); });
+  }
+})();
+</script>
+</body>
+</html>
