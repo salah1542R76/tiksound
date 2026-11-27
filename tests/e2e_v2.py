@@ -616,17 +616,25 @@ def test_promo_video_is_click_to_play_and_downloads_nothing_before(live, mk):
 
 def test_promo_video_hidden_once_library_has_sounds(live, mk):
     no_paywall(live)
-    c = opened(mk, tracks(2), paywall=False)
+    c = mk(); c.seed(tracks(2))
+    hits = []
+    c.page.on("request", lambda r: "/promo" in r.url and hits.append(r.url))
+    c.open()
     assert c.page.locator("#promo").is_hidden()
+    c.page.wait_for_timeout(300)
+    assert not hits                                # pas même l'image d'aperçu
 
 
-def test_promo_video_in_english(live, mk):
+def test_promo_video_hidden_in_english(live, mk):
+    # vidéo en français (sous-titres incrustés) : cachée en anglais tant qu'il n'existe pas de version anglaise
     no_paywall(live)
     c = mk(locale="en-US")
+    hits = []
+    c.page.on("request", lambda r: "/promo" in r.url and hits.append(r.url))
     c.open()
-    assert "TikWave in a video" in c.page.text_content("#promo")   # text_content : l'étiquette est affichée en capitales
-    assert c.page.get_attribute("#promo video", "aria-label") == "TikWave intro video"
-    assert not leaks(c, "promo")
+    assert c.page.locator("#promo").is_hidden()
+    c.page.wait_for_timeout(300)
+    assert not hits and not leaks(c, "promo")
 
 
 def test_cover_colour_becomes_the_accent(live, mk):
@@ -2534,6 +2542,29 @@ def test_sound_deleted_on_another_device_goes_to_the_trash_and_keeps_its_offline
     assert c.ev("S.trash.some(e=>e.t&&e.t.id==='t2')") is False
 
 
+def test_sound_heard_in_passing_that_the_account_already_has_stays_in_the_account(live, mk):
+    c = synced(mk, tk(2))
+    u3 = "https://www.tiktok.com/@x/video/3"
+    c.ev(f"ensureTrack({{url:'{u3}',title:'Radio'}},true); save()")      # écouté en passant (radio, Explorer)
+    s = server_lib(c); d = s["data"]; d["tracks"].append(dict(url=u3, title="Radio"))
+    put_lib(c, d, s["updated"])                                          # ajouté exprès sur un autre appareil
+    sync_now(c)
+    sync_now(c, "S.tracks.find(t=>t.id==='t1').fav=true; save()")        # puis un changement ici : envoi au compte
+    assert u3 in [t["url"] for t in server_lib(c)["data"]["tracks"]]
+    assert c.ev(f"!!S.tracks.find(t=>t.url==='{u3}').tmp") is False
+
+
+def test_full_storage_drops_the_oldest_trash_first_and_keeps_new_changes(live, mk):
+    c = opened(mk, tracks(3))
+    r = c.ev("""(()=>{ const pad='x'.repeat(1000); S.trash=Array.from({length:100},(_,i)=>({kind:'t',at:Date.now(),t:{id:'z'+i,title:pad,url:''}}));
+        const o=Storage.prototype.setItem; Storage.prototype.setItem=function(k,v){
+          if(k==='tiksound'&&v.length>70000) throw new DOMException('plein','QuotaExceededError'); return o.call(this,k,v); };
+        S.tracks[0].title='Gardé'; save(); Storage.prototype.setItem=o;
+        const d=JSON.parse(localStorage.getItem('tiksound')); return [d.tracks[0].title, d.trash.length, d.trash[0].t.id]; })()""")
+    assert r[0] == "Gardé"                                               # le changement survit au rechargement
+    assert 0 < r[1] < 100 and r[2] == "z0"                               # seule la partie la plus ancienne de la corbeille part
+
+
 def test_bulk_delete_keeps_every_sound_restorable_and_saves_once(live, mk):
     c = opened(mk, tracks(250))
     n = c.ev("""(async()=>{ askConfirm=async()=>true; let n=0; const o=Storage.prototype.setItem;
@@ -3038,6 +3069,16 @@ def test_explore_for_you_matches_the_library(live, mk):
     assert "Pépite" in c.page.inner_text("#recs .row >> nth=0")
     c.page.click("#recs .row >> nth=0 >> .m")
     c.page.wait_for_function("S.tracks.some(t=>t.title==='Pépite'&&t.tmp)")   # écouté en passant : pas ajouté à la bibliothèque
+
+
+def test_explore_reserves_no_guessed_space_for_suggestions(live, mk):
+    no_paywall(live)
+    c = opened(mk, [], paywall=False)
+    c.ev("""const f0=window.fetch; window.fetch=(u,o)=>String(u).includes('/api/recs')
+      ? new Promise(r=>setTimeout(r,300)).then(()=>f0(u,o)) : f0(u,o)""")   # suggestions un peu lentes, et vides
+    c.ev("location.hash='decouvrir'")
+    c.page.wait_for_selector("#recs", state="attached")
+    assert c.ev("document.querySelectorAll('#recs .skel').length") == 0     # pas de place devinée qui disparaît ensuite
 
 
 def test_explore_for_you_falls_back_to_trends_for_empty_library(live, mk):

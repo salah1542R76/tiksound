@@ -132,15 +132,21 @@ def test_new_codes_per_email_are_capped(app, make_client):
 
 def test_forgot_stops_sending_codes_after_the_cap_without_revealing_it(app, make_client, signup):
     c = make_client(); signup(c, "a@example.com", "alice")
+    bad = {"REMOTE_ADDR": "203.0.113.9"}
     sent = 0
     for _ in range(app.MAX_CODES_PER_DAY + 2):
         app.x("UPDATE codes SET last_sent=0 WHERE email='a@example.com'")
         for k in [k for k in app._hits if k.startswith("forgot:")]:
-            app._hits.pop(k)                                             # l'attaquant change d'adresse IP
+            app._hits.pop(k)
         n = len(app.OUTBOX)
-        assert c.post("/api/auth/forgot", json={"email": "a@example.com"}).status_code == 200
+        assert c.post("/api/auth/forgot", json={"email": "a@example.com"}, environ_base=bad).status_code == 200
         sent += len(app.OUTBOX) - n
     assert sent == app.MAX_CODES_PER_DAY
+    # le plafond vaut par adresse IP : un inconnu qui connaît l'email ne bloque pas la vraie personne pendant 24 h
+    app.x("UPDATE codes SET last_sent=0 WHERE email='a@example.com'")
+    n = len(app.OUTBOX)
+    assert c.post("/api/auth/forgot", json={"email": "a@example.com"}, environ_base={"REMOTE_ADDR": "198.51.100.7"}).status_code == 200
+    assert len(app.OUTBOX) == n + 1
 
 
 # ── 12 : pas de direct, ni de son de plus de 20 min, sur aucune branche ──
@@ -304,6 +310,21 @@ def test_checkout_closes_older_open_sessions(app, make_client, signup, monkeypat
     assert r.status_code == 200 and len(created) == 1 and expired == ["cs_tab_a"]   # l'autre onglet ne peut plus payer
 
 
+def test_checkout_still_checks_subscriptions_when_closing_an_old_session_fails(app, make_client, signup, monkeypatch):
+    app.STRIPE_KEY, app.STRIPE_PRICE, app.R2_OK = "sk_test", "price_1", True
+    c = make_client(); signup(c, "a@example.com", "alice")
+    app.x("UPDATE users SET stripe_customer_id='cus_1' WHERE email='a@example.com'")
+    created, expired = [], []
+    fake = fake_stripe([{"id": "sub_1", "status": "active"}], ["cs_paid"], created, expired)
+
+    def boom(sid):
+        raise RuntimeError("session déjà payée dans l'autre onglet")
+    fake.checkout.Session.expire = staticmethod(boom)
+    monkeypatch.setattr(app, "_stripe", lambda: fake)
+    r = c.post("/api/stripe/checkout")
+    assert r.status_code == 409 and created == []
+
+
 # ── 77 : /api/find répond à l'heure même si une plateforme traîne ──
 def test_find_returns_on_time_when_a_source_hangs(app, make_client, monkeypatch):
     gate = threading.Event()
@@ -318,6 +339,24 @@ def test_find_returns_on_time_when_a_source_hangs(app, make_client, monkeypatch)
     assert r.status_code == 200 and took < 2
     d = r.get_json()["results"]
     assert d["youtube"] == [] and len(d["soundcloud"]) == 1
+
+
+def test_hung_searches_never_pile_up_threads(app, make_client, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    gate = threading.Event()
+    pool = ThreadPoolExecutor(2)
+    monkeypatch.setattr(app, "_FIND_POOL", pool)
+    monkeypatch.setattr(app, "FIND_TIMEOUT", 0.2)
+    monkeypatch.setattr(app, "find_yt", lambda q: gate.wait(10) and [])
+    monkeypatch.setattr(app, "find_sc", lambda q: gate.wait(10) and [])
+    before = threading.active_count()
+    c = make_client()
+    try:
+        for i in range(6):
+            assert c.get(f"/api/find?q=recherche {i}").status_code == 200
+        assert threading.active_count() - before <= 2          # les recherches bloquées attendent leur tour
+    finally:
+        gate.set(); pool.shutdown(wait=True)
 
 
 # ── 78 : plage inversée ──

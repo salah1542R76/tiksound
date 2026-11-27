@@ -1,4 +1,5 @@
 import os, re, time, uuid, hashlib, hmac, json, base64, secrets, smtplib, ssl, threading, logging, shutil
+import concurrent.futures
 import html as _html
 import urllib.request, urllib.error, urllib.parse
 from email.message import EmailMessage
@@ -57,7 +58,8 @@ TOKEN_DAYS = 30
 CODE_TTL = 15 * 60          # durée de validité d'un code
 RESEND_COOLDOWN = 60        # délai avant de renvoyer un code
 MAX_ATTEMPTS = 5            # essais par code
-MAX_CODES_PER_DAY = 8       # nouveaux codes par email et par usage : renvoyer un code ne redonne pas des essais sans fin
+MAX_CODES_PER_DAY = 8       # nouveaux codes par email, usage et adresse IP : renvoyer un code ne redonne pas des essais sans fin,
+                            # et un inconnu qui connaît l'email ne bloque pas la vraie personne
 MAX_PUBLIC_PLAYLISTS = 100
 FOREVER = 4102444800        # 2100-01-01 : « à vie »
 PREMIUM_GRACE = 2 * 86400   # marge après la fin de période Stripe (webhook en retard, serveur en panne…)
@@ -634,7 +636,7 @@ def register():
     if row and time.time() - row.last_sent < RESEND_COOLDOWN:
         wait = int(RESEND_COOLDOWN - (time.time() - row.last_sent)) + 1
         return err(T("Patiente {s} s avant de redemander un code", s=wait), 429, wait=wait)
-    if limited("reg:" + ip(), 8, 3600) or limited("code:register:" + email, MAX_CODES_PER_DAY, 86400):
+    if limited("reg:" + ip(), 8, 3600) or limited(f"code:register:{email}:{ip()}", MAX_CODES_PER_DAY, 86400):
         return err("Trop de tentatives, réessaie plus tard", 429)
     if not MAIL_ON:
         return err("L'envoi d'email n'est pas configuré sur le serveur (ajoute BREVO_API_KEY ou RESEND_API_KEY et MAIL_FROM).", 503)
@@ -691,7 +693,7 @@ def resend():
     if time.time() - row.last_sent < RESEND_COOLDOWN:
         wait = int(RESEND_COOLDOWN - (time.time() - row.last_sent)) + 1
         return err(T("Patiente {s} s avant de redemander un code", s=wait), 429, wait=wait)
-    if limited("resend:" + ip(), 10, 3600) or limited(f"code:{purpose}:{email}", MAX_CODES_PER_DAY, 86400):
+    if limited("resend:" + ip(), 10, 3600) or limited(f"code:{purpose}:{email}:{ip()}", MAX_CODES_PER_DAY, 86400):
         return err("Trop de demandes, réessaie plus tard", 429)
     code = new_code()
     x("UPDATE codes SET code_hash=:h, expires=:x, attempts=0, last_sent=:t WHERE email=:e AND purpose=:p",
@@ -740,7 +742,7 @@ def forgot():
     user = q1("SELECT username FROM users WHERE lower(email)=:e", e=email)
     if user:
         row = q1("SELECT last_sent FROM codes WHERE email=:e AND purpose='reset'", e=email)
-        if (not row or time.time() - row.last_sent >= RESEND_COOLDOWN) and not limited("code:reset:" + email, MAX_CODES_PER_DAY, 86400):
+        if (not row or time.time() - row.last_sent >= RESEND_COOLDOWN) and not limited(f"code:reset:{email}:{ip()}", MAX_CODES_PER_DAY, 86400):
             code = new_code()
             store_code(email, "reset", code)
             mail_code(email, code, "reset", user.username)
@@ -1362,7 +1364,13 @@ def stripe_create_checkout(customer_id, user_id, base_url):
     st, subs = _stripe(), []
     try:
         for o in _plain(st.checkout.Session.list(customer=customer_id, status="open", limit=20)).get("data") or []:
-            st.checkout.Session.expire(o["id"])
+            try:
+                st.checkout.Session.expire(o["id"])
+            except Exception as ex:                      # session payée entre-temps, limite Stripe… : on vérifie quand même les abonnements
+                log.warning("Stripe : fermeture de la session %s impossible : %s", o.get("id"), ex)
+    except Exception as ex:
+        log.warning("Stripe : liste des paiements ouverts impossible : %s", ex)
+    try:
         subs = _plain(st.Subscription.list(customer=customer_id, status="all", limit=20)).get("data") or []
     except Exception as ex:                              # on ne bloque pas le paiement si cette vérification échoue
         log.warning("Stripe : vérification des abonnements existants impossible : %s", ex)
@@ -2239,6 +2247,9 @@ SPOTIFY_ID = os.environ.get("SPOTIFY_CLIENT_ID", "")
 SPOTIFY_SECRET = os.environ.get("SPOTIFY_CLIENT_SECRET", "")
 FIND_N, FIND_MAX_DUR, FIND_TIMEOUT = 5, 1200, 25
 _find_cache, _sp_token = {}, {"t": "", "exp": 0}
+# Fils partagés par toutes les recherches (8 requêtes × 3 plateformes, comme avant) : des recherches bloquées attendent leur tour
+# au lieu de s'empiler sans limite en arrière-plan.
+_FIND_POOL = concurrent.futures.ThreadPoolExecutor(24, thread_name_prefix="find")
 
 def _cover(e, src):
     if src == "youtube" and e.get("id"):
@@ -2335,11 +2346,9 @@ def find():
         return jsonify(**hit[1])
     if limited("find:" + ip(), 30, 600):
         return err("Trop de recherches d'un coup, patiente un peu", 429)
-    from concurrent.futures import ThreadPoolExecutor
     out, late = {}, False
-    ex = ThreadPoolExecutor(len(jobs))
+    futs = {k: _FIND_POOL.submit(f, q) for k, f in jobs.items()}
     try:
-        futs = {k: ex.submit(f, q) for k, f in jobs.items()}
         end = time.time() + FIND_TIMEOUT                 # un seul délai pour toutes les plateformes
         for k, f in futs.items():
             try:
@@ -2349,7 +2358,8 @@ def find():
                 log.warning("Recherche %s échouée pour « %s » : %s", k, q, str(e)[:200])
                 out[k] = []
     finally:
-        ex.shutdown(wait=False, cancel_futures=True)     # une recherche bloquée finit en arrière-plan, la réponse part
+        for f in futs.values():
+            f.cancel()                                   # pas encore lancée : on l'oublie ; bloquée : elle finit en arrière-plan, la réponse part
 
     res = {"q": q, "sources": list(jobs), "results": out}
     if any(out.values()) and not late:                   # résultat partiel : pas gardé 15 min
@@ -2398,7 +2408,8 @@ def extract():
         "noplaylist": True,
         "socket_timeout": 20,
         "match_filter": no_long_or_live,
-        "max_filesize": 100_000_000,                     # 100 Mo : une vidéo TikTok de 20 min tient dedans
+        # TikTok : souvent pas de piste audio seule, la vidéo entière (20 min ≈ 150-375 Mo) ; ailleurs, 20 min d'audio tiennent dans 100 Mo
+        "max_filesize": 100_000_000 if (spotify or found) else 400_000_000,
         "postprocessors": [{"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "128"}],
     }
     opts.update(_net_opts())

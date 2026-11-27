@@ -276,7 +276,7 @@ section[data-v=playlists] .row.sel .rn::after{content:"✓";position:absolute;to
 .fsrc{font-style:normal;font-weight:700;font-size:11px;color:var(--c);margin-right:6px;text-transform:uppercase;letter-spacing:.04em}
 .fdl{flex:none}.fdl.done{background:var(--ac);color:var(--on);border-color:transparent}
 .fnote{font-size:12.5px;margin:10px 4px 0}
-.fhint{display:inline-flex;align-items:center;gap:6px;margin:10px 2px 0;font-size:14px;color:var(--mut)}
+.fhint{display:inline-flex;align-items:center;gap:6px;margin:10px 2px 0;font-size:14px;color:var(--mut);text-align:left}
 .hsrc{display:flex;flex-wrap:wrap;column-gap:18px}
 #selbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(96px + env(safe-area-inset-bottom,0px));z-index:29;display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:99px;box-shadow:0 12px 40px #0008;max-width:calc(100vw - 20px)}
 #selbar b{padding:0 6px;white-space:nowrap}
@@ -409,7 +409,8 @@ section.has .steps{display:none}
 .promo{display:flex;align-items:center;gap:18px;padding:16px;margin-top:40px}
 .promo .m{flex:1;min-width:0}.promo .m p{color:var(--mut);margin-top:4px}
 .promo video{flex:none;width:min(42%,180px);height:auto;border-radius:calc(var(--r)*.7);background:#000}
-section.has .promo{display:none}
+@media(min-width:900px){.promo{max-width:640px}}
+section.has .promo,html[lang=en] .promo{display:none}   /* vidéo en français (sous-titres incrustés) */
 .feats{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(170px,1fr))}
 .feat{display:grid;grid-template-columns:auto 1fr;column-gap:10px;row-gap:2px;align-items:center;padding:12px 14px;text-align:left;color:var(--tx);transition:transform .2s,border-color .2s}
 .feat:hover{border-color:var(--br2)}.feat:active{transform:scale(.97)}
@@ -417,7 +418,7 @@ section.has .promo{display:none}
 .feat .fn{font-weight:600;font-size:14px;display:flex;align-items:center;flex-wrap:wrap;gap:4px}
 .feat .fd{font-size:12.5px;color:var(--mut);line-height:1.35}.feat .fd::first-letter{text-transform:uppercase}
 .feat .pbadge{font-size:10px;padding:1px 6px;margin-left:2px}
-@media(max-width:400px){.feats{grid-template-columns:1fr 1fr}.feat{grid-template-columns:1fr}.feat .fi{grid-row:auto;margin-bottom:4px}}
+@media(max-width:400px){.feats{grid-template-columns:1fr 1fr}.feat{grid-template-columns:1fr}.feat .fi{grid-row:auto;margin-bottom:4px}.feat{align-content:start}}
 .resume{display:flex;align-items:center;gap:18px;padding:16px;margin-top:40px;cursor:pointer;transition:transform .2s,border-color .2s}
 .resume:hover{border-color:var(--br2)}
 .resume .cv{width:72px;height:72px}
@@ -915,7 +916,7 @@ button,a{-webkit-tap-highlight-color:transparent}
   <!-- promo : remplacer la vidéo = changer ?v= (cache d'un an sous la même adresse) -->
   <div class="promo gcard" id="promo">
     <div class="m"><span class="eyebrow">TikWave en vidéo</span><p>Regarde comment garder le son d'un TikTok et l'écouter en playlist.</p></div>
-    <video src="/promo.mp4?v=1" poster="/promo-poster.jpg?v=1" preload="none" playsinline controls width="720" height="1280" aria-label="Vidéo de présentation de TikWave" onplay="promoPlay(this)"></video>
+    <video src="/promo.mp4?v=1" data-poster="/promo-poster.jpg?v=1" preload="none" playsinline controls width="720" height="1280" aria-label="Vidéo de présentation de TikWave" onplay="promoPlay(this)"></video>
   </div>
   <div id="home-dyn"></div>
   <div class="faq"><h2>Questions fréquentes</h2>
@@ -1245,7 +1246,12 @@ function $$(s) { return [...document.querySelectorAll(s)]; }
 const esc = s => String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const js  = s => esc(JSON.stringify(String(s)));
 let saveErr = 0;   // stockage plein : un seul avertissement par minute (onTime enregistre toutes les 15 s)
-const save = () => { keepTmp(); try { localStorage.setItem("tiksound", JSON.stringify(S)) } catch(e) { if(Date.now()-saveErr<60000) return; saveErr=Date.now();
+const save = () => { keepTmp(); try { localStorage.setItem("tiksound", JSON.stringify(S)) } catch(e) {
+  // stockage plein : la moitié la plus ancienne de la corbeille part avant les changements en cours (sinon plus rien n'est gardé)
+  if(/quota/i.test(e&&e.name)){ const all=S.trash.slice();
+    while(S.trash.length){ S.trash.splice(Math.floor(S.trash.length/2)); try { localStorage.setItem("tiksound", JSON.stringify(S)); all.filter(x=>!S.trash.includes(x)).forEach(dropTrashFiles); return; } catch(_) {} }
+    S.trash=all; }   // même vide, ça ne tient pas : la corbeille n'y est pour rien, on la garde
+  if(Date.now()-saveErr<60000) return; saveErr=Date.now();
   // supprimer des sons ne libère rien tant qu'ils sont dans la corbeille : on propose de la vider
   toast(S.trash.length?_t("Stockage plein : vide la corbeille"):_t("Stockage plein : supprime quelques sons"), S.trash.length?{type:"err",ms:8000,action:_t("Vider"),fn:emptyTrash}:{type:"err"}) } };
 function keepTmp(){                          // un cœur ou une playlist : le son d'écoute devient un vrai son de la bibliothèque
@@ -2786,7 +2792,7 @@ function sotd(){ const l=S.tracks.filter(playable); if(!l.length) return null; l
 const NEWV="2026-11-27";   // à changer (AAAA-MM-JJ, comparé comme texte) en même temps que NEWS, à chaque livraison qui mérite d'être annoncée
 const NEWS=[  // [icône, titre, texte] : seulement ce qui est vraiment en ligne, texte simple (pas de HTML)
   ["music",_t("Spotify et YouTube dès l'accueil"),_t("Importe une playlist Spotify ou cherche un son YouTube en un geste, directement depuis l'accueil.")],
-  ["sliders",_t("Les effets en vitrine"),_t("L'accueil montre tous les effets (slowed, bass boost, réverbe, boucle…) : touche une carte pour l'essayer. Une courte vidéo présente aussi l'appli.")],
+  ["sliders",_t("Les effets en vitrine"),_t("L'accueil montre tous les effets (slowed, bass boost, réverbe, boucle…) : touche une carte pour l'essayer.")],
   ["spark",_t("« Pour toi » et la Radio"),_t("Explorer te suggère des sons proches de ta bibliothèque. Active la Radio dans le menu du lecteur : quand ta file se termine, des sons similaires prennent le relais.")],
   ["check",_t("Plein de corrections"),_t("Synchro plus sûre pour les grosses bibliothèques, égaliseur et lecteur plus fiables, meilleur affichage sur les petits téléphones et les thèmes clairs.")],
   ["gauge",_t("Plus rapide"),_t("L'appli démarre plus vite et s'ouvre même hors ligne dès ta première visite.")],
@@ -3145,6 +3151,7 @@ function renderHome(){
   const [ico,g]=greet(), has=S.tracks.length, st=streak();
   $("#hello").innerHTML=`<span>${ico}</span><span>${g}${ME?`, <b>${esc(ME.username)}</b>`:""}</span>${st>1?`<span>· ${_t("{0} jours d'affilée",st)}</span>`:""}`;
   const sec=$('section[data-v="accueil"]'); sec.classList.toggle("has",!!has);
+  const pv=$("#promo video"); if(!has&&LANG==="fr"&&!pv.getAttribute("poster")) pv.setAttribute("poster",pv.dataset.poster);   // aperçu seulement si la vidéo est montrée
   $("#hello").hidden=!hs("hello"); sec.querySelector(".faq").hidden=!hs("faq"); sec.querySelector("h1").hidden=sec.querySelector(".lead").hidden=!hs("hero"); sec.querySelector(".steps").hidden=!hs("steps");
   const favN=S.tracks.filter(t=>t.fav).length;
   $("#quick").innerHTML=has?`<button class="chip" onclick="playAll(0)">${I("play",14)}${_t("Tout lire")}</button><button class="chip" onclick="playAll(1)">${I("shuffle",14)}${_t("Aléatoire")}</button>${favN?`<button class="chip" onclick="openPl='smart:fav';location.hash='playlists';render()">${I("heart",14)}${_t("Favoris <b>{0}</b>",favN)}</button>`:""}<button class="chip" onclick="surprise()">${_t("Surprends-moi")}</button>`:"";
@@ -3639,6 +3646,7 @@ async function syncLibrary(manual){
         for(const [url,st] of sT){
           const lt=lT.get(url), b=bT.get(url);
           if(lt){
+            if(lt.tmp){ delete lt.tmp; changed=true; }   // écouté en passant ici mais rangé dans le compte : il fait partie de la bibliothèque
             if(b && lt.title===b.title && lt.title!==st.title){ lt.title=st.title; changed=true; }
             if(b && !!lt.fav===!!b.fav && !!lt.fav!==!!st.fav){ lt.fav=!!st.fav; changed=true; }
             if(!lt.local && !lt.remote && st.remote){ lt.remote=st.remote; lt.pending=false; changed=true; }
@@ -3820,10 +3828,11 @@ async function renderExplore(force){
   const recP=loadRecs(force);   // en même temps que le flux : pas de second aller-retour
   if(!FEED||force){ el.innerHTML=`<div class="sec-h" style="margin-top:0"><h2>${_t("Chargement…")}</h2></div>${skel(6)}`; await loadFeed(true); }
   else if(Date.now()-FEED_AT>60000) api("/api/feed").then(d=>{ FEED=d; FEED_AT=Date.now(); if(location.hash==="#decouvrir") renderExplore(); }).catch(()=>{});
+  if(!RECS) await Promise.race([recP,new Promise(r=>setTimeout(r,800))]);   // presque toujours là avant : affiché d'un coup, rien ne saute
   if(($("#dq").value||"").trim().length>=2) return;
   if(!FEED){ el.innerHTML=bigEmpty("globe",_t("Impossible de charger la communauté"),_t("Vérifie ta connexion et réessaie."),`<button class="btn" onclick="renderExplore(true)">${_t("Réessayer")}</button>`); return; }
   $("#comm").innerHTML=`<span>${I("users",15)} ${_t("<b>{0}</b> membre{1}",FEED.stats.users,pS(FEED.stats.users))}</span><span>${I("queue",15)} ${_t("<b>{0}</b> playlist{1} publique{2}",FEED.stats.playlists,pS(FEED.stats.playlists),FEED.stats.playlists>1?"s":"")}</span>`;
-  let h=`<div id="recs">${RECS?recsHTML():`<div class="skel" style="height:240px"></div>`}</div>`;   // place réservée : rien ne saute à l'arrivée
+  let h=`<div id="recs">${recsHTML()}</div>`;
   if((FEED.trend||[]).length) h+=`<div class="sec-h" style="margin-top:0"><h2>${_t("Tendances de la semaine")}</h2></div><div class="pls trend">${FEED.trend.map(trendCard).join("")}</div>`;
   if(FEED.top.length) h+=`<div class="sec-h" ${(FEED.trend||[]).length?"":'style="margin-top:0"'}><h2>${_t("Populaires")}</h2><button class="lnk" onclick="renderExplore(true)">${_t("Actualiser")}</button></div><div class="pls">${FEED.top.map(pubCard).join("")}</div>`;
   const rec=FEED.recent.filter(p=>!FEED.top.slice(0,4).some(x=>x.id===p.id));
