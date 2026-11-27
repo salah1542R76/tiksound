@@ -1191,6 +1191,7 @@ S.player = Object.assign({shuffle:false, repeat:"all", rate:"1"}, S.player || {}
 S.prof   = S.prof || {name:"", color:0};
 S.trash  = Array.isArray(S.trash) ? S.trash : [];
 S.pins   = Array.isArray(S.pins) ? S.pins : [];
+S.pubDel = Array.isArray(S.pubDel) ? S.pubDel : [];   // playlists publiques supprimées ici mais pas encore sur le serveur
 
 let ONLINE = false, DOWN = false, ME = null;
 let PAYWALL = !!S.paywall, BOOTED = false, ADSENSE = null;
@@ -1207,7 +1208,10 @@ function $(s) { return document.querySelector(s); }
 function $$(s) { return [...document.querySelectorAll(s)]; }
 const esc = s => String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const js  = s => esc(JSON.stringify(String(s)));
-const save = () => { try { localStorage.setItem("tiksound", JSON.stringify(S)) } catch(e) { toast(_t("Stockage plein : supprime quelques sons"), {type:"err"}) } };
+let saveErr = 0;   // stockage plein : un seul avertissement par minute (onTime enregistre toutes les 15 s)
+const save = () => { try { localStorage.setItem("tiksound", JSON.stringify(S)) } catch(e) { if(Date.now()-saveErr<60000) return; saveErr=Date.now();
+  // supprimer des sons ne libère rien tant qu'ils sont dans la corbeille : on propose de la vider
+  toast(S.trash.length?_t("Stockage plein : vide la corbeille"):_t("Stockage plein : supprime quelques sons"), S.trash.length?{type:"err",ms:8000,action:_t("Vider"),fn:emptyTrash}:{type:"err"}) } };
 let _db = null;
 const idb  = () => _db || (_db = new Promise((ok,ko) => { const r=indexedDB.open("tiksound",1); r.onupgradeneeded=()=>r.result.createObjectStore("a"); r.onsuccess=()=>ok(r.result); r.onerror=()=>{_db=null;ko(r.error)} }));
 const dbop = (m,...a) => idb().then(d => new Promise((ok,ko) => { const r=d.transaction("a",m==="get"?"readonly":"readwrite").objectStore("a")[m](...a); r.onsuccess=()=>ok(r.result); r.onerror=()=>ko(r.error) }));
@@ -1874,7 +1878,7 @@ async function resendCode(){
   try{ const d=await api("/api/auth/resend",{method:"POST",body:{email:AU.email.trim().toLowerCase(),purpose:AU.purpose}}); startCd(d.cooldown); toast(_t("Nouveau code envoyé"),{type:"ok"}); authErr(""); }
   catch(e){ if(e.data&&e.data.wait) startCd(e.data.wait); authErr(e.message); }
 }
-function setMe(d){ ME=Object.assign({},d,{color:d.color||0,bio:d.bio||"",avatar:d.avatar||""}); delete ME.ok; setPrem(ME); applyServerUI(ME); AU.pw=""; closeAuth(); FEED=null; render(); restorePublic(); syncAllPublic(); syncLibrary(); }
+function setMe(d){ ME=Object.assign({},d,{color:d.color||0,bio:d.bio||"",avatar:d.avatar||""}); delete ME.ok; setPrem(ME); applyServerUI(ME); AU.pw=""; closeAuth(); FEED=null; render(); syncAllPublic(); syncLibrary().finally(restorePublic); }
 async function logout(){ try{ await api("/api/auth/logout",{method:"POST"}); }catch(e){} ME=null; KEYS=null; clearPrem(); render(); toast(_t("Déconnecté")); }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -2126,11 +2130,12 @@ async function findAdd(k){
   if(FR.run.has(r.url)) return;
   if(offlineLocked()) return offlineNotice();
   FR.run.add(r.url); findDraw();
+  const existed=S.tracks.some(t=>t.url===r.url);   // déjà là (en attente, ex. import Spotify) : un échec ne doit pas le supprimer
   const id=ensureTrack({url:r.url,title:r.title,author:r.author,cover:r.cover,duration:r.duration}); save(); render();
   const ok=await dl(id,true);
   FR.run.delete(r.url);
   if(ok){ sfx("pop"); toast(_t("« {0} » ajouté",r.title),{type:"ok",action:_t("Écouter"),fn:()=>play([id],0)}); }
-  else { const t=S.tracks.find(x=>x.id===id); if(t&&t.pending&&!t.local&&!t.remote){ S.tracks=S.tracks.filter(x=>x!==t); save(); render(); } }
+  else if(!existed){ const t=S.tracks.find(x=>x.id===id); if(t&&t.pending&&!t.local&&!t.remote){ S.tracks=S.tracks.filter(x=>x!==t); save(); render(); } }
   findDraw();
 }
 
@@ -2178,7 +2183,7 @@ async function convert(inputId, btn){
   if(!ONLINE){ toast(_t("Un instant, on prépare le service…")); if(!await ping()) return toast(_t("Service momentanément indisponible. Réessaie dans un instant."),{type:"err"}); }
   converting=true; const old=btn?btn.innerHTML:""; if(btn){ btn.disabled=true; btn.innerHTML=`<span class="spin-i"></span>${_t("Conversion…")}`; }
   $("#prog").innerHTML=""; urls.forEach((u,k)=>progRow(k,u,"wait"));
-  let ok=0, lastId=null;
+  let ok=0, lastId=null; const failed=[];
   if(urls.length>1&&!DLP.on) dlpStart(urls.length,_t("Conversion"));
   for(const [k,url] of urls.entries()){
     if(k>0) dlpDone(true);
@@ -2188,18 +2193,18 @@ async function convert(inputId, btn){
     const ex=S.tracks.find(t=>t.url===url);
     if(ex&&(ex.local||ex.remote)){ progRow(k,url,"dup"); continue; }
     try{
-      if(ex&&ex.pending){ if(await dl(ex.id,true)){ ok++; lastId=ex.id; progRow(k,url,"ok",ex.title); } else progRow(k,url,"err"); continue; }
+      if(ex&&ex.pending){ if(await dl(ex.id,true)){ ok++; lastId=ex.id; progRow(k,url,"ok",ex.title); } else { failed.push(url); progRow(k,url,"err"); } continue; }
       const tid=newId("t"), d=await grab(url,tid), canon=d.url||url;
       const ex2=S.tracks.find(t=>t.url===canon);
       if(ex2&&(ex2.local||ex2.remote)){ dbop("delete",tid).catch(()=>{}); dbop("delete","cv:"+tid).catch(()=>{}); progRow(k,url,"dup"); continue; }
       if(ex2&&ex2.pending){ if(!d.remote){ const b=await dbop("get",tid); await dbop("put",b,ex2.id); } dbop("delete",tid).catch(()=>{}); if(COVERS[tid]){ COVERS[ex2.id]=COVERS[tid]; const cb=await dbop("get","cv:"+tid).catch(()=>null); if(cb) dbop("put",cb,"cv:"+ex2.id); } Object.assign(ex2,{local:!d.remote,remote:d.remote?d.audio_url:"",pending:false,cover:d.cover||ex2.cover,duration:d.duration||0}); lastId=ex2.id; }
       else { S.tracks.unshift({id:tid,title:d.title,author:d.author,cover:d.cover||"",duration:d.duration||0,url:canon,local:!d.remote,remote:d.remote?d.audio_url:"",added:Date.now()}); lastId=tid; }
       save(); ok++; progRow(k,url,"ok",d.title); render();
-    }catch(e){ progRow(k,url,"err",e.message); }
+    }catch(e){ failed.push(url); progRow(k,url,"err",e.message); }
   }
   dlpEnd(); converting=false; if(btn){ btn.disabled=false; btn.innerHTML=old; }
   if(ok){
-    inp.value="";
+    inp.value=failed.join("\n");   // seuls les liens en échec restent, prêts à réessayer
     if(!S.stats.first){ S.stats.first=1; save(); confetti(); }
     const id=lastId;
     toast(ok>1?_t("{0} sons ajoutés",ok):_t("Son ajouté"),{type:"ok",action:_t("Écouter"),fn:()=>play([id],0),ms:4500});
@@ -2793,13 +2798,18 @@ function trackMenu(id){
 async function renameTrack(id){ const t=S.tracks.find(x=>x.id===id); if(!t) return; const v=await askText(_t("Renommer le son"),t.title,_t("Titre"),80); if(!v) return; t.title=v; save(); render(); if(q[qi]===id){ $("#pt").textContent=v; renderNP(); } S.pls.filter(p=>p.pub&&p.ids.includes(id)).forEach(schedSync); toast(_t("Renommé")); }
 async function saveMp3(id){ const t=S.tracks.find(x=>x.id===id); if(t&&t.remote){ window.open(t.remote,"_blank"); return; } const b=await dbop("get",id).catch(()=>null); if(!b) return toast(_t("Fichier introuvable"),{type:"err"}); const a=document.createElement("a"); a.href=URL.createObjectURL(b); a.download=(t.title||"son").replace(/[\\/:*?"<>|]+/g,"").slice(0,60)+".mp3"; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),5000); }
 function copyTxt(s,msg){ (navigator.clipboard?navigator.clipboard.writeText(s):Promise.reject()).then(()=>toast(msg||_t("Copié"),{type:"ok"}),()=>askText(_t("Copie ce lien"),s,"",2000)); }
-function delTrack(id,quiet){
-  const t=S.tracks.find(x=>x.id===id); if(!t) return;
+// Met un son à la corbeille (ses fichiers hors ligne restent 30 jours). Sert aussi à la synchro du compte.
+function trashTrack(id){
+  const t=S.tracks.find(x=>x.id===id); if(!t) return null;
   const idx=S.tracks.indexOf(t), mem=S.pls.map(p=>[p.id,p.ids.indexOf(id)]).filter(a=>a[1]>=0);
   S.tracks.splice(idx,1); S.pls.forEach(p=>p.ids=p.ids.filter(i=>i!==id)); S.pins=S.pins.filter(k=>k!==id);
-  const e={kind:"t",at:Date.now(),t,mem,idx}; S.trash.unshift(e); trimTrash(); save(); render();
-  S.pls.filter(p=>p.pub&&mem.some(m=>m[0]===p.id)).forEach(schedSync);
-  if(quiet) return;
+  const e={kind:"t",at:Date.now(),t,mem,idx}; S.trash.unshift(e); return e;
+}
+function delTrack(id,quiet){
+  const e=trashTrack(id); if(!e) return; const t=e.t;
+  S.pls.filter(p=>p.pub&&e.mem.some(m=>m[0]===p.id)).forEach(schedSync);
+  if(quiet) return;   // sélection multiple : selDel range et enregistre une seule fois à la fin
+  trimTrash(); save(); render();
   toast(_t("« {0} » mis à la corbeille",t.title),{action:_t("Annuler"),ms:5000,fn:()=>restoreTrash(S.trash.indexOf(e))});
 }
 // Modifier un son : titre, auteur, étiquettes, pochette
@@ -2845,13 +2855,14 @@ function libView(){
     S.trash.length&&{l:"Corbeille ("+S.trash.length+")",i:"trash",fn:openTrash}]);
 }
 // Corbeille : 30 jours pour changer d'avis
-function trimTrash(){ const extra=S.trash.splice(200); extra.forEach(dropTrashFiles); }
+// 200 éléments au plus, mais jamais ceux de moins de 30 jours : la suppression promet 30 jours (purgeTrash s'occupe de l'expiration)
+function trimTrash(){ const lim=Date.now()-30*864e5, extra=S.trash.filter((e,i)=>i>=200&&!(e&&e.at>lim)); if(!extra.length) return; S.trash=S.trash.filter(e=>!extra.includes(e)); extra.forEach(dropTrashFiles); }
 function dropTrashFiles(e){ if(e&&e.kind==="t"&&e.t&&e.t.id&&!S.tracks.some(t=>t.id===e.t.id)){ for(const k of ["","cv:","cvo:"]) dbop("delete",k+e.t.id).catch(()=>{}); } }
 function purgeTrash(){ const lim=Date.now()-30*864e5, old=S.trash.filter(e=>!e||!(e.at>lim)); if(!old.length) return; S.trash=S.trash.filter(e=>e&&e.at>lim); old.forEach(dropTrashFiles); save(); }
 function restoreTrash(i){
   const e=S.trash[i]; if(!e) return;
   S.trash.splice(i,1);
-  if(e.kind==="t"&&e.t&&!S.tracks.some(t=>t.id===e.t.id)){
+  if(e.kind==="t"&&e.t&&!S.tracks.some(t=>t.id===e.t.id||(e.t.url&&t.url===e.t.url))){
     S.tracks.splice(Math.min(e.idx||0,S.tracks.length),0,e.t);
     (e.mem||[]).forEach(([pid,k])=>{ const p=S.pls.find(x=>x.id===pid); if(p&&!p.ids.includes(e.t.id)){ p.ids.splice(Math.min(k,p.ids.length),0,e.t.id); if(p.pub) schedSync(p); } });
   } else if(e.kind==="pl"&&e.p&&!S.pls.some(p=>p.id===e.p.id)) S.pls.splice(Math.min(e.idx||0,S.pls.length),0,e.p);
@@ -2993,7 +3004,7 @@ function renderHome(){
   if(sd){ LISTS.sotd=[sd.id]; h+=`<div class="sotd gcard">${cover(sd)}<div class="m"><span class="eyebrow">${I("spark",12)} ${_t("Son du jour")}</span><div class="t" style="font-size:18px">${esc(sd.title)}</div><div class="a ell">${esc(sd.author||"")}</div></div><button class="pi-btn p" onclick="playL('sotd',0)" aria-label="${_t("Lire le son du jour")}">${I("play",20)}</button></div>`; }
   if(hs("resume")&&last&&q[qi]!==last.id) h+=`<div class="resume gcard" onclick="play(['${last.id}'],0)">${cover(last)}<div class="m"><span class="eyebrow">${_t("Reprendre")}</span><div class="t" style="font-size:18px">${esc(last.title)}</div><div class="a ell">${esc(last.author||"")}</div></div><span class="pi-btn p">${I("play",20)}</span></div>`;
   if(has){
-    const rec=S.tracks.slice(0,10); LISTS.rec=rec.map(t=>t.id);
+    const rec=byAdded(S.tracks).slice(0,10); LISTS.rec=rec.map(t=>t.id);
     if(hs("recent")) h+=`<div class="sec-h"><h2>${_t("Récemment ajoutés")}</h2><a href="#bibliotheque">${_t("Tout voir →")}</a></div><div class="hs">${rec.map((t,i)=>card(t,"rec",i)).join("")}</div>`;
     const top=S.tracks.filter(t=>t.plays).sort((a,b)=>b.plays-a.plays).slice(0,5);
     if(hs("top")&&top.length>=2){ LISTS.top=top.map(t=>t.id); h+=`<div class="sec-h"><h2>${_t("Tes plus écoutés")}</h2><button class="lnk" onclick="openPl='smart:top';location.hash='playlists';render()">${_t("Voir la playlist →")}</button></div><div class="list">${top.map((t,i)=>row(t,"top",i)).join("")}</div>`; }
@@ -3006,10 +3017,11 @@ function renderHome(){
   const tip=TIPS[(new Date().getDate()+(has?1:0))%TIPS.length];
   if(hs("tip")) h+=`<div class="tip gcard"><div class="ti">${I("spark",20)}</div><p>${_t("<b>Astuce · {0}</b>{1}",esc(tip[0]),esc(tip[1]))}</p></div>`;
   safeSet($("#home-dyn"),h);
-  const rc=S.tracks.slice(0,5); LISTS.addrec=rc.map(t=>t.id);
+  const rc=byAdded(S.tracks).slice(0,5); LISTS.addrec=rc.map(t=>t.id);
   $("#add-recent").innerHTML=rc.length?`<div class="sec-h"><h2>${_t("Derniers ajouts")}</h2><a href="#bibliotheque">${_t("Mes sons →")}</a></div><div class="list">${rc.map((t,i)=>row(t,"addrec",i)).join("")}</div>`:"";
 }
 
+const byAdded=a=>[...a].sort((x,y)=>(y.added||0)-(x.added||0));   // plus récents d'abord (tri stable)
 function libList(){
   const sq=($("#sq").value||"").toLowerCase().trim(), f=S.ui.filter;
   let a=S.tracks.filter(t=>((t.title||"")+" "+(t.author||"")+" "+(t.tags||[]).map(x=>"#"+x).join(" ")).toLowerCase().includes(sq));
@@ -3017,6 +3029,7 @@ function libList(){
   else if(f==="never") a=a.filter(t=>!t.plays); else if(f==="short") a=a.filter(t=>t.duration&&t.duration<60);
   else if(String(f).startsWith("tag:")){ const g=f.slice(4); a=a.filter(t=>(t.tags||[]).includes(g)); }
   const s=S.ui.sort;
+  if(!s||s==="recent") a=byAdded(a);
   if(s==="dur") a=[...a].sort((x,y)=>(x.duration||0)-(y.duration||0));
   if(s==="title") a=[...a].sort((x,y)=>(x.title||"").localeCompare(y.title||"",LOC));
   else if(s==="author") a=[...a].sort((x,y)=>(x.author||"").localeCompare(y.author||"",LOC));
@@ -3042,7 +3055,7 @@ function renderLib(){
 
 function smartPls(){ const now=Date.now(); return [
   {id:"smart:fav",name:_t("Favoris"),icon:"heart",ids:S.tracks.filter(t=>t.fav).map(t=>t.id),smart:true},
-  {id:"smart:added",name:_t("Ajoutés récemment"),icon:"plus",ids:S.tracks.filter(t=>t.added&&now-t.added<14*864e5).slice(0,30).map(t=>t.id),smart:true},
+  {id:"smart:added",name:_t("Ajoutés récemment"),icon:"plus",ids:byAdded(S.tracks.filter(t=>t.added&&now-t.added<14*864e5)).slice(0,30).map(t=>t.id),smart:true},
   {id:"smart:never",name:_t("Jamais écoutés"),icon:"spark",ids:S.tracks.filter(t=>!t.plays).map(t=>t.id),smart:true},
   {id:"smart:again",name:_t("À redécouvrir"),icon:"repeat",ids:S.tracks.filter(t=>t.plays&&t.last&&now-t.last>30*864e5).sort((a,b)=>b.plays-a.plays).slice(0,25).map(t=>t.id),smart:true},
   {id:"smart:short",name:_t("Sons courts"),icon:"clock",ids:S.tracks.filter(t=>t.duration&&t.duration<30).map(t=>t.id),smart:true},
@@ -3210,8 +3223,8 @@ async function deleteAccount(){
   openGen(_t("Supprimer mon compte"),`<p class="sub">${_t("Ton compte et tes playlists publiques seront supprimés définitivement. Tes sons restent sur cet appareil. Confirme avec ton mot de passe.")}</p><div class="fld"><input id="delpw" type="password" placeholder="${_t("Mot de passe")}" autocomplete="current-password"><div class="fld-err" id="delerr"></div><button class="btn danger" onclick="doDelete()">${_t("Supprimer définitivement")}</button></div>`);
   setTimeout(()=>$("#delpw").focus(),100);
 }
-async function doDelete(){ try{ await api("/api/auth/me",{method:"DELETE",body:{password:$("#delpw").value}}); closeSh("gen"); ME=null; KEYS=null; clearPrem(); S.pls.forEach(p=>{p.pub=false;p.pubId=null;p.owner=null}); save(); render(); toast(_t("Compte supprimé")); }catch(e){ $("#delerr").textContent=e.message; } }
-function exportData(){ const data={app:"tikwave",v:2,date:new Date().toISOString(),tracks:S.tracks.map(t=>({...t,local:false,pending:!!t.url})),pls:S.pls,ui:S.ui,stats:S.stats}; const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,1)],{type:"application/json"})); a.download="tikwave-sauvegarde-"+dayKey(new Date())+".json"; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),4000); toast(_t("Sauvegarde exportée"),{type:"ok"}); }
+async function doDelete(){ try{ await api("/api/auth/me",{method:"DELETE",body:{password:$("#delpw").value}}); closeSh("gen"); ME=null; KEYS=null; clearPrem(); S.pls.forEach(p=>{p.pub=false;p.pubId=null;p.owner=null}); S.tracks.forEach(t=>delete t.postId); save(); render(); toast(_t("Compte supprimé")); }catch(e){ $("#delerr").textContent=e.message; } }
+function exportData(){ const data={app:"tikwave",v:2,date:new Date().toISOString(),tracks:S.tracks.map(t=>({...t,local:false,pending:!!t.url})),pls:S.pls,ui:S.ui,stats:S.stats,goal:S.goal||0}; const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,1)],{type:"application/json"})); a.download="tikwave-sauvegarde-"+dayKey(new Date())+".json"; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),4000); toast(_t("Sauvegarde exportée"),{type:"ok"}); }
 // Les mêmes liens que le serveur accepte (ok_url) : TikTok, Spotify, YouTube, SoundCloud
 const URL_OK=[/^https?:\/\/([a-z0-9-]+\.)*tiktok\.com\//i,/^https:\/\/open\.spotify\.com\/track\/[A-Za-z0-9]{22}$/,/^https:\/\/(?:(?:www\.|m\.|music\.)?youtube\.com\/watch\?v=[\w-]{11}(?:&\S*)?|youtu\.be\/[\w-]{11}|(?:www\.|m\.)?soundcloud\.com\/(?!sets\/|discover|search|stream)[\w-]+\/(?!sets\/)[\w-]+\/?)$/];
 const okUrl=u=>typeof u==="string"&&u.length<=500&&URL_OK.some(r=>r.test(u));
@@ -3221,9 +3234,21 @@ async function importData(file){
   try{ const d=JSON.parse(await file.text()); if(d.app!=="tiksound"&&d.app!=="tikwave") throw 0;
     const okId=s=>/^[\w-]{1,40}$/.test(String(s)); let nt=0, np=0; const map={};
     for(const t of d.tracks||[]){ if(!okId(t.id)) continue; const ex=S.tracks.find(x=>x.id===t.id||(t.url&&x.url===t.url)); if(ex){ map[t.id]=ex.id; continue; }
-      S.tracks.push({id:t.id,title:String(t.title||_t("Son TikTok")).slice(0,120),author:String(t.author||"").slice(0,60),cover:/^https:/.test(t.cover||"")?t.cover:"",duration:+t.duration||0,url:okUrl(t.url)?t.url:"",local:false,pending:okUrl(t.url),fav:!!t.fav,plays:+t.plays||0,added:+t.added||Date.now()}); map[t.id]=t.id; nt++; }
-    for(const p of d.pls||[]){ if(!okId(p.id)||S.pls.some(x=>x.id===p.id)) continue; S.pls.push({id:p.id,name:String(p.name||_t("Playlist")).slice(0,40),ids:(p.ids||[]).map(i=>map[i]).filter(Boolean),from:p.from?String(p.from).slice(0,24):undefined}); np++; }
+      const remote=/^https:\/\/\S{1,500}$/.test(t.remote||"")?t.remote:"", fx=t.fx&&typeof t.fx==="object"?t.fx:{}, cut=t.cut||{};
+      const fxk=FXK.filter(k=>k in fx&&(k==="eqc"?fx[k]===null||Array.isArray(fx[k])&&fx[k].every(Number.isFinite):typeof fx[k]===typeof FX_DEF[k]));
+      S.tracks.push({id:t.id,title:String(t.title||_t("Son TikTok")).slice(0,120),author:String(t.author||"").slice(0,60),cover:/^https:/.test(t.cover||"")?t.cover:"",duration:+t.duration||0,url:okUrl(t.url)?t.url:"",local:false,remote,pending:!remote&&okUrl(t.url),fav:!!t.fav,plays:+t.plays||0,added:+t.added||Date.now(),
+        tags:Array.isArray(t.tags)?parseTags(t.tags.join(",")):undefined, cut:Number.isFinite(cut.a)&&Number.isFinite(cut.b)?{a:cut.a,b:cut.b}:undefined,
+        fx:fxk.length?Object.fromEntries(fxk.map(k=>[k,fx[k]])):undefined, last:+t.last||0, sec:+t.sec||0}); map[t.id]=t.id; nt++; }
+    for(const p of d.pls||[]){ if(!okId(p.id)||S.pls.some(x=>x.id===p.id)) continue; S.pls.push({id:p.id,name:String(p.name||_t("Playlist")).slice(0,40),ids:(p.ids||[]).map(i=>map[i]).filter(Boolean),from:p.from?String(p.from).slice(0,24):undefined,
+      folder:p.folder?String(p.folder).slice(0,30):undefined, emoji:p.emoji?String(p.emoji).slice(0,4):undefined, color:/^#[0-9a-f]{6}$/i.test(p.color||"")?p.color:undefined, sp:/^[A-Za-z0-9]{22}$/.test(p.sp||"")?p.sp:undefined}); np++; }
     if(d.ui) S.ui=Object.assign({},UI_DEF,S.ui,d.ui);
+    // Statistiques : le maximum de chaque côté (réimporter la même sauvegarde ne compte rien deux fois)
+    const st=d.stats&&typeof d.stats==="object"?d.stats:{}, num=v=>Number.isFinite(+v)?+v:0, my=S.stats;
+    my.sec=Math.max(num(my.sec),num(st.sec)); my.best=Math.max(num(my.best),num(st.best));
+    if(Array.isArray(st.days)) my.days=[...new Set([...my.days,...st.days.filter(k=>/^\d{4}-\d\d-\d\d$/.test(k))])].sort().slice(-120);
+    if(st.byDay&&typeof st.byDay==="object") for(const [k,v] of Object.entries(st.byDay)) if(/^\d{4}-\d\d-\d\d$/.test(k)) my.byDay[k]=Math.max(num(my.byDay[k]),num(v));
+    if(Array.isArray(st.hours)) st.hours.slice(0,24).forEach((v,h)=>{ my.hours[h]=Math.max(num(my.hours[h]),num(v)); });
+    if(!S.goal&&num(d.goal)>0) S.goal=num(d.goal);
     save(); applyUI(); render(); toast(_t("Import terminé : {0}, {1}",plural(nt,"son"),plural(np,"playlist")),{type:"ok",ms:4000});
   }catch(e){ toast(_t("Fichier de sauvegarde invalide"),{type:"err"}); }
 }
@@ -3238,7 +3263,10 @@ async function delPl(id){
   S.pls=S.pls.filter(x=>x.id!==id); S.pins=S.pins.filter(k=>k!=="pl:"+id); openPl=null;
   S.trash.unshift({kind:"pl",at:Date.now(),p:Object.assign({},p,{pub:false,pubId:null,owner:undefined}),idx:0}); trimTrash(); save(); render();
   toast(_t("Playlist mise à la corbeille"),{action:_t("Annuler"),ms:5000,fn:()=>restoreTrash(S.trash.findIndex(x=>x.p&&x.p.id===id))});
-  if(p.pubId&&ME&&(!p.owner||p.owner===ME.id)) api("/api/playlists/"+p.pubId,{method:"DELETE"}).catch(()=>{});
+  // noté AVANT l'appel : restorePublic ne la réimporte pas pendant la suppression, et la réessaie si elle échoue
+  if(p.pubId&&(!ME||!p.owner||p.owner===ME.id)){ const pid=p.pubId, done=()=>{ S.pubDel=S.pubDel.filter(x=>x!==pid); save(); FEED=null; };
+    S.pubDel.push(pid); save();
+    if(ME) api("/api/playlists/"+pid,{method:"DELETE"}).then(done,e=>{ if(e.status===404||e.status===403) done(); }); }
 }
 function rmFrom(pid,tid){ const p=S.pls.find(x=>x.id===pid); if(!p) return; p.ids=p.ids.filter(i=>i!==tid); touchPl(p); render(); }
 let shT=null;
@@ -3366,7 +3394,7 @@ function selFav(){ const ids=[...(SEL||[])], ts=S.tracks.filter(t=>ids.includes(
 async function selDel(){
   const ids=[...(SEL||[])]; if(!ids.length) return;
   if(!await askConfirm(_t("Mettre {0} à la corbeille ?",plural(ids.length,"son")),_t("Tu peux les récupérer pendant 30 jours."),_t("Mettre à la corbeille"),true)) return;
-  selEnd(); ids.forEach(id=>delTrack(id,true)); render();
+  selEnd(); ids.forEach(id=>delTrack(id,true)); trimTrash(); save(); render();
   toast(_t("{0} mis à la corbeille",plural(ids.length,"son")),{action:_t("Voir"),ms:5000,fn:openTrash});
 }
 
@@ -3388,7 +3416,9 @@ function syncAllPublic(){ S.pls.filter(p=>p.pub&&(!p.owner||p.owner===ME.id)).fo
 async function publishTrack(id){
   const t=S.tracks.find(x=>x.id===id); if(!t) return;
   if(t.postId){
-    try{ await api("/api/posts/"+t.postId,{method:"DELETE"}); }catch(e){ if(e.status!==404){ return toast(e.message,{type:"err"}); } }
+    if(!ME){ toast(_t("Connecte-toi pour publier un son")); openAuth("login"); return; }
+    // 403 : publiée avec un autre compte, ce lien ne sert plus ici
+    try{ await api("/api/posts/"+t.postId,{method:"DELETE"}); }catch(e){ if(e.status!==404&&e.status!==403){ return toast(e.message,{type:"err"}); } }
     delete t.postId; save(); resetPosts(); return toast(_t("Publication retirée"));
   }
   if(!ME){ toast(_t("Connecte-toi pour publier un son")); openAuth("register"); return; }
@@ -3405,7 +3435,7 @@ async function togglePub(pid){
   if(p.owner&&p.owner!==ME.id) return toast(_t("Cette playlist est liée à un autre compte"),{type:"err"});
   if(p.pub){
     p.pub=false; save(); render();
-    if(p.pubId){ try{ await api("/api/playlists/"+p.pubId,{method:"DELETE"}); }catch(e){} p.pubId=null; save(); }
+    if(p.pubId){ try{ await api("/api/playlists/"+p.pubId,{method:"DELETE"}); }catch(e){ if(e.status!==404&&e.status!==403){ p.pub=true; save(); render(); return toast(e.message,{type:"err"}); } } p.pubId=null; save(); }
     FEED=null; toast(_t("Playlist rendue privée"));
   } else {
     if(!plPayload(p).tracks.length) return toast(_t("Ajoute d'abord des sons (avec un lien TikTok) à cette playlist"),{type:"err"});
@@ -3419,18 +3449,16 @@ async function togglePub(pid){
 //  Bibliothèque synchronisée entre appareils (compte)
 // ═══════════════════════════════════════════════════════════════════════════
 const SYNC = {busy:false};
+// Mêmes règles que le serveur (clean_library) : liens acceptés, sans doublon, 1500 sons (les plus récents), 200 playlists,
+// 500 sons par playlist. Sinon ce que le serveur laisse de côté passerait pour une suppression à la synchro suivante.
 function libSnap(){
-  const byId = new Map(S.tracks.map(t=>[t.id,t]));
-  return {
-    tracks: S.tracks.filter(t=>t.url).map(t=>({url:t.url,title:t.title,author:t.author||"",duration:t.duration||0,fav:!!t.fav,added:t.added||0,remote:t.remote||""})),
-    pls: S.pls.filter(p=>!p.smart).map(p=>({id:p.id,name:p.name,urls:p.ids.map(i=>byId.get(i)).filter(t=>t&&t.url).map(t=>t.url),pub:!!p.pub,pubId:p.pubId||""}))
-  };
+  const seen=new Set(), tracks=[];
+  for(const t of byAdded(S.tracks)){ if(tracks.length>=1500) break; if(!okUrl(t.url)||seen.has(t.url)) continue; seen.add(t.url);
+    tracks.push({url:t.url,title:t.title,author:t.author||"",duration:t.duration||0,fav:!!t.fav,added:t.added||0,remote:t.remote||""}); }
+  const byId=new Map(S.tracks.map(t=>[t.id,t]));
+  return {tracks, pls:S.pls.filter(p=>!p.smart).slice(0,200).map(p=>({id:p.id,name:p.name,urls:plUrls(p,byId,seen),pub:!!p.pub,pubId:p.pubId||""}))};
 }
-function rmTrackLocal(id){
-  S.tracks=S.tracks.filter(t=>t.id!==id);
-  S.pls.forEach(p=>{ p.ids=p.ids.filter(i=>i!==id); });
-  dbop("delete",id).catch(()=>{}); dbop("delete","cv:"+id).catch(()=>{});
-}
+function plUrls(p,byId,seen){ return p.ids.map(i=>byId.get(i)).filter(t=>t&&seen.has(t.url)).map(t=>t.url).slice(0,500); }
 async function syncLibrary(manual){
   if(!ME){ if(manual===true) toast(_t("Connecte-toi pour synchroniser"),{type:"err"}); return; }
   if(SYNC.busy) return; SYNC.busy=true;
@@ -3441,34 +3469,60 @@ async function syncLibrary(manual){
       const lc = JSON.stringify(libSnap()) !== base.hash;   // modifié sur cet appareil depuis la dernière synchro
       let changed = false;
       if(r.data){
-        const bt=new Set(base.tr), bp=new Set(base.pl);
+        // Fusion élément par élément avec la dernière version envoyée (base) : on prend la valeur du serveur
+        // seulement là où cet appareil n'a rien changé, pour ne pas écraser ce qu'un autre appareil a fait.
+        const B=base.hash?JSON.parse(base.hash):{tracks:[],pls:[]}, bT=new Map(B.tracks.map(t=>[t.url,t])), bP=new Map(B.pls.map(p=>[p.id,p]));
+        const bt=new Set(base.tr), bp=new Set(base.pl), sIds=new Set(r.data.pls.map(p=>p.id));
         const sT=new Map(r.data.tracks.map(t=>[t.url,t])), lT=new Map(S.tracks.filter(t=>t.url).map(t=>[t.url,t]));
         for(const [url,st] of sT){
-          const lt=lT.get(url);
+          const lt=lT.get(url), b=bT.get(url);
           if(lt){
-            if(!lc && (lt.title!==st.title || !!lt.fav!==!!st.fav)){ lt.title=st.title; lt.fav=!!st.fav; changed=true; }
+            if(b && lt.title===b.title && lt.title!==st.title){ lt.title=st.title; changed=true; }
+            if(b && !!lt.fav===!!b.fav && !!lt.fav!==!!st.fav){ lt.fav=!!st.fav; changed=true; }
             if(!lt.local && !lt.remote && st.remote){ lt.remote=st.remote; lt.pending=false; changed=true; }
           } else if(!bt.has(url)){
-            S.tracks.push({id:newId("t"),title:st.title,author:st.author||"",cover:"",duration:st.duration||0,url,local:false,remote:st.remote||"",pending:!st.remote,fav:!!st.fav,added:st.added||Date.now()}); changed=true;
+            const ti=S.trash.findIndex(e=>e&&e.kind==="t"&&e.t&&e.t.url===url);   // restauré ailleurs : on reprend la fiche et ses fichiers hors ligne
+            if(ti>=0){ const t=S.trash.splice(ti,1)[0].t; Object.assign(t,{title:st.title,fav:!!st.fav}); if(!t.local&&!t.remote&&st.remote){ t.remote=st.remote; t.pending=false; } S.tracks.push(t); }
+            else S.tracks.push({id:newId("t"),title:st.title,author:st.author||"",cover:"",duration:st.duration||0,url,local:false,remote:st.remote||"",pending:!st.remote,fav:!!st.fav,added:st.added||Date.now()});
+            changed=true;
           }
         }
-        for(const [url,lt] of lT){ if(!sT.has(url) && bt.has(url)){ rmTrackLocal(lt.id); changed=true; } }
-        const byUrl=new Map(S.tracks.filter(t=>t.url).map(t=>[t.url,t.id]));
+        for(const [url,lt] of lT){ if(!sT.has(url) && bt.has(url)){ trashTrack(lt.id); changed=true; } }   // supprimé ailleurs : corbeille, pas d'effacement
+        const byUrl=new Map(S.tracks.filter(t=>t.url).map(t=>[t.url,t.id])), byId=new Map(S.tracks.map(t=>[t.id,t]));
+        const seen=new Set(libSnap().tracks.map(t=>t.url)), same=(x,y)=>x.join("\n")===y.join("\n");
         const ids=urls=>urls.map(u=>byUrl.get(u)).filter(Boolean);
         for(const sp of r.data.pls){
-          const lp=S.pls.find(p=>p.id===sp.id);
-          if(lp){ if(!lc){ const n=ids(sp.urls); if(lp.name!==sp.name || n.join()!==lp.ids.join()){ lp.name=sp.name; lp.ids=n; changed=true; } } }
+          let lp=S.pls.find(p=>p.id===sp.id);
+          if(!lp && sp.pubId){   // même playlist publique remise par restorePublic sous un autre identifiant : on prend celui du compte
+            lp=S.pls.find(p=>!p.smart && p.pubId===sp.pubId && !sIds.has(p.id));
+            if(lp){ S.pins=S.pins.map(k=>k==="pl:"+lp.id?"pl:"+sp.id:k); lp.id=sp.id; changed=true; }
+          }
+          if(lp){
+            const b=bP.get(sp.id); if(!b) continue;
+            if(lp.name===b.name && lp.name!==sp.name){ lp.name=sp.name; changed=true; }
+            const lu=plUrls(lp,byId,seen), bu=b.urls, su=sp.urls; let mu=null;
+            if(same(lu,bu)) mu=su;
+            else if(!same(su,bu)){ const rm=new Set(bu.filter(u=>!su.includes(u))); mu=lu.filter(u=>!rm.has(u)); for(const u of su) if(!bu.includes(u)&&!mu.includes(u)) mu.push(u); }
+            if(mu && !same(mu,lu)){ const has=new Set(lu);   // les sons hors synchro (au-delà des limites, sans lien) restent
+              lp.ids=[...new Set(ids(mu).concat(lp.ids.filter(i=>{ const t=byId.get(i); return t&&!has.has(t.url); })))]; changed=true; }
+          }
           else if(!bp.has(sp.id)){ S.pls.push({id:sp.id,name:sp.name,ids:ids(sp.urls),pub:sp.pub,pubId:sp.pubId||null,owner:sp.pub?ME.id:undefined}); changed=true; }
         }
-        const sIds=new Set(r.data.pls.map(p=>p.id)), before=S.pls.length;
+        const before=S.pls.length;
         S.pls=S.pls.filter(p=>p.smart || sIds.has(p.id) || !bp.has(p.id));
         if(S.pls.length!==before) changed=true;
         if(changed){ save(); render(); }
+        if(!lc && !changed && base.hash){   // rien à envoyer : on note seulement la version du serveur
+          S.sync=Object.assign({},base,{at:r.updated,tr:r.data.tracks.map(t=>t.url),pl:r.data.pls.map(p=>p.id)}); save();
+          if(manual===true) toast(_t("Tout est déjà à jour"),{type:"ok"});
+          break;
+        }
       }
       const snap=libSnap();
       try{
         const w = await api("/api/me/library",{method:"PUT",body:{data:snap,base:r.updated||null}});
-        S.sync = {uid:ME.id, at:w.updated, tr:snap.tracks.map(t=>t.url), pl:snap.pls.map(p=>p.id), hash:JSON.stringify(snap)};
+        // ce que le serveur a vraiment gardé (tr, pl) ; à défaut (ancien serveur) notre envoi, déjà aux mêmes limites
+        S.sync = {uid:ME.id, at:w.updated, tr:w.tr||snap.tracks.map(t=>t.url), pl:w.pl||snap.pls.map(p=>p.id), hash:JSON.stringify(snap)};
         save();
         if(changed) toast(_t("Bibliothèque synchronisée avec ton compte"),{type:"ok"});
         else if(manual===true) toast(_t("Tout est déjà à jour"),{type:"ok"});
@@ -3483,8 +3537,9 @@ document.addEventListener("visibilitychange",()=>{ if(!document.hidden && ME){ s
 
 async function restorePublic(){
   if(!ME) return;
+  for(const id of [...S.pubDel]){ try{ await api("/api/playlists/"+id,{method:"DELETE"}); }catch(e){ if(e.status!==404&&e.status!==403) continue; } S.pubDel=S.pubDel.filter(x=>x!==id); save(); FEED=null; }
   try{ const d=await api("/api/me/playlists"); let n=0;
-    for(const sp of d.playlists){ if(S.pls.some(p=>p.pubId===sp.id)) continue; S.pls.push({id:newId("p"),name:sp.name,ids:sp.tracks.map(ensureTrack),pub:true,pubId:sp.id,owner:ME.id}); n++; }
+    for(const sp of d.playlists){ if(S.pubDel.includes(sp.id)||S.pls.some(p=>p.pubId===sp.id)) continue; S.pls.push({id:newId("p"),name:sp.name,ids:sp.tracks.map(ensureTrack),pub:true,pubId:sp.id,owner:ME.id}); n++; }
     if(n){ save(); render(); toast(_t("{0} récupérée{1} depuis ton compte",plural(n,"playlist publique"),n>1?"s":""),{type:"ok"}); }
   }catch(e){}
 }
@@ -3723,7 +3778,7 @@ showMoved(location.hostname);
   loadBgImage();
   await Promise.all([checkMe(), ping()]);
   render();
-  if(ME){ restorePublic(); syncAllPublic(); syncLibrary(); }
+  if(ME){ syncAllPublic(); syncLibrary().finally(restorePublic); }
   BOOTED=true; updatePremUI();
   if(PREM_) handlePremiumReturn(PREM_);
   { let w=null; try{ w=localStorage.getItem("tkwel"); }catch(e){} if(!w&&!S.tracks.length&&!P_&&!PL_&&!U_&&!shared&&!PREM_) setTimeout(()=>{ if($$(".ov2").every(o=>o.hidden)) welcome(0); },600); }

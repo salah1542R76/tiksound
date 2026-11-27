@@ -36,6 +36,7 @@ window.TK_EN={
 "Favoris": "Favorites",
 "Touche le cœur sur un son : il rejoint automatiquement la playlist « Favoris ».": "Tap the heart on a sound: it automatically joins the “Favorites” playlist.",
 "Stockage plein : supprime quelques sons": "Storage full: delete a few sounds",
+"Stockage plein : vide la corbeille": "Storage full: empty the trash",
 "{0} min": "{0} min",
 "Connexion impossible, vérifie ton réseau": "Can't connect, check your network",
 "Erreur ({0})": "Error ({0})",

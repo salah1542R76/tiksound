@@ -2103,3 +2103,215 @@ def test_publishing_through_the_sound_menu_reaches_explore(live, mk):
     c.page.wait_for_function("S.tracks[0].postId")
     c.ev("location.hash='decouvrir'")
     c.page.wait_for_selector("#posts-wrap .post:has-text('Son YouTube')")
+
+
+
+# ═══════════════════════════ Bibliothèque : synchro, corbeille, import ═══════════════════════════
+def tk(n, start=1):
+    """Sons avec un vrai lien TikTok (le serveur ne garde que les liens qu'il accepte)."""
+    return [dict(id=f"t{i}", title=f"Son {i}", author="A", duration=60, url=f"https://www.tiktok.com/@x/video/{i}",
+                 local=False, remote="", pending=True, added=i) for i in range(start, start + n)]
+
+
+def synced(mk, tr, pls=None, email="sync@example.com"):
+    """Un appareil connecté dont la bibliothèque a déjà été envoyée une première fois au compte."""
+    c = mk(); c.signup(email, "synchro"); c.seed(tr, pls=pls or []); c.open()
+    c.page.wait_for_function("ME && S.sync && S.sync.at && !SYNC.busy")
+    return c
+
+
+def server_lib(c):
+    return c.ctx.request.get(c.live.base + "/api/me/library").json()
+
+
+def put_lib(c, data, base):
+    """Ce qu'un autre appareil du même compte enregistre."""
+    r = c.ctx.request.put(c.live.base + "/api/me/library", data={"data": data, "base": base})
+    assert r.ok, r.text()
+
+
+def sync_now(c, before=""):
+    """Attend la fin d'une synchro en cours (minuterie de 6 s), fait `before` puis synchronise."""
+    c.ev("(async()=>{ while(SYNC.busy) await new Promise(r=>setTimeout(r,50)); %s; await syncLibrary(false); })()" % before)
+
+
+def json_route(status, body):
+    return lambda r: r.fulfill(status=status, content_type="application/json", body=json.dumps(body))
+
+
+def test_sync_never_deletes_sounds_or_playlist_entries_beyond_the_account_limits(live, mk):
+    big = dict(id="pbig", name="Grosse", ids=[f"t{i}" for i in range(1, 601)])
+    c = synced(mk, tk(1600), pls=[big])
+    sync_now(c)
+    sync_now(c)
+    assert c.ev("S.tracks.length") == 1600                          # le serveur n'en garde que 1500 : rien n'est supprimé ici
+    assert c.ev("S.pls.find(p=>p.id==='pbig').ids.length") == 600
+    assert len(server_lib(c)["data"]["tracks"]) == 1500
+
+
+def test_sync_does_not_upload_an_unchanged_library_again(live, mk):
+    c = synced(mk, tk(3))
+    puts = []
+    c.page.on("request", lambda r: puts.append(1) if r.method == "PUT" and "/api/me/library" in r.url else None)
+    sync_now(c)
+    sync_now(c)
+    assert puts == []
+    sync_now(c, "S.tracks[0].fav=true; save()")
+    assert len(puts) == 1
+
+
+def test_sync_keeps_edits_made_on_another_device_when_this_one_also_changed(live, mk):
+    c = synced(mk, tk(2), pls=[dict(id="pa", name="A", ids=["t1"])])
+    s = server_lib(c); d = s["data"]
+    u2 = "https://www.tiktok.com/@x/video/2"
+    for t in d["tracks"]:
+        if t["url"] == u2:
+            t["title"] = "Renommé ailleurs"
+    d["pls"][0]["urls"].append(u2)
+    put_lib(c, d, s["updated"])
+    sync_now(c, "S.tracks.find(t=>t.id==='t1').fav=true; save()")      # cet appareil a aussi changé autre chose
+    assert c.ev("S.tracks.find(t=>t.id==='t2').title") == "Renommé ailleurs"
+    assert c.ev("S.tracks.find(t=>t.id==='t1').fav") is True
+    assert c.ev("S.pls.find(p=>p.id==='pa').ids") == ["t1", "t2"]
+    d = server_lib(c)["data"]
+    assert [t["title"] for t in d["tracks"] if t["url"] == u2] == ["Renommé ailleurs"]
+    assert d["pls"][0]["urls"][-1] == u2
+
+
+def test_public_playlist_restored_before_the_library_sync_is_not_duplicated(live, mk):
+    pub = "a" * 32
+    c = mk(); c.signup("dup@example.com", "doublon")
+    c.ctx.route(re.compile(r"/api/playlists"), json_route(200, {"ok": True}))
+    c.ctx.route(re.compile(r"/api/me/playlists"), json_route(200, {"playlists": []}))
+    u1 = "https://www.tiktok.com/@x/video/1"
+    put_lib(c, {"tracks": [dict(url=u1, title="Son 1")], "pls": [dict(id="ps", name="Pub", urls=[u1], pub=True, pubId=pub)]}, None)
+    # restorePublic a déjà remis sa copie (autre identifiant) avant la réponse de la bibliothèque
+    c.seed(tk(1), pls=[dict(id="plocal", name="Pub", ids=["t1"], pub=True, pubId=pub)])
+    c.open()
+    c.page.wait_for_function("ME && S.sync && S.sync.at && !SYNC.busy")
+    assert c.ev(f"S.pls.filter(p=>p.pubId==='{pub}').map(p=>p.id)") == ["ps"]
+    assert [p["id"] for p in server_lib(c)["data"]["pls"]] == ["ps"]
+
+
+def test_sound_deleted_on_another_device_goes_to_the_trash_and_keeps_its_offline_file(live, mk):
+    c = synced(mk, tk(2))
+    store_local_blob(c, "t2")
+    s = server_lib(c); d = s["data"]
+    gone = [t for t in d["tracks"] if t["url"].endswith("/2")][0]
+    d["tracks"] = [t for t in d["tracks"] if t is not gone]
+    put_lib(c, d, s["updated"])
+    sync_now(c)
+    assert c.ev("S.tracks.some(t=>t.id==='t2')") is False
+    assert c.ev("S.trash.some(e=>e.t&&e.t.id==='t2')") is True
+    assert c.ev("dbop('get','t2').then(b=>!!b)") is True
+    s = server_lib(c); d = s["data"]; d["tracks"].append(gone)              # restauré sur l'autre appareil
+    put_lib(c, d, s["updated"])
+    sync_now(c)
+    assert c.ev("S.tracks.some(t=>t.id==='t2')") is True                 # même son, même fichier hors ligne
+    assert c.ev("S.trash.some(e=>e.t&&e.t.id==='t2')") is False
+
+
+def test_bulk_delete_keeps_every_sound_restorable_and_saves_once(live, mk):
+    c = opened(mk, tracks(250))
+    n = c.ev("""(async()=>{ askConfirm=async()=>true; let n=0; const o=Storage.prototype.setItem;
+        Storage.prototype.setItem=function(k,v){ if(k==='tiksound') n++; return o.call(this,k,v); };
+        SEL=new Set(S.tracks.map(t=>t.id)); await selDel(); Storage.prototype.setItem=o; return n; })()""")
+    assert c.ev("S.tracks.length") == 0
+    assert c.ev("S.trash.length") == 250                               # promis : récupérables pendant 30 jours
+    assert n <= 2
+    c.ev("restoreTrash(S.trash.length-1)")                             # le tout premier mis à la corbeille
+    assert c.ev("S.tracks.map(t=>t.id)") == ["t1"]
+
+
+def test_failed_search_download_keeps_a_sound_already_in_the_library(live, mk):
+    no_paywall(live)
+    url = "https://open.spotify.com/track/" + "a" * 22
+    c = opened(mk, [dict(id="s1", title="Titre", author="A", duration=60, url=url, local=False, pending=True, added=1)],
+               paywall=False, pls=[dict(id="p1", name="Spotify", ids=["s1"])])
+    c.ev(f"dl=async()=>false; FR.items=[{{url:'{url}',title:'Titre',author:'A',src:'spotify'}}]")
+    c.ev("findAdd(0)")
+    assert c.ev("S.tracks.map(t=>t.id)") == ["s1"]
+    assert c.ev("S.pls[0].ids") == ["s1"]
+
+
+def test_private_or_deleted_playlist_stays_public_until_the_server_agrees(live, mk):
+    pub = "b" * 32
+    c = mk(); c.signup("pub@example.com", "publieur")
+    st = {"fail": True}
+
+    def pls(r):
+        if r.request.method == "DELETE" and st["fail"]:
+            return json_route(500, {"error": "Erreur serveur"})(r)
+        json_route(200, {"ok": True})(r)
+    c.ctx.route(re.compile(r"/api/playlists/"), pls)
+    c.ctx.route(re.compile(r"/api/me/playlists"),
+                lambda r: json_route(200, {"playlists": [{"id": pub, "name": "Pub", "tracks": []}] if st["fail"] else []})(r))
+    c.seed(tk(1), pls=[dict(id="p1", name="Pub", ids=["t1"], pub=True, pubId=pub)])
+    c.open(); c.page.wait_for_function("ME")
+    c.ev("togglePub('p1')")
+    assert c.ev("[S.pls[0].pub, S.pls[0].pubId]") == [True, pub]      # toujours publique : on ne fait pas croire le contraire
+    c.ev("askConfirm=async()=>true; delPl('p1')")
+    c.page.wait_for_function(f"S.pubDel.includes('{pub}')")
+    c.ev("restorePublic()")
+    assert c.ev("S.pls.length") == 0                                   # pas réimportée au prochain lancement
+    st["fail"] = False
+    c.ev("restorePublic()")
+    assert c.ev("S.pubDel") == []
+
+
+def test_backup_import_keeps_tags_trims_effects_folders_and_stats(live, mk):
+    c = opened(mk, [])
+    backup = {"app": "tikwave", "v": 2, "goal": 60,
+              "tracks": [{"id": "t9", "title": "Gardé", "url": "https://www.tiktok.com/@x/video/9", "tags": ["gym", "chill"],
+                          "cut": {"a": 1, "b": 5}, "fx": {"rate": "1.25", "bogus": 1}, "remote": "https://r2.example.test/audio/t9.mp3",
+                          "sec": 42, "last": 5, "added": 3}],
+              "pls": [{"id": "p9", "name": "Sport", "ids": ["t9"], "folder": "Muscu", "emoji": "💪", "color": "#ff0000"}],
+              "stats": {"sec": 3600, "days": ["2026-11-01"], "byDay": {"2026-11-01": 3600}, "hours": [0, 0, 0, 0, 0, 0, 0, 700], "best": 4}}
+    c.page.evaluate("d => importData(new File([JSON.stringify(d)], 'b.json'))", backup)
+    t = c.ev("S.tracks.find(t=>t.id==='t9')")
+    assert t["tags"] == ["gym", "chill"] and t["cut"] == {"a": 1, "b": 5} and t["fx"] == {"rate": "1.25"}
+    assert t["remote"] == "https://r2.example.test/audio/t9.mp3" and t["pending"] is False and t["sec"] == 42
+    p = c.ev("S.pls.find(p=>p.id==='p9')")
+    assert (p["folder"], p["emoji"], p["color"]) == ("Muscu", "💪", "#ff0000")
+    assert c.ev("S.stats.sec") >= 3600 and "2026-11-01" in c.ev("S.stats.days")
+    assert c.ev("S.stats.hours[7]") == 700 and c.ev("S.stats.best") == 4 and c.ev("S.goal") == 60
+
+
+def test_sound_added_from_search_shows_first_under_recent(live, mk):
+    c = opened(mk, tracks(12))
+    new = c.ev("ensureTrack({url:'https://www.tiktok.com/@x/video/99',title:'Nouveau'})")
+    c.ev("renderHome()")
+    assert c.ev("libList()[0].id") == new
+    assert c.ev("LISTS.rec[0]") == new and c.ev("LISTS.addrec[0]") == new
+
+
+def test_batch_convert_keeps_only_the_failed_links_in_the_box(live, mk):
+    c = opened(mk, [])
+    c.ev("""ONLINE=true; grab=async(url,id)=>{ if(url.endsWith('/2')) throw new Error('Vidéo privée');
+        return {title:'OK',author:'',url,remote:true,audio_url:'https://r2.example.test/a.mp3'}; }; 0""")
+    c.ev("document.getElementById('u2').value='https://www.tiktok.com/@a/video/1 https://www.tiktok.com/@a/video/2'")
+    c.ev("convert('u2', null)")
+    assert c.ev("S.tracks.length") == 1
+    assert c.ev("document.getElementById('u2').value") == "https://www.tiktok.com/@a/video/2"
+
+
+def test_full_storage_warns_once_and_offers_to_empty_the_trash(live, mk):
+    c = opened(mk, tracks(2))
+    c.ev("delTrack('t1')")
+    c.ev("""const o=Storage.prototype.setItem; Storage.prototype.setItem=function(k,v){
+        if(k==='tiksound') throw new DOMException('plein','QuotaExceededError'); return o.call(this,k,v); };
+        save(); save(); save();""")
+    t = toasts(c)
+    assert t.count("Stockage plein") == 1 and "corbeille" in t
+    assert c.page.locator("#toasts button:has-text('Vider')").count() == 1
+
+
+def test_unpublish_after_switching_account_frees_the_sound(live, mk):
+    no_paywall(live)
+    c = mk(); c.signup("b@example.com", "compte_b")
+    c.seed([dict(id="t1", title="Son", author="A", duration=60, url="https://www.tiktok.com/@x/video/1",
+                 local=False, remote="{BASE}/__m/silence.wav", added=1, postId="p_de_a")])
+    c.ctx.route(re.compile(r"/api/posts/p_de_a"), json_route(403, {"error": "Interdit"}))
+    c.open(); c.page.wait_for_function("ME")
+    c.ev("publishTrack('t1')")
+    assert c.ev("S.tracks[0].postId") is None                          # « Publier ce son » revient
