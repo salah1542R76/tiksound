@@ -40,9 +40,9 @@ Le compte Stripe est partagé avec un autre projet du propriétaire : ne jamais 
 Lancer chaque groupe séparément (les tests Chrome dans leur propre processus) :
 
 ```
-python3 -m pytest tests -q --ignore=tests/e2e_front.py --ignore=tests/e2e_v2.py   # serveur (191)
-python3 -m pytest tests/e2e_front.py -q                                           # appli (50)
-python3 -m pytest tests/e2e_v2.py -q                                              # appli (172)
+python3 -m pytest tests -q --ignore=tests/e2e_front.py --ignore=tests/e2e_v2.py   # serveur (223)
+python3 -m pytest tests/e2e_front.py -q                                           # appli (53)
+python3 -m pytest tests/e2e_v2.py -q                                              # appli (244)
 ```
 
 Dépendances : `pip install -r requirements.txt pytest playwright pillow opencv-python-headless numpy` puis `playwright install chromium` (ou `CHROME_BIN` vers un Chrome installé). Sous Windows : `PYTHONUTF8=1`. `tests/_shims.py` simule sqlalchemy et yt_dlp s'ils manquent : aucun test ne touche Internet. Les navigateurs de test sont en `fr-FR` par défaut (`tests/e2e_front.py`). Méthode : test qui échoue d'abord, puis correction, puis les trois groupes au vert avant de livrer.
@@ -54,6 +54,7 @@ Dépendances : `pip install -r requirements.txt pytest playwright pillow opencv-
 - **Effets sur les sons en ligne** : si R2 refuse la lecture directe (CORS), le son passe par `GET /api/media/<clé>`. Les gardes `REROUTEN` / `LOADN` évitent que deux changements rapides se marchent dessus.
 - **Recherche** : `GET /api/find?q=` (YouTube + SoundCloud, Spotify si clés). Si YouTube bloque le serveur, le même son est cherché sur SoundCloud (`soundcloud_twin`).
 - **Explorer** : les sons publiés (`/api/posts`) sont relus à chaque visite ; `POSTS_GEN` jette les réponses arrivées après une remise à zéro ; « Voir » après une publication amène le son à l'écran (`POSTS_FOCUS`). Le flux des playlists est rafraîchi s'il a plus d'une minute.
+- **Recommandations** : `POST /api/recs` reçoit les artistes / mots les plus présents de la bibliothèque (`recSeeds`) et les liens à exclure, classe les sons publiés (artiste exact +3, artiste dans le titre +2, mot du titre +1, puis j'aime) et renvoie des playlists publiques proches (page 0). Bibliothèque vide = tendances (`mode: "trend"`). Rien n'est enregistré, jamais d'e-mail (`post_json`, `pl_summary`). Explorer affiche « Suggestions pour toi » (`#recs`, cache 5 min). **Radio** (menu du lecteur, `S.player.radio`, désactivée par défaut) : à la fin de la file, `radioMore` ajoute 5 sons proches (écoutés en passant, `tmp`) et passe avant « répéter la file ».
 - **Premium visible** : les listes (Explorer, recherche, sons publiés) renvoient `premium` et la décoration d'avatar (`list_badge` dans `server.py`, jamais l'e-mail). L'appli met une lueur dorée (`.av.prem`) et le badge « Premium », seulement quand l'abonnement est actif sur le serveur (`PAYWALL`).
 - **Cosmétiques Premium** : listes `COS_*` dans `server.py` et `COSB/COSF/COSE/COSN/COSG` dans `index.html` (+ règles CSS `bn-`, `fr-`, `pfx-`, `nf-`). Ajouter une décoration = les trois endroits + sa traduction.
 - **Statut Discord** : `npExpose()` écrit ce qui joue sur `<html data-np-title|artist|cover|state|start|end>` ; le module PreMiD de `discord/premid/` le lit. Impossible sur téléphone.

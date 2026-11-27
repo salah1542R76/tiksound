@@ -2028,6 +2028,15 @@ def test_signed_in_profile_and_explore_are_fully_english(live, mk):
     c.ev("openPremium()")
     c.page.wait_for_timeout(500)
     found += leaks(c, "premium actif")
+    c.ev("closeSh('gen')")
+    c.ev("location.hash='decouvrir'")
+    c.page.wait_for_selector("#recs h2")                               # « Suggestions for you » / « Trending sounds »
+    found += leaks(c, "recommandations")
+    c.ev("void play(['t1'],0)")
+    c.page.wait_for_function("!!au.src")
+    c.ev("npMenu()")                                                   # Radio, Rogner…
+    c.page.wait_for_timeout(300)
+    found += leaks(c, "menu lecteur")
     assert not found, "\n".join(sorted(set(found))[:60])
     assert not c.logs, c.logs
 
@@ -2963,3 +2972,80 @@ def test_open_playlist_drops_deleted_tracks_and_keeps_order(live, mk):
     c.page.wait_for_selector("#pll [data-id='t1']")
     assert c.ev("[...document.querySelectorAll('#pll [data-id]')].map(e=>e.dataset.id)") == ["t3", "t1"]
     assert c.ev("S.pls[0].ids") == ["t3", "t1"]
+
+
+# ═══════════════════════════ Recommandations « Pour toi » et radio ═══════════════════════════
+def community(live, mk, *posts):
+    """Un autre membre publie des sons (titre, artiste)."""
+    o = mk()
+    o.signup("o@example.com", "autre")
+    for n, (title, author) in enumerate(posts, 100):
+        assert o.ctx.request.post(live.base + "/api/posts", data={"url": f"https://www.tiktok.com/@a/video/{n}", "title": title, "author": author}).ok
+
+
+def short_tracks(n):
+    return [dict(t, remote=t["remote"].replace("silence", "short")) for t in tracks(n)]
+
+
+def test_explore_for_you_matches_the_library(live, mk):
+    no_paywall(live)
+    community(live, mk, ("Ailleurs", "Zzz"), ("Pépite", "Artiste"))      # « Artiste » : l'artiste des sons de tracks()
+    c = opened(mk, tracks(3), paywall=False)
+    c.ev("location.hash='decouvrir'")
+    c.page.wait_for_selector("#recs .row:has-text('Pépite')")
+    assert c.page.inner_text("#recs h2") == "Suggestions pour toi"
+    assert "Pépite" in c.page.inner_text("#recs .row >> nth=0")
+    c.page.click("#recs .row >> nth=0 >> .m")
+    c.page.wait_for_function("S.tracks.some(t=>t.title==='Pépite'&&t.tmp)")   # écouté en passant : pas ajouté à la bibliothèque
+
+
+def test_explore_for_you_falls_back_to_trends_for_empty_library(live, mk):
+    no_paywall(live)
+    community(live, mk, ("Tube", "Zzz"))
+    c = opened(mk, [], paywall=False)
+    c.ev("location.hash='decouvrir'")
+    c.page.wait_for_selector("#recs .row:has-text('Tube')")
+    assert c.page.inner_text("#recs h2") == "Sons du moment"
+
+
+def test_radio_continues_with_a_similar_community_sound(live, mk):
+    no_paywall(live)
+    community(live, mk, ("Pépite", "Artiste"))
+    c = opened(mk, short_tracks(1), paywall=False)
+    c.ev("S.player.repeat='off'; S.player.radio=true; void play(['t1'],0)")
+    c.page.wait_for_function("q.length===2 && S.tracks.some(t=>t.title==='Pépite' && t.tmp && q[1]===t.id)", timeout=8000)
+    assert c.ev("qi") == 1
+    assert "Radio" in toasts(c)
+
+
+def test_radio_off_stops_at_end_of_queue(live, mk):
+    no_paywall(live)
+    community(live, mk, ("Pépite", "Artiste"))
+    c = opened(mk, short_tracks(1), paywall=False)
+    c.ev("S.player.repeat='off'; void play(['t1'],0)")
+    c.page.wait_for_function("au.paused && au.ended", timeout=6000)
+    time.sleep(0.6)
+    assert c.ev("q.length") == 1 and c.ev("au.paused") is True
+
+
+def test_radio_ignores_a_queue_replaced_while_fetching(live, mk):
+    no_paywall(live)
+    community(live, mk, ("Pépite", "Artiste"))
+    c = opened(mk, short_tracks(1) + tracks(2)[1:], paywall=False)    # t1 court, t2 long (ne finit pas pendant le test)
+    c.ev("""window.ASKED=0; const f0=window.fetch; window.fetch=(u,o)=>String(u).includes('/api/recs')
+      ? (ASKED++, new Promise(r=>setTimeout(r,1000)).then(()=>f0(u,o))) : f0(u,o)""")   # réponse de la radio lente
+    c.ev("S.player.repeat='all'; S.player.radio=true; void play(['t1'],0)")
+    c.page.wait_for_function("ASKED===1", timeout=6000)
+    c.ev("void play(['t2'],0)")                                       # l'utilisateur lance autre chose pendant la requête
+    time.sleep(1.8)
+    assert c.ev("q.length") == 1 and c.ev("au.src.includes('n=2')") is True
+
+
+def test_radio_toggle_in_player_menu(live, mk):
+    no_paywall(live)
+    c = opened(mk, tracks(1), paywall=False)
+    start(c, 1)
+    c.ev("npMenu()")
+    c.page.click("#opt >> text=Radio : désactivée")
+    c.page.wait_for_function("S.player.radio===true")                  # le menu se ferme puis applique le choix
+    assert "Radio activée" in toasts(c)

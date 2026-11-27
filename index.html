@@ -347,6 +347,7 @@ h3{font-weight:800}
 .eyebrow{display:inline-flex;align-items:center;gap:6px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);font-weight:500}
 .sec-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:52px 0 16px}
 .sec-h h2{margin:0;font-size:clamp(22px,3.4vw,28px)}
+#recs:not(:empty){margin-bottom:52px}
 button.lnk{background:none;border:0;cursor:pointer}
 .sec-h a,.sec-h button.lnk{color:var(--mut);font-size:14px;text-decoration:none;background:none;border:0}
 .sec-h a:hover,.sec-h button.lnk:hover{color:var(--tx)}
@@ -2509,7 +2510,10 @@ function onEnded(){
   { const t=curT(); if(t&&t.pos) t.pos=0; }
   if(sleepEnd===true||(sleepEnd==="queue"&&qi>=q.length-1)){ sleepEnd=false; renderNP(); toast(_t("Bonne nuit")); updatePlaying(); return; }
   if(S.player.repeat==="one"){ if(offlineLocked()){ offlineNotice(); updatePlaying(); return; } if(adDue()){ loadCur(); return; } adTick(); save(); { const t=curT(); au.currentTime=(t&&t.cut&&t.cut.a)||0; } au.play(); return; }
-  if(qi<q.length-1 || S.player.repeat==="all") step(1); else updatePlaying();
+  if(qi<q.length-1) return step(1);
+  if(S.player.radio){ const q0=q;            // la radio passe avant « répéter la file » ; rien si l'utilisateur a lancé autre chose entre-temps
+    return radioMore(q0).then(n=>{ if(q!==q0||!au.paused) return; if(n||S.player.repeat==="all") step(1); else updatePlaying(); }); }
+  if(S.player.repeat==="all") step(1); else updatePlaying();
 }
 let lastTU=0, statSave=0;
 function onTime(){
@@ -2760,10 +2764,11 @@ setInterval(()=>{                                 // 10 fois par seconde : boucl
 function npMenu(){ const id=q[qi]; if(!id) return; showOptions(_t("Lecteur"),[
   {l:_t("Ajouter à une playlist"),i:"plus",fn:()=>openSheet(id)},
   {l:_t("Mode voiture"),i:"phone",fn:()=>carMode(true)},
-  {l:"Rogner : commencer ici ("+fm(au.currentTime)+")",i:"next1",fn:()=>cutHere("a")},
-  {l:"Rogner : finir ici ("+fm(au.currentTime)+")",i:"x",fn:()=>cutHere("b")},
+  {l:_t("Rogner : commencer ici ({0})",fm(au.currentTime)),i:"next1",fn:()=>cutHere("a")},
+  {l:_t("Rogner : finir ici ({0})",fm(au.currentTime)),i:"x",fn:()=>cutHere("b")},
   (curT()||{}).cut&&{l:_t("Rétablir le son entier"),i:"repeat",fn:()=>cutHere("reset")},
   {l:S.player.smart===false?_t("Mélange malin : désactivé"):_t("Mélange malin : activé"),i:"shuffle",fn:()=>{ S.player.smart=S.player.smart===false; save(); toast(S.player.smart?_t("Mélange malin activé : les sons écoutés récemment passent en dernier"):_t("Mélange malin désactivé")); }},
+  {l:S.player.radio?_t("Radio : activée"):_t("Radio : désactivée"),i:"spark",fn:()=>{ S.player.radio=!S.player.radio; save(); toast(S.player.radio?_t("Radio activée : quand la file se termine, des sons similaires de la communauté prennent le relais"):_t("Radio désactivée")); }},
   {l:S.player.resume===false?_t("Reprendre là où j'en étais : non"):_t("Reprendre là où j'en étais : oui"),i:"clock",fn:()=>{ S.player.resume=S.player.resume===false; save(); toast(S.player.resume?_t("Les longs sons reprennent où tu les as laissés"):_t("Les sons repartent du début")); }},
   {l:_t("Options du son"),i:"dots",fn:()=>trackMenu(id)}]); }
 // Rogner un son sans toucher au fichier : début et fin de lecture mémorisés
@@ -2853,6 +2858,24 @@ function jumpQ(i){ if(i===qi) return togglePlay(); qi=i; loadCur(); }
 function rmQ(i){ q.splice(i,1); if(i<qi) qi--; renderQueue(); }
 function queueNext(id){ if(!au.src||!q.length) return play([id],0); const k=q.indexOf(id); if(k>=0&&k!==qi){ q.splice(k,1); if(k<qi) qi--; } q.splice(qi+1,0,id); toast(_t("Lecture ensuite")); if(!$("#npq").hidden) renderQueue(); }
 function queueAdd(id){ if(!au.src||!q.length) return play([id],0); q.push(id); toast(_t("Ajouté à la file d'attente")); if(!$("#npq").hidden) renderQueue(); }
+// Radio : la file se termine, on y ajoute des sons de la communauté proches de ce qu'on vient d'écouter (écoutés en passant : tmp)
+let RADIO_BUSY=false;
+async function radioMore(q0){
+  if(RADIO_BUSY||!navigator.onLine) return 0; RADIO_BUSY=true;
+  try{
+    const qt=q0.map(id=>S.tracks.find(t=>t.id===id)).filter(Boolean);
+    let s=recSeeds(qt.slice(-15));
+    if(!s.artists.length&&!s.words.length) s=recSeeds(libT());
+    const ex=s.exclude; s.exclude=[...new Set([...qt.slice(-100).map(t=>t.url),...ex])].filter(Boolean).slice(0,200);
+    const d=await api("/api/recs",{method:"POST",body:{...s,n:5}});
+    if(q!==q0) return 0;
+    const ids=d.posts.filter(p=>!qt.some(t=>t.url===p.url)).map(p=>ensureTrack(p,true));
+    if(!ids.length) return 0;
+    q.push(...ids); save(); if(!$("#npq").hidden) renderQueue();
+    toast(_t("Radio : la suite arrive ({0})",plural(ids.length,"son")));
+    return ids.length;
+  }catch(e){ return 0; } finally{ RADIO_BUSY=false; }
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  Favoris, menus de son, stats
@@ -3729,6 +3752,34 @@ function renderPosts(){
   if(f){ POSTS_FOCUS=null; f.classList.add("hl"); f.scrollIntoView({block:"center",behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth"}); }
 }
 function playPost(i){ const ids=POSTS.slice(i,i+10).map(p=>ensureTrack(p,true)); save(); render(); play(ids,0); }
+// Recommandations : on envoie seulement les artistes / mots les plus présents et les liens déjà connus (rien n'est gardé côté serveur)
+const REC_STOP=new Set(["the","and","feat","with","pour","avec","les","des","une","son","sound","original","tiktok","remix","version","official","video","audio","lyrics","prod","music","musique"]);
+function recSeeds(list){
+  const A={}, W={};
+  for(const t of list){ if(!t||(t.pending&&!t.plays)||(t.tmp&&(t.plays||0)<2)) continue;   // ajouté sans être écouté, ou écouté en passant : pas encore un goût
+    const k=1+(t.fav?3:0)+Math.min(t.plays||0,10), a=(t.author||"").trim().toLowerCase();
+    if(a.length>1) A[a]=(A[a]||0)+k;
+    for(const w of ((t.title||"")+" "+(t.tags||[]).join(" ")).toLowerCase().split(/[^\p{L}\p{N}]+/u))
+      if(w.length>2&&!REC_STOP.has(w)&&!/^\d+$/.test(w)) W[w]=(W[w]||0)+k; }
+  const top=(o,n)=>Object.entries(o).sort((x,y)=>y[1]-x[1]).slice(0,n).map(e=>e[0]);
+  return {artists:top(A,10), words:top(W,12), exclude:S.tracks.slice(-200).map(t=>t.url).filter(Boolean)};
+}
+let RECS=null, RECS_AT=0, RECS_P=null;
+function loadRecs(force){        // 5 min de cache ; une seule requête à la fois
+  if(RECS&&!force&&Date.now()-RECS_AT<300000) return Promise.resolve(RECS);
+  return RECS_P||(RECS_P=api("/api/recs",{method:"POST",body:{...recSeeds(libT()),n:8}})
+    .then(d=>{ RECS=d; RECS_AT=Date.now(); },()=>{}).finally(()=>{ RECS_P=null; }));
+}
+function recsHTML(){
+  if(!RECS||(!RECS.posts.length&&!RECS.playlists.length)) return "";
+  return `<div class="sec-h" style="margin-top:0"><h2>${RECS.mode==="trend"?_t("Sons du moment"):_t("Suggestions pour toi")}</h2><button class="lnk" onclick="loadRecs(true).then(renderRecs)">${_t("Actualiser")}</button></div>`
+    +(RECS.posts.length?`<div class="list">${RECS.posts.map(recRow).join("")}</div>`:"")
+    +(RECS.playlists.length?`<div class="hs" style="margin-top:16px">${RECS.playlists.map(pubCard).join("")}</div>`:"");
+}
+function renderRecs(){ const el=$("#recs"); if(el) el.innerHTML=recsHTML(); }   // recherche en cours ou autre écran : rien à remplir
+function recRow(p){ const tt={id:"x"+p.id,title:p.title,author:p.author,cover:p.cover};
+  return `<div class="row">${cover(tt)}<div class="m" onclick="playRec(${js(p.id)})"><div class="t">${esc(p.title)}</div><div class="a ell"><a href="#" class="by" onclick="event.stopPropagation();viewUser(${js(p.username)});return false">${avatarHTML(p,18)}<span>@${esc(p.username)}</span></a>${p.author?" · "+esc(p.author):""}</div></div><button class="icon-btn sm" onclick="playRec(${js(p.id)})" aria-label="${_t("Écouter")}">${I("play",16)}</button></div>`; }
+function playRec(id){ const i=RECS?RECS.posts.findIndex(p=>p.id===id):-1; if(i<0) return; const ids=RECS.posts.slice(i).map(p=>ensureTrack(p,true)); save(); render(); play(ids,0); }
 async function likePost(i){
   if(!ME){ toast(_t("Connecte-toi pour aimer un son")); return openAuth(); }
   const p=POSTS[i]; if(!p) return;
@@ -3750,12 +3801,13 @@ async function renderExplore(force){
   const el=$("#discover-results");
   if(($("#dq").value||"").trim().length>=2) return;
   resetPosts();   // les sons publiés sont relus à chaque visite : ceux d'un autre appareil ou d'un autre membre apparaissent
+  const recP=loadRecs(force);   // en même temps que le flux : pas de second aller-retour
   if(!FEED||force){ el.innerHTML=`<div class="sec-h" style="margin-top:0"><h2>${_t("Chargement…")}</h2></div>${skel(6)}`; await loadFeed(true); }
   else if(Date.now()-FEED_AT>60000) api("/api/feed").then(d=>{ FEED=d; FEED_AT=Date.now(); if(location.hash==="#decouvrir") renderExplore(); }).catch(()=>{});
   if(($("#dq").value||"").trim().length>=2) return;
   if(!FEED){ el.innerHTML=bigEmpty("globe",_t("Impossible de charger la communauté"),_t("Vérifie ta connexion et réessaie."),`<button class="btn" onclick="renderExplore(true)">${_t("Réessayer")}</button>`); return; }
   $("#comm").innerHTML=`<span>${I("users",15)} ${_t("<b>{0}</b> membre{1}",FEED.stats.users,pS(FEED.stats.users))}</span><span>${I("queue",15)} ${_t("<b>{0}</b> playlist{1} publique{2}",FEED.stats.playlists,pS(FEED.stats.playlists),FEED.stats.playlists>1?"s":"")}</span>`;
-  let h="";
+  let h=`<div id="recs">${RECS?recsHTML():`<div class="skel" style="height:240px"></div>`}</div>`;   // place réservée : rien ne saute à l'arrivée
   if((FEED.trend||[]).length) h+=`<div class="sec-h" style="margin-top:0"><h2>${_t("Tendances de la semaine")}</h2></div><div class="pls trend">${FEED.trend.map(trendCard).join("")}</div>`;
   if(FEED.top.length) h+=`<div class="sec-h" ${(FEED.trend||[]).length?"":'style="margin-top:0"'}><h2>${_t("Populaires")}</h2><button class="lnk" onclick="renderExplore(true)">${_t("Actualiser")}</button></div><div class="pls">${FEED.top.map(pubCard).join("")}</div>`;
   const rec=FEED.recent.filter(p=>!FEED.top.slice(0,4).some(x=>x.id===p.id));
@@ -3763,6 +3815,7 @@ async function renderExplore(force){
   if(!FEED.top.length) h+=bigEmpty("spark",_t("Sois le premier à publier !"),_t("Aucune playlist publique pour l'instant. Ouvre une de tes playlists et active « Publique » pour qu'elle apparaisse ici."),`<a class="btn" href="#playlists">${_t("Mes playlists")}</a>`);
   if(FEED.users.length) h+=`<div class="sec-h"><h2>${_t("Nouveaux membres")}</h2></div><div class="users-grid">${FEED.users.map(userCard).join("")}</div>`;
   el.innerHTML=adSlot("banner",2)+h;
+  recP.then(renderRecs);
   loadPosts();
 }
 function searchAll(){ clearTimeout(searchTimer); searchTimer=setTimeout(doSearch,300); }

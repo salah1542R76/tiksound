@@ -1105,6 +1105,19 @@ POST_SELECT = ("SELECT p.id,p.user_id,p.url,p.title,p.author,p.cover,p.duration,
                "(SELECT COUNT(*) FROM post_likes l WHERE l.post_id=p.id) AS likes "
                "FROM posts p JOIN users u ON u.id=p.user_id ")
 
+def post_likes_of(cu, rows):
+    """Les sons de cette page que le membre connecté aime : une seule requête."""
+    if not (cu and rows):
+        return set()
+    with engine.connect() as c:
+        return {r[0] for r in c.execute(text("SELECT post_id FROM post_likes WHERE user_id=:u AND post_id IN :ids")
+                                       .bindparams(bindparam("ids", expanding=True)), {"u": cu["sub"], "ids": [r.id for r in rows]})}
+
+def post_json(r, cu, mine):
+    return {"id": r.id, "url": r.url, "title": r.title or T("Son TikTok"), "author": r.author or "", "cover": live_cover(r.cover),
+            "duration": r.duration or 0, "created": r.created, "username": r.username, "color": r.color or 0, "pic": r.pic or "",
+            "likes": int(r.likes or 0), "liked": r.id in mine, "mine": bool(cu and cu["sub"] == r.user_id), **list_badge(r)}
+
 @app.get("/api/posts")
 def list_posts():
     try: off = max(0, int(request.args.get("offset", 0)))
@@ -1114,16 +1127,64 @@ def list_posts():
     more = len(rows) > n
     rows = rows[:n]
     cu = current_user()
-    mine = set()
-    if cu and rows:
-        with engine.connect() as c:
-            for r in c.execute(text("SELECT post_id FROM post_likes WHERE user_id=:u AND post_id IN :ids")
-                               .bindparams(bindparam("ids", expanding=True)), {"u": cu["sub"], "ids": [r.id for r in rows]}):
-                mine.add(r[0])
-    return jsonify(more=more, posts=[{
-        "id": r.id, "url": r.url, "title": r.title or T("Son TikTok"), "author": r.author or "", "cover": live_cover(r.cover),
-        "duration": r.duration or 0, "created": r.created, "username": r.username, "color": r.color or 0, "pic": r.pic or "",
-        "likes": int(r.likes or 0), "liked": r.id in mine, "mine": bool(cu and cu["sub"] == r.user_id), **list_badge(r)} for r in rows])
+    mine = post_likes_of(cu, rows)
+    return jsonify(more=more, posts=[post_json(r, cu, mine) for r in rows])
+
+
+REC_N = 20
+
+def _seeds(v, n, lo=2):
+    out = []
+    for s in (v if isinstance(v, list) else [])[:n * 3]:
+        s = str(s or "").strip().lower()[:40] if isinstance(s, str) else ""
+        if len(s) >= lo and s not in out:
+            out.append(s)
+        if len(out) >= n:
+            break
+    return out
+
+@app.post("/api/recs")
+def recs():
+    """« Pour toi » et radio : sons publiés et playlists publiques proches des artistes / mots envoyés.
+    Rien de ce qui est envoyé n'est enregistré. Sans graine (bibliothèque vide) : score 0 partout = tendances."""
+    if limited("recs:" + ip(), 60, 600):
+        return err("Trop d'actions, patiente un peu", 429)
+    b = body()
+    artists, words = _seeds(b.get("artists"), 10), _seeds(b.get("words"), 12, 3)
+    raw_ex = b.get("exclude") if isinstance(b.get("exclude"), list) else []
+    ex = [""] + [str(u)[:500] for u in raw_ex[:200]]          # "" : jamais de liste vide dans NOT IN (le shim de test en ferait NULL)
+    off, n = to_int(b.get("offset"), 0, 0, 1000), to_int(b.get("n"), REC_N, 1, REC_N)
+    # shortcut: score recalculé par LIKE sur toute la table posts à chaque appel ; suffisant jusqu'à ~50 000 sons, au-delà précalculer
+    parts, p = [], {"ex": ex, "n": n + 1, "o": off}
+    for i, a in enumerate(artists):
+        p[f"a{i}"], p[f"al{i}"] = a, f"%{like_escape(a)}%"
+        parts.append(f"(CASE WHEN lower(COALESCE(t.author,''))=:a{i} THEN 3 "
+                     f"WHEN lower(COALESCE(t.title,'')||' '||COALESCE(t.author,'')) LIKE :al{i} ESCAPE '\\' THEN 2 ELSE 0 END)")
+    for i, w in enumerate(words):
+        p[f"w{i}"] = f"%{like_escape(w)}%"
+        parts.append(f"(CASE WHEN lower(COALESCE(t.title,'')) LIKE :w{i} ESCAPE '\\' THEN 1 ELSE 0 END)")
+    sql = (f"SELECT t.*, ({' + '.join(parts) or '0'}) AS score FROM (" + POST_SELECT + "WHERE p.url NOT IN :ex) t "
+           "ORDER BY score DESC, likes DESC, created DESC, id DESC LIMIT :n OFFSET :o")
+    with engine.connect() as c:
+        rows = c.execute(text(sql).bindparams(bindparam("ex", expanding=True)), p).fetchall()
+    more, rows = len(rows) > n, rows[:n]
+    cu = current_user()
+    pls = []
+    if off == 0 and (artists or words):
+        pp, pparts = {"me": cu["sub"] if cu else ""}, []
+        for i, a in enumerate(artists):     # morceaux rangés en JSON (json.dumps) : on cherche le champ artiste exact
+            pp[f"a{i}"] = f'%"author": "{like_escape(json.dumps(a)[1:-1])}"%'
+            pparts.append(f"(CASE WHEN lower(t.tracks) LIKE :a{i} ESCAPE '\\' THEN 2 ELSE 0 END)")
+        for i, w in enumerate(words):
+            pp[f"w{i}"] = f"%{like_escape(w)}%"
+            pparts.append(f"(CASE WHEN lower(t.name) LIKE :w{i} ESCAPE '\\' THEN 2 ELSE 0 END)")
+        pls = [r for r in q(f"SELECT t.*, ({' + '.join(pparts)}) AS score FROM (" + PL_SELECT +
+                            "WHERE p.tracks <> '[]' AND p.user_id <> :me) t ORDER BY score DESC, likes DESC, updated DESC LIMIT 8", **pp)
+               if r.score > 0]
+    mine, lk = post_likes_of(cu, rows), (liked_set(cu["sub"]) if cu and pls else set())
+    # JSON écrit à la main (post_json / pl_summary) : l'e-mail lu par list_badge ne sort jamais
+    return jsonify(mode="match" if rows and rows[0].score > 0 else "trend", more=more,
+                   posts=[post_json(r, cu, mine) for r in rows], playlists=[pl_summary(r, lk) for r in pls])
 
 
 @app.post("/api/posts")
