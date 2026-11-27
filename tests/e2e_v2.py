@@ -963,7 +963,7 @@ def test_profile_settings_are_folded(live, mk):
     assert "Personnaliser l'interface" not in c.page.inner_text("#profil-content")      # plus de grande boîte « Apparence »
     c.page.click("#profil-content details.setd summary")
     txt = c.page.inner_text("#profil-content details.setd")
-    for w in ("Personnalisation", "Statistiques", "Synchronisation", "Corbeille", "Sauvegarde", "Raccourcis"):
+    for w in ("Personnalisation", "Statistiques", "Synchronisation", "Corbeille", "Sauvegarde", "Raccourcis", "nouveautés"):
         assert w in txt, w
     c.ev("renderProf()")                                     # reste ouvert après un re-rendu
     assert c.ev("document.querySelector('#profil-content details.setd').open") is True
@@ -1001,16 +1001,57 @@ def test_sound_of_the_day_on_home(live, mk):
 
 def test_welcome_for_new_visitors_only(live, mk):
     no_paywall(live)
-    c = mk(); c.ctx.add_init_script("localStorage.removeItem('tkwel')"); c.seed([]); c.open()
+    c = mk(); c.ctx.add_init_script("localStorage.removeItem('tkwel');localStorage.removeItem('tknew')"); c.seed([]); c.open()
     c.page.wait_for_selector("#gen:not([hidden]) .wel")
     for _ in range(2):
         c.page.click("#gen .wel .btn:has-text('Suivant')")
     c.page.click("#gen .wel .btn:has-text('Commencer')")
     c.page.wait_for_selector("#gen", state="hidden")
     assert c.ev("localStorage.getItem('tkwel')") == "1"
+    assert c.ev("localStorage.getItem('tknew')") == c.ev("NEWV")   # un nouveau ne reçoit pas « Quoi de neuf » juste après
+    c.page.wait_for_timeout(1000)
+    assert c.page.locator("#gen .wn").count() == 0
     c2 = opened(mk, tracks(2), paywall=False)
     c2.page.wait_for_timeout(500)
     assert c2.page.locator("#gen .wel").count() == 0
+
+
+def test_whats_new_shows_once_per_version_to_returning_users(live, mk):
+    no_paywall(live)
+    c = mk(); c.ctx.add_init_script("localStorage.setItem('tknew','2000-01-01')"); c.seed(tracks(2)); c.open()
+    c.page.wait_for_selector("#gen:not([hidden]) .wn")
+    assert c.page.locator("#gen .wn-r").count() == c.ev("NEWS.length") > 0
+    c.page.click("#gen .btn:has-text(\"C'est noté\")")
+    c.page.wait_for_selector("#gen", state="hidden")
+    v = c.ev("NEWV")
+    assert c.ev("localStorage.getItem('tknew')") == v
+    c2 = mk(); c2.ctx.add_init_script(f"localStorage.setItem('tknew','{v}')"); c2.seed(tracks(2)); c2.open()
+    c2.page.wait_for_timeout(1300)
+    assert c2.page.locator("#gen .wn").count() == 0          # déjà vu : plus rien
+
+
+def test_whats_new_for_old_users_without_the_welcome_flag(live, mk):
+    no_paywall(live)
+    c = mk(); c.ctx.add_init_script("localStorage.removeItem('tkwel');localStorage.removeItem('tknew')"); c.seed(tracks(2)); c.open()
+    c.page.wait_for_selector("#gen:not([hidden]) .wn")       # ancien utilisateur (sons, pas de tkwel) : nouveautés, pas la bienvenue
+    assert c.page.locator("#gen .wel").count() == 0
+
+
+def test_whats_new_not_shown_on_a_direct_link(live, mk):
+    no_paywall(live)
+    c = mk(); c.ctx.add_init_script("localStorage.removeItem('tknew')"); c.seed(tracks(2))
+    c.open("?u=quelquun")
+    c.page.wait_for_timeout(1300)
+    assert c.page.locator("#gen .wn").count() == 0
+
+
+def test_whats_new_reachable_from_settings(live, mk):
+    no_paywall(live)
+    c = opened(mk, tracks(2), paywall=False)
+    c.page.goto(live.base + "/#profil")
+    c.page.click("#profil-content details.setd summary")
+    c.page.click("#profil-content details.setd .kv:has-text('Les nouveautés de TikWave') button")
+    c.page.wait_for_selector("#gen:not([hidden]) .wn")
 
 
 def test_admin_dashboard_numbers(live, mk):
@@ -1972,7 +2013,7 @@ def test_no_french_is_left_on_any_english_screen(live, mk):
     c.page.wait_for_timeout(300)
     for name, js in [("stats", "openStats()"), ("trash", "openTrash()"), ("fx", "openFx()"), ("tri", "libView()"),
                      ("son", "trackMenu('t1')"), ("playlist", "plMenu('p1')"), ("picker", "openPicker('p1')"),
-                     ("raccourcis", "showShortcuts()"), ("minuterie", "pickSleep()"), ("bienvenue", "welcome(0)"),
+                     ("raccourcis", "showShortcuts()"), ("minuterie", "pickSleep()"), ("bienvenue", "welcome(0)"), ("nouveautes", "whatsNew()"),
                      ("premium", "openPremium()")]:
         c.ev(f"void {js}")
         c.page.wait_for_timeout(450)

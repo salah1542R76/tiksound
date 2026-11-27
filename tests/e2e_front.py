@@ -120,6 +120,7 @@ class Ctx:
         self.ctx = browser.new_context(service_workers="block", **({"viewport": {"width": 1100, "height": 800}, "locale": "fr-FR"} | opts))
         self.ctx.set_default_timeout(TIMEOUT)
         self.ctx.add_init_script("localStorage.setItem('tkwel','1')")   # pas d'écran de bienvenue dans les tests (sauf test dédié)
+        self.ctx.add_init_script("localStorage.setItem('tknew','9999')")   # pas de « Quoi de neuf » dans les tests (sauf test dédié) ; '9999' > toute date
         self.ctx.route(re.compile(r"/__m/\w+\.wav"), _media)
         self.ctx.route(re.compile(r"https://(checkout|billing)\.stripe\.test/"),
                        lambda r: r.fulfill(status=200, content_type="text/html", body="<h1>Stripe simulé</h1>"))
@@ -1017,7 +1018,7 @@ def _sw_ctx(browser, live, stall=None):
     """Navigateur AVEC service worker (les autres tests le bloquent)."""
     ctx = browser.new_context(locale="en-US", viewport={"width": 1100, "height": 800})
     ctx.set_default_timeout(TIMEOUT)
-    ctx.add_init_script("localStorage.setItem('tkwel','1')")
+    ctx.add_init_script("localStorage.setItem('tkwel','1');localStorage.setItem('tknew','9999')")
     ctx.route(re.compile(r"https://fonts\.(googleapis|gstatic)\.com/"), lambda r: r.abort())
     page = ctx.new_page()
     page.goto(live.base + "/")

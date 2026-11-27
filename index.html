@@ -863,6 +863,7 @@ button,a{-webkit-tap-highlight-color:transparent}
 .sotd{display:flex;align-items:center;gap:14px;padding:12px;margin-top:18px}.sotd .cv{width:64px;height:64px;flex:none;border-radius:calc(var(--r)*.7);overflow:hidden}.sotd .m{flex:1;min-width:0}
 .wel{text-align:center;padding:6px 4px}.wel-i{width:84px;height:84px;margin:4px auto 14px;border-radius:50%;display:grid;place-items:center;background:color-mix(in oklab,var(--ac) 20%,transparent);color:var(--act)}.wel h3{font-size:22px;margin-bottom:8px}.wel p{color:var(--mut);max-width:40ch;margin:0 auto 14px}
 .wel-d{display:flex;justify-content:center;gap:6px;margin-bottom:16px}.wel-d i{width:8px;height:8px;border-radius:50%;background:var(--br2)}.wel-d i.on{background:var(--ac);width:22px;border-radius:9px}
+.wn{display:grid;gap:14px;margin:4px 0 18px}.wn-r{display:flex;gap:12px;align-items:flex-start;text-align:left}.wn-i{flex:none;width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:color-mix(in oklab,var(--ac) 20%,transparent);color:var(--act)}.wn-r b{font-family:var(--fd);font-size:15px}.wn-r p{margin:2px 0 0;color:var(--mut);font-size:14px}
 .faq{margin-top:48px}.faq h2{margin-bottom:12px}.faq details{border-top:1px solid var(--br);padding:4px 0}.faq summary{cursor:pointer;padding:12px 0;font-weight:500;list-style:none}.faq summary::-webkit-details-marker{display:none}.faq summary::after{content:"+";float:right;color:var(--mut)}.faq details[open] summary::after{content:"−"}.faq p{color:var(--mut);padding:0 0 12px}
 .foot a+a{margin-left:18px}
 .trend .pc{position:relative}.pc.ph>*{visibility:hidden}.trend .wk{position:absolute;top:10px;left:10px;z-index:2;background:var(--ac);color:var(--on);font-size:12px;font-weight:600;padding:3px 9px;border-radius:99px}
@@ -2780,11 +2781,24 @@ function cutHere(w){
   save();
 }
 function sotd(){ const l=S.tracks.filter(playable); if(!l.length) return null; let h=0; for(const ch of dayKey(new Date())) h=(h*31+ch.charCodeAt(0))>>>0; return l[h%l.length]; }
+// Quoi de neuf : une fois par nouvelle version, pour ceux qui connaissent déjà l'appli (les nouveaux ont la bienvenue)
+const NEWV="2026-11-27";   // à changer (AAAA-MM-JJ, comparé comme texte) en même temps que NEWS, à chaque livraison qui mérite d'être annoncée
+const NEWS=[  // [icône, titre, texte] : seulement ce qui est vraiment en ligne, texte simple (pas de HTML)
+  ["music",_t("Spotify et YouTube dès l'accueil"),_t("Importe une playlist Spotify ou cherche un son YouTube en un geste, directement depuis l'accueil.")],
+  ["sliders",_t("Les effets en vitrine"),_t("L'accueil montre tous les effets (slowed, bass boost, réverbe, boucle…) : touche une carte pour l'essayer. Une courte vidéo présente aussi l'appli.")],
+  ["spark",_t("« Pour toi » et la Radio"),_t("Explorer te suggère des sons proches de ta bibliothèque. Active la Radio dans le menu du lecteur : quand ta file se termine, des sons similaires prennent le relais.")],
+  ["check",_t("Plein de corrections"),_t("Synchro plus sûre pour les grosses bibliothèques, égaliseur et lecteur plus fiables, meilleur affichage sur les petits téléphones et les thèmes clairs.")],
+  ["gauge",_t("Plus rapide"),_t("L'appli démarre plus vite et s'ouvre même hors ligne dès ta première visite.")],
+  ["eye",_t("Plus accessible"),_t("Meilleure navigation au clavier et avec les lecteurs d'écran, et la réduction des animations est respectée.")]];
+function newsSeen(){ try{ localStorage.setItem("tknew",NEWV); }catch(e){} }
+function whatsNew(){ newsSeen();
+  openGen(_t("Quoi de neuf ?"),`<div class="wn">${NEWS.map(([ic,ti,tx])=>`<div class="wn-r"><span class="wn-i">${I(ic,20)}</span><div><b>${ti}</b><p>${tx}</p></div></div>`).join("")}</div>
+    <div class="nw"><button class="btn" style="flex:1" onclick="closeSh('gen')">${_t("C'est noté")}</button></div>`); }
 // Bienvenue : 3 écrans, une seule fois
 const WEL=[["music",_t("Colle un lien TikTok"),_t("Touche « Partager » puis « Copier le lien » dans TikTok, colle-le ici : on garde uniquement le son.")],
   ["queue",_t("Range et écoute"),_t("Crée des playlists, écoute écran éteint, ajoute des effets (bass boost, slowed, boucle…) depuis le lecteur.")],
   ["palette",_t("À ton image"),_t("Thèmes, couleurs, fond, police, pages : touche la palette en haut pour tout personnaliser.")]];
-function welcome(i){ try{ localStorage.setItem("tkwel","1"); }catch(e){} const [ic,ti,tx]=WEL[i];
+function welcome(i){ try{ localStorage.setItem("tkwel","1"); }catch(e){} newsSeen(); const [ic,ti,tx]=WEL[i];
   openGen(_t("Bienvenue sur TikWave"),`<div class="wel"><div class="wel-i">${I(ic,40)}</div><h3>${ti}</h3><p>${tx}</p><div class="wel-d">${WEL.map((_,k)=>`<i class="${k===i?"on":""}"></i>`).join("")}</div>
     <div class="nw">${i<WEL.length-1?`<button class="btn alt" onclick="closeSh('gen')">${_t("Passer")}</button><button class="btn" style="flex:1" onclick="welcome(${i+1})">${_t("Suivant")}</button>`:`<button class="btn" style="flex:1" onclick="closeSh('gen');location.hash='ajouter'">${_t("Commencer")}</button>`}</div></div>`); }
 // Mode voiture : très gros boutons, l'écran reste allumé
@@ -3322,6 +3336,7 @@ function renderProf(){
     <div class="kv"><span>${_t("Stockage utilisé sur l'appareil")}</span><span class="a" id="stor">…</span></div>
     <div class="kv"><span>${_t("Sauvegarde (playlists, titres, réglages)")}</span><span style="display:flex;gap:8px"><button class="btn alt sm" onclick="exportData()">${I("dl",16)}${_t("Exporter")}</button><label class="btn alt sm" style="cursor:pointer">${I("up2",16)}${_t("Importer")}<input type="file" accept="application/json,.json" hidden onchange="importData(this.files[0]);this.value=''"></label></span></div>
     <div class="kv"><span>${_t("Raccourcis clavier")}</span><button class="btn alt sm" onclick="showShortcuts()">${I("kbd",16)}${_t("Voir")}</button></div>
+    <div class="kv"><span>${_t("Les nouveautés de TikWave")}</span><button class="btn alt sm" onclick="whatsNew()">${I("spark",16)}${_t("Voir")}</button></div>
     ${isIOS()&&!isStandalone()?`<div class="kv"><span>${_t("Installer sur iPhone : touche <b>Partager</b> puis <b>Sur l'écran d'accueil</b>")}</span></div>`:""}
   </details>`;
   if(ME) h+=`<div class="box gcard danger-z"><h3 style="color:var(--err)">${_t("Zone sensible")}</h3><div class="kv"><span>${_t("Supprimer mon compte et mes playlists publiques")}</span><button class="btn alt sm" style="color:var(--err)" onclick="deleteAccount()">${I("trash",16)}${_t("Supprimer")}</button></div></div>`;
@@ -3963,7 +3978,10 @@ showMoved(location.hostname);
   if(ME){ syncAllPublic(); syncLibrary().finally(restorePublic); }
   BOOTED=true; updatePremUI();
   if(PREM_) handlePremiumReturn(PREM_);
-  { let w=null; try{ w=localStorage.getItem("tkwel"); }catch(e){} if(!w&&!S.tracks.length&&!P_&&!PL_&&!U_&&!shared&&!PREM_) setTimeout(()=>{ if($$(".ov2").every(o=>o.hidden)) welcome(0); },600); }
+  { let w=null,n=""; try{ w=localStorage.getItem("tkwel"); n=localStorage.getItem("tknew")||""; }catch(e){}
+    const deep=P_||PL_||U_||shared||PREM_;   // lien direct (import, playlist, profil, partage, retour paiement) : on ne cache pas ce que la personne vient voir
+    if(!w&&!S.tracks.length&&!deep) setTimeout(()=>{ if($$(".ov2").every(o=>o.hidden)) welcome(0); },600);
+    else if(!deep&&n<NEWV) setTimeout(()=>{ if($$(".ov2").every(o=>o.hidden)) whatsNew(); },900); }
   if(ONLINE) loadFeed().then(()=>{ renderHome(); });
 
   if(P_) checkImport(P_);

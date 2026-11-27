@@ -1036,5 +1036,20 @@ window.TK_EN={
 "(copie)": "(copy)",
 "toi": "you",
 "Compte": "Account",
-"Pastel": "Pastel"
+"Pastel": "Pastel",
+"Quoi de neuf ?": "What's new?",
+"C'est noté": "Got it",
+"Les nouveautés de TikWave": "What's new in TikWave",
+"Spotify et YouTube dès l'accueil": "Spotify and YouTube right from home",
+"Importe une playlist Spotify ou cherche un son YouTube en un geste, directement depuis l'accueil.": "Import a Spotify playlist or search for a YouTube sound in one tap, right from the home screen.",
+"Les effets en vitrine": "Effects on display",
+"L'accueil montre tous les effets (slowed, bass boost, réverbe, boucle…) : touche une carte pour l'essayer. Une courte vidéo présente aussi l'appli.": "The home screen shows every effect (slowed, bass boost, reverb, loop…): tap a card to try it. A short video also introduces the app.",
+"« Pour toi » et la Radio": "“For you” and Radio",
+"Explorer te suggère des sons proches de ta bibliothèque. Active la Radio dans le menu du lecteur : quand ta file se termine, des sons similaires prennent le relais.": "Explore suggests sounds close to your library. Turn on Radio in the player menu: when your queue ends, similar sounds take over.",
+"Plein de corrections": "Lots of fixes",
+"Synchro plus sûre pour les grosses bibliothèques, égaliseur et lecteur plus fiables, meilleur affichage sur les petits téléphones et les thèmes clairs.": "Safer sync for big libraries, a more reliable equalizer and player, and better display on small phones and light themes.",
+"Plus rapide": "Faster",
+"L'appli démarre plus vite et s'ouvre même hors ligne dès ta première visite.": "The app starts faster and even opens offline after your first visit.",
+"Plus accessible": "More accessible",
+"Meilleure navigation au clavier et avec les lecteurs d'écran, et la réduction des animations est respectée.": "Better keyboard and screen reader navigation, and reduced motion is respected."
 };
