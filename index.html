@@ -1081,7 +1081,7 @@ button,a{-webkit-tap-highlight-color:transparent}
 
 <div id="toasts" role="status" aria-live="polite"></div>
 
-<script>if(LANG==="en")document.write('<script src="/lang-en.js?v=11"><\/script>')   /* les textes anglais, seulement pour qui en a besoin */</script>
+<script>if(LANG==="en")document.write('<script src="/lang-en.js?v=12"><\/script>')   /* les textes anglais, seulement pour qui en a besoin */</script>
 <script>
 // ═══ Français / English : la phrase française est la clé ; les traductions sont dans lang-en.js ═══
 // Nouveau texte : passe-le dans la fonction _t (cases {0}, {1} pour les valeurs), puis ajoute la traduction dans lang-en.js.
@@ -1301,6 +1301,7 @@ function sfx(name){
       a.gain.setValueAtTime(.0001,s); a.gain.exponentialRampToValueAtTime(g,s+.004); a.gain.exponentialRampToValueAtTime(.0001,s+dur);
       o.connect(a); a.connect(SFX.out); o.start(s); o.stop(s+dur+.02);
     }
+    SFX.t=performance.now();   // la fenêtre anti-rafale part du son joué (créer la carte son peut prendre ~100 ms)
     clearTimeout(SFX.idle); SFX.idle=setTimeout(sfxClose,3000);   // libère la carte son quand rien ne se passe
   }catch(e){}
 }

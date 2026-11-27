@@ -14,7 +14,7 @@ Le propriétaire n'est pas développeur : il parle français, tutoie, et veut de
 | `i18n_server.py` | Traductions anglaises du serveur (messages d'erreur, e-mails, aperçus de liens) et choix de la langue d'une requête |
 | `index.html` | Toute l'appli front en un seul fichier (HTML + CSS + JS, ~380 Ko) |
 | `lang-en.js` | Traductions anglaises de l'appli (chargé seulement pour les visiteurs en anglais) |
-| `sw.js` | Service worker (cache `tk-vN` : augmenter N à chaque livraison d'`index.html` ou de `lang-en.js`, avec `?v=N` dans `index.html`, et mettre à jour `tests/test_icons.py`). Actuellement `tk-v11` |
+| `sw.js` | Service worker (cache `tk-vN` : augmenter N à chaque livraison d'`index.html` ou de `lang-en.js`, avec `?v=N` dans `index.html`, et mettre à jour `tests/test_icons.py`). Actuellement `tk-v12`. Le `SHELL` (page, manifest, `lang-en.js?v=N`, icônes) est gardé dès l'installation : l'appli s'ouvre hors ligne après une seule visite |
 | `promo.mp4`, `promo-poster.jpg` | Vidéo de présentation de l'accueil (nouveaux visiteurs). Servie par `statique` (morceaux 206, cache long via `?v=N`), jamais gardée par le service worker. La remplacer = changer `?v=` dans `index.html` |
 | `manifest.webmanifest`, icônes, favicons | PWA installable (le serveur traduit le manifest en anglais) |
 | `conditions.html`, `confidentialite.html`, `signalement.html` + `*.en.html` | Pages légales en français et en anglais (à faire relire) |
@@ -42,7 +42,7 @@ Lancer chaque groupe séparément (les tests Chrome dans leur propre processus) 
 ```
 python3 -m pytest tests -q --ignore=tests/e2e_front.py --ignore=tests/e2e_v2.py   # serveur (223)
 python3 -m pytest tests/e2e_front.py -q                                           # appli (53)
-python3 -m pytest tests/e2e_v2.py -q                                              # appli (244)
+python3 -m pytest tests/e2e_v2.py -q                                              # appli (248)
 ```
 
 Dépendances : `pip install -r requirements.txt pytest playwright pillow opencv-python-headless numpy` puis `playwright install chromium` (ou `CHROME_BIN` vers un Chrome installé). Sous Windows : `PYTHONUTF8=1`. `tests/_shims.py` simule sqlalchemy et yt_dlp s'ils manquent : aucun test ne touche Internet. Les navigateurs de test sont en `fr-FR` par défaut (`tests/e2e_front.py`). Méthode : test qui échoue d'abord, puis correction, puis les trois groupes au vert avant de livrer.
@@ -55,6 +55,10 @@ Dépendances : `pip install -r requirements.txt pytest playwright pillow opencv-
 - **Recherche** : `GET /api/find?q=` (YouTube + SoundCloud, Spotify si clés). Si YouTube bloque le serveur, le même son est cherché sur SoundCloud (`soundcloud_twin`).
 - **Explorer** : les sons publiés (`/api/posts`) sont relus à chaque visite ; `POSTS_GEN` jette les réponses arrivées après une remise à zéro ; « Voir » après une publication amène le son à l'écran (`POSTS_FOCUS`). Le flux des playlists est rafraîchi s'il a plus d'une minute.
 - **Recommandations** : `POST /api/recs` reçoit les artistes / mots les plus présents de la bibliothèque (`recSeeds`) et les liens à exclure, classe les sons publiés (artiste exact +3, artiste dans le titre +2, mot du titre +1, puis j'aime) et renvoie des playlists publiques proches (page 0). Bibliothèque vide = tendances (`mode: "trend"`). Rien n'est enregistré, jamais d'e-mail (`post_json`, `pl_summary`). Explorer affiche « Suggestions pour toi » (`#recs`, cache 5 min). **Radio** (menu du lecteur, `S.player.radio`, désactivée par défaut) : à la fin de la file, `radioMore` ajoute 5 sons proches (écoutés en passant, `tmp`) et passe avant « répéter la file ».
+- **Quoi de neuf ?** : liste `NEWS` dans `index.html` (seulement ce qui est vraiment en ligne, texte simple traduit). Montrée une fois aux habitués quand `NEWV` dépasse la valeur gardée (`localStorage` `tknew`), jamais par-dessus un lien direct ni à un nouveau visiteur (lui voit `welcome`), et toujours dans Profil > Réglages et données. Ajouter une nouveauté = une ligne dans `NEWS` + augmenter `NEWV` + traduction.
+- **Synchro de la bibliothèque** : après un envoi, l'appli prend comme base ce que le serveur a vraiment gardé (`data` de la réponse), pas ce qu'elle a envoyé, sinon un son refusé passerait pour une suppression. Playlists limitées à 1500 sons des deux côtés (`plUrls`).
+- **Paiement** : Stripe.js (`js.stripe.com`) ne se charge qu'au premier paiement lancé (`loadStripe`) ; un échec (hors ligne, bloqueur) laisse réessayer.
+- **Sons d'interface** : `sfx(nom)` synthétise de petits sons (aucun fichier), un au plus toutes les 70 ms, comptés à partir du son joué (créer la carte son peut prendre ~100 ms au premier).
 - **Premium visible** : les listes (Explorer, recherche, sons publiés) renvoient `premium` et la décoration d'avatar (`list_badge` dans `server.py`, jamais l'e-mail). L'appli met une lueur dorée (`.av.prem`) et le badge « Premium », seulement quand l'abonnement est actif sur le serveur (`PAYWALL`).
 - **Cosmétiques Premium** : listes `COS_*` dans `server.py` et `COSB/COSF/COSE/COSN/COSG` dans `index.html` (+ règles CSS `bn-`, `fr-`, `pfx-`, `nf-`). Ajouter une décoration = les trois endroits + sa traduction.
 - **Statut Discord** : `npExpose()` écrit ce qui joue sur `<html data-np-title|artist|cover|state|start|end>` ; le module PreMiD de `discord/premid/` le lit. Impossible sur téléphone.

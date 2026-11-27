@@ -1,4 +1,4 @@
-const C = "tk-v11";
+const C = "tk-v12";
 // Coquille de l'appli gardée dès l'installation : elle s'ouvre hors ligne après une seule visite. lang-en.js suit le N de tk-vN (même ?v=N que index.html).
 const SHELL = ["/", "/manifest.webmanifest", "/lang-en.js?v=" + C.slice(4), "/favicon.svg", "/favicon.ico", "/icon-192.png"];
 self.addEventListener("install", e => { self.skipWaiting(); e.waitUntil(caches.open(C).then(c => Promise.all(SHELL.map(u =>
