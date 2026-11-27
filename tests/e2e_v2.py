@@ -2813,3 +2813,40 @@ def test_trophies_and_best_streak_stay_earned(live, mk):
     c.ev("S.goal=1; S.stats.byDay={[dayKey(new Date())]:120}; openStats()")
     c.ev("closeSh('gen'); S.stats.byDay={}; openStats()")
     assert c.ev("[...document.querySelectorAll('#genb .tro.on')].some(e=>e.textContent.includes('🎯'))")
+
+
+# ═══ Performance : un cœur ou un nouveau son ne reconstruisent pas toute la bibliothèque ═══
+def test_heart_in_library_updates_the_card_in_place(live, mk):
+    c = opened(mk, tracks(3))
+    c.ev("location.hash='bibliotheque'; render()")
+    c.page.wait_for_selector("#lib [data-id='t2']")
+    c.ev("document.querySelector('#lib [data-id=\"t2\"]').__k=1")
+    c.page.click("#lib [data-id='t2'] .fav")
+    assert c.ev("document.querySelector('#lib [data-id=\"t2\"]').__k") == 1        # même carte : pas de reconstruction
+    assert c.ev("document.querySelector('#lib [data-id=\"t2\"] .fav').classList.contains('on')")
+    assert "Favoris 1" in c.ev("document.querySelector('#filters').textContent")                        # le compteur suit quand même
+    c.page.click("#filters >> text=Favoris")                                     # filtre Favoris : retirer le cœur enlève la carte
+    c.page.click("#lib [data-id='t2'] .fav")
+    c.page.wait_for_selector("#lib [data-id='t2']", state="detached")
+
+
+def test_new_track_does_not_rebuild_the_library_unless_the_order_depends_on_it(live, mk):
+    c = opened(mk, tracks(3))
+    c.ev("location.hash='bibliotheque'; render()")
+    c.page.wait_for_selector("#lib [data-id='t2']")
+    c.ev("document.querySelector('#lib [data-id=\"t2\"]').__k=1")
+    start(c, 1)
+    playing_src(c, 1)
+    assert c.ev("document.querySelector('#lib [data-id=\"t2\"]').__k") == 1
+    assert c.ev("document.querySelector('#lib [data-id=\"t1\"]').classList.contains('cur')")
+    c.ev("S.tracks.forEach(t=>t.plays=0); S.ui.sort='plays'; renderLib()")                                     # tri par écoutes : l'ordre change, on redessine
+    start(c, 3)
+    c.page.wait_for_function("document.querySelector('#lib [data-id]').dataset.id==='t3'")
+
+
+def test_open_playlist_drops_deleted_tracks_and_keeps_order(live, mk):
+    c = opened(mk, tracks(3), pls=[{"id": "p", "name": "P", "ids": ["t3", "gone", "t1"]}])
+    c.ev("openPl='p'; location.hash='playlists'; render()")
+    c.page.wait_for_selector("#pll [data-id='t1']")
+    assert c.ev("[...document.querySelectorAll('#pll [data-id]')].map(e=>e.dataset.id)") == ["t3", "t1"]
+    assert c.ev("S.pls[0].ids") == ["t3", "t1"]

@@ -19,7 +19,6 @@
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <meta name="msapplication-TileColor" content="#0b0b0c">
 <meta name="msapplication-TileImage" content="/icon-192.png">
-<script async src="https://js.stripe.com/dahlia/stripe.js"></script>
 <!--og-->
 <title>TikWave – tes sons TikTok en playlist</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -427,6 +426,8 @@ section.has .steps{display:none}
 .tc::before,.pc::before,.user-card::before{content:"";position:absolute;inset:0;border-radius:inherit;background:radial-gradient(260px circle at var(--mx,50%) var(--my,0%),var(--hl),transparent 65%);opacity:0;transition:opacity .3s;pointer-events:none;z-index:0}
 .tc:hover::before,.pc:hover::before,.user-card:hover::before{opacity:1}
 .tc:hover{box-shadow:var(--sh);border-color:var(--br2)}
+#lib.grid>.tc{content-visibility:auto;contain-intrinsic-size:auto 260px}   /* grandes bibliothèques : le navigateur ne dessine que les sons visibles */
+#lib.list>.row,#pll>.row{content-visibility:auto;contain-intrinsic-size:auto 64px}
 .tc.cur{border-color:color-mix(in oklab,var(--ac) 70%,transparent);box-shadow:0 0 0 1px var(--ac),0 10px 36px color-mix(in oklab,var(--ac) 22%,transparent)}
 .art{position:relative;display:grid;place-items:center;width:100%;aspect-ratio:1;border:0;padding:0;border-radius:calc(var(--r)*.75);overflow:hidden;background:linear-gradient(135deg,color-mix(in oklab,var(--ac) 30%,#2a2a32),#16161b);z-index:1}
 .art img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transition:transform .5s cubic-bezier(.2,.8,.3,1)}
@@ -1983,7 +1984,7 @@ function premHTML(p){
   return `${head}${perks}${ME.plan_status==="canceled"?`<p class="a" style="margin:0 0 12px">${_t("Ton abonnement est terminé.")}</p>`:""}<button class="btn" id="gopm" style="width:100%" onclick="goPremium()">${_t("Passer Premium{0}",price?" · "+esc(price):"")}</button>${redeem}`;
 }
 function goExternal(u){ if(!/^https:\/\//.test(u||"")) throw new Error(_t("Adresse de paiement invalide")); location.href=u; }
-// Formulaire de paiement Stripe intégré (Checkout Studio, ui_mode "form"). La clé publique vient du serveur ; Stripe.js se charge dans le <head>, depuis js.stripe.com uniquement.
+// Formulaire de paiement Stripe intégré (Checkout Studio, ui_mode "form"). La clé publique vient du serveur ; Stripe.js (js.stripe.com uniquement) ne se charge qu'au premier paiement lancé.
 const STRIPE_APPEARANCE={theme:"stripe",labels:"auto",inputs:"spaced",variables:{borderRadius:"4px",colorBackground:"#ffffff",colorDanger:"#df1b41",colorPrimary:"#0570de",colorSuccess:"#00c853",colorText:"#30313d",fontFamily:"default",fontSizeBase:"16px",spacingUnit:"4px"}};
 async function mountCheckout(publishableKey, secret){
   $("#genb").innerHTML=`<button class="lnk" onclick="openPremium()" style="margin-bottom:10px">${_t("← Retour")}</button><div style="background:#fff;border-radius:12px;padding:12px"><div id="checkout-form"></div></div>`;
@@ -1999,11 +2000,19 @@ async function mountCheckout(publishableKey, secret){
     });
   } else throw new Error((loadActionsResult.error&&loadActionsResult.error.message)||_t("Le formulaire de paiement ne s'est pas chargé"));
 }
+let STRIPE_JS;
+function loadStripe(){                      // une seule fois ; un échec (hors ligne, bloqueur) laisse réessayer au prochain appui
+  return STRIPE_JS||(STRIPE_JS=typeof Stripe!=="undefined"?Promise.resolve():new Promise((ok,ko)=>{
+    const s=document.createElement("script"); s.src="https://js.stripe.com/dahlia/stripe.js"; s.onload=ok;
+    s.onerror=()=>{ s.remove(); STRIPE_JS=null; ko(new Error(_t("Le paiement n'est pas disponible sans connexion. Réessaie dans un instant."))); };
+    document.head.appendChild(s);
+  }));
+}
 async function goPremium(){
   if(!ME){ closeSh("gen"); return openAuth("register"); }
   const b=$("#gopm"), old=b?b.innerHTML:""; if(b){ b.disabled=true; b.innerHTML=`<span class="spin-i"></span>${_t("Chargement…")}`; }
   try{
-    if(typeof Stripe==="undefined") throw new Error(_t("Le paiement n'est pas disponible sans connexion. Réessaie dans un instant."));
+    await loadStripe();
     const info=await api("/api/premium"); if(!info.publishable_key) throw new Error(_t("Le paiement est momentanément indisponible"));
     const d=await api("/api/stripe/checkout",{method:"POST"});
     await mountCheckout(info.publishable_key,d.client_secret);
@@ -2424,7 +2433,7 @@ async function loadCur(){
   au.play().catch(()=>toast(_t("Lecture bloquée, touche ▶")));
   adTick();
   t.plays=(t.plays||0)+1; t.last=Date.now(); S.lastId=t.id; markDay(); save();
-  showPlayer(t); render(); if(!$("#np").hidden) renderNP();
+  showPlayer(t); if(libStays("never","plays","last")) updatePlaying(); else render(); if(!$("#np").hidden) renderNP();
 }
 async function coverColor(src){
   if(!src) return null;
@@ -2827,7 +2836,9 @@ function queueAdd(id){ if(!au.src||!q.length) return play([id],0); q.push(id); t
 // ═══════════════════════════════════════════════════════════════════════════
 //  Favoris, menus de son, stats
 // ═══════════════════════════════════════════════════════════════════════════
-function toggleFav(id){ const t=S.tracks.find(x=>x.id===id); if(!t) return; t.fav=!t.fav; if(t.fav) sfx("like"); save(); POP=t.fav?id:null; render(); if(q[qi]===id) renderNP(); if(t.fav) toast(_t("Ajouté aux favoris")); setTimeout(()=>POP=null,600); }
+function toggleFav(id){ const t=S.tracks.find(x=>x.id===id); if(!t) return; t.fav=!t.fav; if(t.fav) sfx("like"); save(); POP=t.fav?id:null;
+  if(libStays("fav")){ renderFilters(LISTS.lib.length); $$(`#lib [data-id="${id}"] .fav`).forEach(b=>{ b.classList.toggle("on",t.fav); b.classList.toggle("pop",t.fav); }); } else render();
+  if(q[qi]===id) renderNP(); if(t.fav) toast(_t("Ajouté aux favoris")); setTimeout(()=>POP=null,600); }
 function favCur(){ const t=curT(); if(t) toggleFav(t.id); }
 function trackMenu(id){
   const t=S.tracks.find(x=>x.id===id); if(!t) return;
@@ -3093,20 +3104,25 @@ function libList(){
   else if(s==="last") a=[...a].sort((x,y)=>(y.last||0)-(x.last||0));
   return a;
 }
+// Bibliothèque affichée et ni son filtre ni son tri ne dépendent de ce qui change : inutile de tout reconstruire
+const libStays=(...k)=>location.hash.slice(1)==="bibliotheque"&&!k.includes(S.ui.filter)&&!k.includes(S.ui.sort);
 function renderLib(){
   const a=libList(), T=libT(); LISTS.lib=a.map(t=>t.id);
   $("#cnt").textContent=T.length?"("+T.length+")":"";
   $("#trashl").textContent=S.trash.length?_t("Corbeille ({0})",S.trash.length):"";
-  const pend=T.filter(t=>t.pending).length, fav=T.filter(t=>t.fav).length, loc=T.filter(t=>t.local).length;
-  if(S.ui.filter==="pending"&&!pend) S.ui.filter="all";
-  const tags={}; T.forEach(t=>(t.tags||[]).forEach(g=>tags[g]=(tags[g]||0)+1));
-  const topTags=Object.entries(tags).sort((x,y)=>y[1]-x[1]).slice(0,6).map(([g,n])=>["tag:"+g,"#"+esc(g),n]);
-  const xf={never:_t("Jamais écoutés"),short:_t("Courts")}[S.ui.filter];
-  $("#filters").innerHTML=T.length?[["all",_t("Tous"),T.length],fav&&["fav",_t("Favoris"),fav],loc&&["local",_t("Hors ligne"),loc],pend&&["pending",_t("À télécharger"),pend],xf&&[S.ui.filter,xf,libList().length],...topTags].filter(Boolean).map(([k,l,n])=>`<button class="chip ${S.ui.filter===k?"on":""}" onclick="S.ui.filter=${js(k)};save();renderLib()">${l} <b>${n}</b></button>`).join("")+(pend&&S.ui.filter==="pending"?`<button class="chip" onclick="dlAll(LISTS.lib)">${I("dl",14)}${_t("Tout télécharger")}</button>`:""):"";
+  renderFilters(a.length);
   const el=$("#lib"); el.className=S.ui.view==="list"?"list":"grid"; queueMicrotask(selPaint);
   el.innerHTML=a.length?withAds(S.ui.view==="list"?a.map((t,i)=>row(t,"lib",i)):a.map((t,i)=>card(t,"lib",i)))
     :S.tracks.length?`<p class="empty">${_t("Aucun résultat{0}",S.ui.filter!=="all"?` ${_t("dans ce filtre.")} <a href="#" onclick="S.ui.filter='all';renderLib();return false">${_t("Tout afficher")}</a>`:".")}</p>`
     :bigEmpty("music",_t("Ta bibliothèque est vide"),_t("Colle un lien TikTok pour ajouter ton premier son. {0}",isPrem()?_t("Il sera stocké sur ton appareil."):_t("Tu pourras l'écouter dès qu'il est prêt.")),`<a class="btn" href="#ajouter">${I("plus",18)}${_t("Ajouter un son")}</a>`);
+}
+function renderFilters(n){                  // n : nombre de sons de la liste affichée
+  const T=libT(), pend=T.filter(t=>t.pending).length, fav=T.filter(t=>t.fav).length, loc=T.filter(t=>t.local).length;
+  if(S.ui.filter==="pending"&&!pend) S.ui.filter="all";
+  const tags={}; T.forEach(t=>(t.tags||[]).forEach(g=>tags[g]=(tags[g]||0)+1));
+  const topTags=Object.entries(tags).sort((x,y)=>y[1]-x[1]).slice(0,6).map(([g,n])=>["tag:"+g,"#"+esc(g),n]);
+  const xf={never:_t("Jamais écoutés"),short:_t("Courts")}[S.ui.filter];
+  $("#filters").innerHTML=T.length?[["all",_t("Tous"),T.length],fav&&["fav",_t("Favoris"),fav],loc&&["local",_t("Hors ligne"),loc],pend&&["pending",_t("À télécharger"),pend],xf&&[S.ui.filter,xf,n],...topTags].filter(Boolean).map(([k,l,n])=>`<button class="chip ${S.ui.filter===k?"on":""}" onclick="S.ui.filter=${js(k)};save();renderLib()">${l} <b>${n}</b></button>`).join("")+(pend&&S.ui.filter==="pending"?`<button class="chip" onclick="dlAll(LISTS.lib)">${I("dl",14)}${_t("Tout télécharger")}</button>`:""):"";
 }
 
 function smartPls(){ const now=Date.now(); return [
@@ -3122,8 +3138,9 @@ function plCard(p){ return `<button class="pc" onclick="openPl='${p.id}';render(
 function renderPlaylists(){
   const v=$("#plsv"), pl=getPl(openPl);
   if(pl){
-    if(!pl.smart) pl.ids=pl.ids.filter(id=>S.tracks.some(t=>t.id===id));
-    const ts=pl.ids.map(id=>S.tracks.find(t=>t.id===id)).filter(Boolean); LISTS.pl=ts.map(t=>t.id);
+    const byId=new Map(S.tracks.map(t=>[t.id,t]));
+    if(!pl.smart) pl.ids=pl.ids.filter(id=>byId.has(id));
+    const ts=pl.ids.map(id=>byId.get(id)).filter(Boolean); LISTS.pl=ts.map(t=>t.id);
     const tot=ts.reduce((s,t)=>s+(t.duration||0),0), pend=ts.some(t=>t.pending);
     safeSet(v,`<button class="ib back" onclick="openPl=null;render()">${I("back",16)} ${_t("Playlists")}</button>
     <div class="pl-hero gcard"><div class="pl-art">${plArt(pl)}</div>

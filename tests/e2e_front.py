@@ -996,3 +996,59 @@ def test_offline_pill_explains_to_free_and_reassures_premium(live, mk):
     prem.page.wait_for_selector("#offline", state="visible")
     txt = prem.page.inner_text("#offline")
     assert "disponibles" in txt and "Premium" not in txt
+
+
+# ═══ Performance : Stripe.js seulement au paiement, coquille de l'appli gardée hors ligne ═══
+def test_stripe_js_is_loaded_only_when_checkout_starts(live, mk):
+    c = mk()
+    hits = []
+    c.ctx.on("request", lambda r: hits.append(r.url) if "js.stripe.com" in r.url else None)
+    c.signup("a@example.com", "alice")
+    c.open()
+    c.page.wait_for_timeout(300)
+    assert hits == [] and c.page.locator("script[src*='js.stripe.com']").count() == 0
+    c.page.click("#premb")
+    c.page.get_by_role("button", name=re.compile("Passer Premium")).click()
+    c.page.wait_for_selector("#checkout-form #fake-stripe-form")
+    assert len(hits) == 1
+
+
+def _sw_ctx(browser, live, stall=None):
+    """Navigateur AVEC service worker (les autres tests le bloquent)."""
+    ctx = browser.new_context(locale="en-US", viewport={"width": 1100, "height": 800})
+    ctx.set_default_timeout(TIMEOUT)
+    ctx.add_init_script("localStorage.setItem('tkwel','1')")
+    ctx.route(re.compile(r"https://fonts\.(googleapis|gstatic)\.com/"), lambda r: r.abort())
+    page = ctx.new_page()
+    page.goto(live.base + "/")
+    page.wait_for_function("navigator.serviceWorker.controller!==null")
+    page.evaluate("navigator.serviceWorker.ready")
+    return ctx, page
+
+
+def test_app_opens_offline_after_a_single_visit(live, browser):
+    ctx, page = _sw_ctx(browser, live)
+    v = re.search(r"lang-en\.js\?v=(\d+)", open(os.path.join(HERE, "..", "index.html"), encoding="utf-8").read()).group(1)
+    page.wait_for_function(f"caches.match('/lang-en.js?v={v}').then(Boolean)")
+    for u in ["/", "/manifest.webmanifest", "/icon-192.png"]:
+        assert page.evaluate(f"caches.match('{u}').then(Boolean)"), u
+    ctx.set_offline(True)
+    page.reload()
+    page.wait_for_function("typeof BOOTED!=='undefined' && BOOTED===true")
+    assert page.evaluate("_t('Favoris')") == "Favorites"                      # textes anglais servis depuis le cache
+    ctx.close()
+
+
+def test_stalled_network_falls_back_to_the_cached_app(live, browser):
+    stall = {"s": 0}
+    live.app.app.before_request_funcs.setdefault(None, []).append(
+        lambda: time.sleep(stall["s"]) if __import__("flask").request.path == "/" else None)
+    ctx, page = _sw_ctx(browser, live)
+    page.wait_for_function("caches.match('/').then(Boolean)")
+    stall["s"] = 8
+    t0 = time.time()
+    page.reload()
+    page.wait_for_function("typeof BOOTED!=='undefined' && BOOTED===true")
+    assert time.time() - t0 < 6                                                  # ~3 s d'attente au plus, pas 8
+    stall["s"] = 0
+    ctx.close()
