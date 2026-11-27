@@ -2475,3 +2475,108 @@ def test_unpublish_after_switching_account_frees_the_sound(live, mk):
     c.open(); c.page.wait_for_function("ME")
     c.ev("publishTrack('t1')")
     assert c.ev("S.tracks[0].postId") is None                          # « Publier ce son » revient
+
+
+# ═══════════════════════════ Animations et mise en page ═══════════════════════════
+PHONE = dict(viewport={"width": 375, "height": 740}, is_mobile=True, has_touch=True)
+
+
+def rect(c, sel):
+    return c.ev(f"(()=>{{const r=document.querySelector({json.dumps(sel)}).getBoundingClientRect(); return {{top:r.top,bottom:r.bottom,left:r.left,right:r.right}}}})()")
+
+
+def test_os_reduce_motion_turns_animations_and_effects_off(live, mk):
+    c = mk(reduced_motion="reduce")
+    c.seed(tracks(2), ui={"amb": "snow"}); c.open()
+    assert c.ev("document.documentElement.dataset.motion") == "off"
+    c.ev("confetti()")
+    assert c.ev("document.querySelectorAll('.cf').length") == 0
+    assert c.ev("AMB.raf") == 0
+
+
+def test_ambiance_is_drawn_behind_the_page(live, mk):
+    c = opened(mk, tracks(2), premium=True)
+    c.ev("setUI('amb','snow')")
+    c.page.wait_for_function("document.getElementById('amb')")
+    assert c.ev("getComputedStyle(document.getElementById('amb')).zIndex") == "-1"
+
+
+def test_equalizer_bars_animate_transform_not_height(live, mk):
+    c = opened(mk, tracks(2))
+    props = c.ev("[...new Set(document.querySelector('.eq i').getAnimations().flatMap(a=>a.effect.getKeyframes().flatMap(k=>Object.keys(k))))]")
+    assert "transform" in props and "height" not in props
+
+
+def test_animations_pause_while_the_screen_is_off(live, mk):
+    c = opened(mk, tracks(2))
+    c.ev("Object.defineProperty(document,'hidden',{configurable:true,get:()=>true}); document.dispatchEvent(new Event('visibilitychange'))")
+    assert c.ev("getComputedStyle(document.querySelector('.eq i')).animationPlayState") == "paused"
+    assert c.ev("getComputedStyle(document.getElementById('premb'),'::after').animationPlayState") == "paused"
+
+
+def test_swiped_sheet_slides_out_from_where_it_was_dropped(live, mk):
+    c = opened(mk, tracks(2))
+    c.ev("showOptions('Test',[{label:'A',fn(){}}]); openSh('opt')")
+    c.ev("document.querySelector('#opt .sheet').style.transform='translateY(140px)'; closeSh('opt')")
+    assert c.ev("document.querySelector('#opt .sheet').style.transform") == ""
+
+
+def test_selection_tip_waits_for_the_library_to_stay_open(live, mk):
+    c = mk(**PHONE)
+    c.seed(tracks(3)); c.open()
+    c.ev("location.hash='bibliotheque'")
+    c.page.wait_for_timeout(100)
+    c.ev("location.hash='accueil'")
+    c.page.wait_for_timeout(1300)
+    assert "Astuce : reste appuyé" not in toasts(c)
+    assert c.ev("localStorage.getItem('tkselhint')") is None          # le conseil reste à montrer dans Mes sons
+
+
+def test_phone_selection_bar_clears_the_player_and_stays_under_sheets(live, mk):
+    no_paywall(live)
+    c = mk(**PHONE)
+    c.seed(local_tracks(3)); c.open("#bibliotheque")
+    playing_blob(c)
+    c.page.wait_for_timeout(600)                                        # fin de l'animation d'entrée du lecteur
+    c.ev("selStart('t2')")
+    c.page.wait_for_selector("#selbar:not([hidden])")
+    assert rect(c, "#selbar")["bottom"] <= rect(c, "#pl")["top"]
+    c.ev("selToPl()")
+    c.page.wait_for_selector("#opt:not([hidden])")
+    assert int(c.ev("getComputedStyle(document.getElementById('selbar')).zIndex")) < int(c.ev("getComputedStyle(document.getElementById('opt')).zIndex"))
+
+
+@pytest.mark.parametrize("width", [320, 360])
+def test_header_fits_small_phones_even_with_the_install_button(live, mk, width):
+    c = mk(viewport={"width": width, "height": 700}, is_mobile=True, has_touch=True)
+    c.seed(tracks(1)); c.open()
+    c.page.wait_for_function("PAYWALL===true")
+    c.ev("document.getElementById('inst').hidden=false")
+    assert rect(c, "#don")["right"] <= width
+    assert "abonner" in c.ev("document.getElementById('premb').textContent")   # le nom reste lisible par les lecteurs d'écran
+
+
+def test_customize_header_keeps_its_subtitle_readable_on_a_phone(live, mk):
+    c = mk(**PHONE)
+    c.seed(tracks(1)); c.open()
+    c.ev("openCustom()")
+    c.page.wait_for_selector("#pzsub", state="attached")
+    sub, save = rect(c, "#pzsub"), rect(c, "#pzsave")
+    assert sub["right"] - sub["left"] > 150
+    assert save["top"] >= sub["bottom"] - 1
+
+
+def test_home_feed_does_not_push_the_faq_down_when_it_arrives(live, mk):
+    feed = {"trend": [{"id": f"p{i}", "name": f"Liste {i}", "username": "dj", "count": 3, "likes": 2, "week": 1, "preview": []} for i in range(6)],
+            "recent": [{"id": f"r{i}", "name": f"Récente {i}", "username": "dj", "count": 3, "likes": 0, "preview": []} for i in range(6)]}
+    c = mk(**PHONE)
+    held = []
+    c.ctx.route(re.compile(r".*/api/feed$"), lambda r: held.append(r))                # la réponse arrive quand le test le décide
+    c.seed([]); c.open()
+    c.page.wait_for_timeout(300)
+    assert held
+    before = rect(c, ".faq")["top"]
+    held[0].fulfill(status=200, content_type="application/json", body=json.dumps(feed))
+    c.page.wait_for_selector("#home-dyn .trend .pc:not(.ph)")
+    c.page.wait_for_timeout(100)
+    assert abs(rect(c, ".faq")["top"] - before) < 40, (before, rect(c, ".faq")["top"])
