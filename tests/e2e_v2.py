@@ -2309,6 +2309,13 @@ def test_sync_never_deletes_sounds_or_playlist_entries_beyond_the_account_limits
     assert len(server_lib(c)["data"]["tracks"]) == 1500
 
 
+def test_sync_sends_a_playlist_of_more_than_500_sounds_whole(live, mk):
+    c = synced(mk, tk(600), pls=[dict(id="pbig", name="Grosse", ids=[f"t{i}" for i in range(1, 601)])])
+    sync_now(c)
+    assert len(server_lib(c)["data"]["pls"][0]["urls"]) == 600     # même limite que le serveur (1500)
+    assert c.ev("S.sync.tr.length") == 600
+
+
 def test_sync_does_not_upload_an_unchanged_library_again(live, mk):
     c = synced(mk, tk(3))
     puts = []

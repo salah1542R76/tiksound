@@ -3523,7 +3523,7 @@ async function togglePub(pid){
 // ═══════════════════════════════════════════════════════════════════════════
 const SYNC = {busy:false};
 // Mêmes règles que le serveur (clean_library) : liens acceptés, sans doublon, 1500 sons (les plus récents), 200 playlists,
-// 500 sons par playlist. Sinon ce que le serveur laisse de côté passerait pour une suppression à la synchro suivante.
+// 1500 sons par playlist. Sinon ce que le serveur laisse de côté passerait pour une suppression à la synchro suivante.
 function libSnap(){
   const seen=new Set(), tracks=[];
   for(const t of byAdded(libT())){ if(tracks.length>=1500) break; if(!okUrl(t.url)||seen.has(t.url)) continue; seen.add(t.url);
@@ -3531,7 +3531,7 @@ function libSnap(){
   const byId=new Map(S.tracks.map(t=>[t.id,t]));
   return {tracks, pls:S.pls.filter(p=>!p.smart).slice(0,200).map(p=>({id:p.id,name:p.name,urls:plUrls(p,byId,seen),pub:!!p.pub,pubId:p.pubId||""}))};
 }
-function plUrls(p,byId,seen){ return p.ids.map(i=>byId.get(i)).filter(t=>t&&seen.has(t.url)).map(t=>t.url).slice(0,500); }
+function plUrls(p,byId,seen){ return p.ids.map(i=>byId.get(i)).filter(t=>t&&seen.has(t.url)).map(t=>t.url).slice(0,1500); }
 async function syncLibrary(manual){
   if(!ME){ if(manual===true) toast(_t("Connecte-toi pour synchroniser"),{type:"err"}); return; }
   if(SYNC.busy) return; SYNC.busy=true;
@@ -3594,8 +3594,9 @@ async function syncLibrary(manual){
       const snap=libSnap();
       try{
         const w = await api("/api/me/library",{method:"PUT",body:{data:snap,base:r.updated||null}});
-        // ce que le serveur a vraiment gardé (tr, pl) ; à défaut (ancien serveur) notre envoi, déjà aux mêmes limites
-        S.sync = {uid:ME.id, at:w.updated, tr:w.tr||snap.tracks.map(t=>t.url), pl:w.pl||snap.pls.map(p=>p.id), hash:JSON.stringify(snap)};
+        // ce que le serveur a vraiment gardé (data) ; à défaut (ancien serveur) notre envoi, déjà aux mêmes limites
+        const kept = w.data || snap;
+        S.sync = {uid:ME.id, at:w.updated, tr:kept.tracks.map(t=>t.url), pl:kept.pls.map(p=>p.id), hash:JSON.stringify(snap)};
         save();
         if(changed) toast(_t("Bibliothèque synchronisée avec ton compte"),{type:"ok"});
         else if(manual===true) toast(_t("Tout est déjà à jour"),{type:"ok"});

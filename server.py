@@ -57,6 +57,7 @@ TOKEN_DAYS = 30
 CODE_TTL = 15 * 60          # durée de validité d'un code
 RESEND_COOLDOWN = 60        # délai avant de renvoyer un code
 MAX_ATTEMPTS = 5            # essais par code
+MAX_CODES_PER_DAY = 8       # nouveaux codes par email et par usage : renvoyer un code ne redonne pas des essais sans fin
 MAX_PUBLIC_PLAYLISTS = 100
 FOREVER = 4102444800        # 2100-01-01 : « à vie »
 PREMIUM_GRACE = 2 * 86400   # marge après la fin de période Stripe (webhook en retard, serveur en panne…)
@@ -412,10 +413,11 @@ def check_code(row, email, purpose, code):
         return T("Aucun code en attente. Demande un nouveau code.")
     if row.expires < time.time():
         return T("Ce code a expiré. Demande un nouveau code.")
-    if row.attempts >= MAX_ATTEMPTS:
+    # L'essai est compté avant la comparaison, en une seule requête : des essais envoyés en même temps ne dépassent jamais la limite
+    if x("UPDATE codes SET attempts=attempts+1 WHERE email=:e AND purpose=:p AND attempts<:m",
+         e=email, p=purpose, m=MAX_ATTEMPTS).rowcount == 0:
         return T("Trop d'essais. Demande un nouveau code.")
     if not re.fullmatch(r"\d{6}", code or "") or not hmac.compare_digest(row.code_hash, code_hash(email, purpose, code)):
-        x("UPDATE codes SET attempts=attempts+1 WHERE email=:e AND purpose=:p", e=email, p=purpose)
         left = MAX_ATTEMPTS - row.attempts - 1
         if left <= 0:
             return T("Trop d'essais. Demande un nouveau code.")
@@ -563,6 +565,14 @@ def clean_tracks(lst):
                     "author": str(t.get("author") or "")[:60], "cover": cover, "duration": dur})
     return out
 
+def live_cover(c):
+    """Couverture encore valable : les liens TikTok signés (x-expires) meurent au bout de quelques jours."""
+    c = str(c or "")
+    if not c.startswith("https://"):
+        return ""
+    exp = urllib.parse.parse_qs(urllib.parse.urlsplit(c).query).get("x-expires", [""])[0]
+    return "" if exp.isdigit() and int(exp) < time.time() else c
+
 def liked_set(uid):
     if not uid:
         return set()
@@ -571,7 +581,7 @@ def liked_set(uid):
 def pl_summary(p, liked=frozenset()):
     tr = json.loads(p.tracks or "[]")
     return {"id": p.id, "name": p.name, "count": len(tr),
-            "preview": [{"title": t.get("title", ""), "cover": t.get("cover", "")} for t in tr[:4]],
+            "preview": [{"title": t.get("title", ""), "cover": live_cover(t.get("cover"))} for t in tr[:4]],
             "username": p.username, "color": p.color or 0, "avatar": p.avatar or "", "pic": p.pic or "",
             "likes": int(p.likes or 0), "liked": p.id in liked, "updated": p.updated, **list_badge(p)}
 
@@ -622,7 +632,7 @@ def register():
     if row and time.time() - row.last_sent < RESEND_COOLDOWN:
         wait = int(RESEND_COOLDOWN - (time.time() - row.last_sent)) + 1
         return err(T("Patiente {s} s avant de redemander un code", s=wait), 429, wait=wait)
-    if limited("reg:" + ip(), 8, 3600):
+    if limited("reg:" + ip(), 8, 3600) or limited("code:register:" + email, MAX_CODES_PER_DAY, 86400):
         return err("Trop de tentatives, réessaie plus tard", 429)
     if not MAIL_ON:
         return err("L'envoi d'email n'est pas configuré sur le serveur (ajoute BREVO_API_KEY ou RESEND_API_KEY et MAIL_FROM).", 503)
@@ -637,6 +647,8 @@ def register():
 
 @app.post("/api/auth/verify")
 def verify():
+    if limited("guess:" + ip(), 30, 600):
+        return err("Trop de tentatives, réessaie plus tard", 429)
     d = body()
     email = (d.get("email") or "").strip().lower()
     code = re.sub(r"\D", "", str(d.get("code") or ""))
@@ -677,7 +689,7 @@ def resend():
     if time.time() - row.last_sent < RESEND_COOLDOWN:
         wait = int(RESEND_COOLDOWN - (time.time() - row.last_sent)) + 1
         return err(T("Patiente {s} s avant de redemander un code", s=wait), 429, wait=wait)
-    if limited("resend:" + ip(), 10, 3600):
+    if limited("resend:" + ip(), 10, 3600) or limited(f"code:{purpose}:{email}", MAX_CODES_PER_DAY, 86400):
         return err("Trop de demandes, réessaie plus tard", 429)
     code = new_code()
     x("UPDATE codes SET code_hash=:h, expires=:x, attempts=0, last_sent=:t WHERE email=:e AND purpose=:p",
@@ -726,7 +738,7 @@ def forgot():
     user = q1("SELECT username FROM users WHERE lower(email)=:e", e=email)
     if user:
         row = q1("SELECT last_sent FROM codes WHERE email=:e AND purpose='reset'", e=email)
-        if not row or time.time() - row.last_sent >= RESEND_COOLDOWN:
+        if (not row or time.time() - row.last_sent >= RESEND_COOLDOWN) and not limited("code:reset:" + email, MAX_CODES_PER_DAY, 86400):
             code = new_code()
             store_code(email, "reset", code)
             mail_code(email, code, "reset", user.username)
@@ -735,6 +747,8 @@ def forgot():
 
 @app.post("/api/auth/reset")
 def reset_pw():
+    if limited("guess:" + ip(), 30, 600):
+        return err("Trop de tentatives, réessaie plus tard", 429)
     d = body()
     email = (d.get("email") or "").strip().lower()
     code = re.sub(r"\D", "", str(d.get("code") or ""))
@@ -933,7 +947,8 @@ def feed():
             "(CASE WHEN COALESCE(u.avatar_img,'')<>'' THEN COALESCE(NULLIF(u.imgv,''),'1') ELSE '' END) AS pic,"
             "(SELECT COUNT(*) FROM playlist_likes l WHERE l.playlist_id=p.id) AS likes,"
             "(SELECT COUNT(*) FROM playlist_likes l WHERE l.playlist_id=p.id AND l.created>=:s) AS week "
-            "FROM public_playlists p JOIN users u ON u.id=p.user_id WHERE p.tracks <> '[]') t "
+            "FROM public_playlists p JOIN users u ON u.id=p.user_id WHERE p.tracks <> '[]' "
+            "AND p.id IN (SELECT playlist_id FROM playlist_likes WHERE created>=:s)) t "
             "WHERE week > 0 ORDER BY week DESC, likes DESC LIMIT 8", s=since)
     trend = [dict(pl_summary(p, lk), week=int(p.week or 0)) for p in hot]
     return jsonify(top=[pl_summary(p, lk) for p in top], recent=[pl_summary(p, lk) for p in recent], trend=trend,
@@ -954,7 +969,7 @@ def get_user(username):
         tr = json.loads(p.tracks or "[]")
         if not tr: continue
         s = pl_summary(p, lk)
-        s["tracks"] = tr
+        s["tracks"] = [dict(t, cover=live_cover(t.get("cover"))) for t in tr]
         playlists.append(s)
     pub = user_json(row, private=False)
     pub.update(playlists=playlists, likes=sum(p["likes"] for p in playlists))
@@ -1038,6 +1053,7 @@ def get_playlist(pid):
                                    .bindparams(bindparam("us", expanding=True)), {"u": cu["sub"], "us": urls}):
                     mine_l.add(r[0])
     for t in tr:
+        t["cover"] = live_cover(t.get("cover"))
         t["likes"] = counts.get(t.get("url"), 0)
         t["liked"] = t.get("url") in mine_l
     s["tracks"] = tr
@@ -1103,7 +1119,7 @@ def list_posts():
                                .bindparams(bindparam("ids", expanding=True)), {"u": cu["sub"], "ids": [r.id for r in rows]}):
                 mine.add(r[0])
     return jsonify(more=more, posts=[{
-        "id": r.id, "url": r.url, "title": r.title or T("Son TikTok"), "author": r.author or "", "cover": r.cover or "",
+        "id": r.id, "url": r.url, "title": r.title or T("Son TikTok"), "author": r.author or "", "cover": live_cover(r.cover),
         "duration": r.duration or 0, "created": r.created, "username": r.username, "color": r.color or 0, "pic": r.pic or "",
         "likes": int(r.likes or 0), "liked": r.id in mine, "mine": bool(cu and cu["sub"] == r.user_id), **list_badge(r)} for r in rows])
 
@@ -1192,7 +1208,7 @@ def clean_library(d):
         if not re.fullmatch(r"[\w-]{1,40}", pid):
             continue
         raw_u = p.get("urls") if isinstance(p.get("urls"), list) else []
-        urls = [u for u in raw_u[:500] if isinstance(u, str) and u in seen]
+        urls = [u for u in raw_u[:1500] if isinstance(u, str) and u in seen]
         pub_id = str(p.get("pubId") or "")
         pls.append({"id": pid, "name": str(p.get("name") or "Playlist")[:40], "urls": urls,
                     "pub": bool(p.get("pub")), "pubId": pub_id if re.fullmatch(r"[0-9a-f]{32}", pub_id) else ""})
@@ -1214,7 +1230,8 @@ def put_library():
     if limited("lib:" + u["sub"], 120, 600):
         return err("Trop de synchronisations, patiente un peu", 429)
     b = body()
-    data = json.dumps(clean_library(b.get("data")))
+    kept = clean_library(b.get("data"))
+    data = json.dumps(kept)
     cur = q1("SELECT updated FROM libraries WHERE user_id=:u", u=u["sub"])
     if (cur.updated if cur else None) != (b.get("base") or None):
         return err("Bibliothèque modifiée sur un autre appareil", 409)
@@ -1229,7 +1246,7 @@ def put_library():
             x("INSERT INTO libraries (user_id,data,updated) VALUES (:u,:d,:v)", u=u["sub"], d=data, v=ver)
     except Exception:
         return err("Bibliothèque modifiée sur un autre appareil", 409)
-    return jsonify(ok=True, updated=ver)
+    return jsonify(ok=True, updated=ver, data=kept)     # ce qui a vraiment été gardé : l'appli s'en sert comme base
 
 
 # ── Stripe : appels sortants (SDK) ───────────────────────────────────────────
@@ -1273,9 +1290,22 @@ def _plain(o):
 def stripe_create_customer(email, user_id):
     return _stripe().Customer.create(email=email, metadata={"user_id": user_id}).id
 
+class AlreadySubscribed(Exception):
+    pass
+
 def stripe_create_checkout(customer_id, user_id, base_url):
-    """Session Checkout pour le formulaire intégré (ui_mode "form") : renvoie le client_secret que le navigateur utilise."""
-    s = _stripe().checkout.Session.create(
+    """Session Checkout pour le formulaire intégré (ui_mode "form") : renvoie le client_secret que le navigateur utilise.
+    Ferme d'abord les paiements restés ouverts (autre onglet, autre appareil) et refuse si un abonnement vit déjà chez Stripe."""
+    st, subs = _stripe(), []
+    try:
+        for o in _plain(st.checkout.Session.list(customer=customer_id, status="open", limit=20)).get("data") or []:
+            st.checkout.Session.expire(o["id"])
+        subs = _plain(st.Subscription.list(customer=customer_id, status="all", limit=20)).get("data") or []
+    except Exception as ex:                              # on ne bloque pas le paiement si cette vérification échoue
+        log.warning("Stripe : vérification des abonnements existants impossible : %s", ex)
+    if any(str(o.get("status")) in ("active", "trialing", "past_due", "unpaid") for o in subs):
+        raise AlreadySubscribed(customer_id)
+    s = st.checkout.Session.create(
         ui_mode="form",
         mode="subscription",
         billing_address_collection="auto",
@@ -1334,6 +1364,8 @@ def stripe_checkout():
             x("UPDATE users SET stripe_customer_id=:c WHERE id=:u", c=cid, u=row.id)
             secret = stripe_create_checkout(cid, row.id, public_base())
         return jsonify(client_secret=secret)
+    except AlreadySubscribed:
+        return err("Tu as déjà un abonnement : gère-le depuis ton profil", 409, portal=True)
     except Exception as ex:
         log.error("Stripe checkout : %s", ex)
         return err("Le paiement est momentanément indisponible, réessaie dans un instant", 502)
@@ -1575,7 +1607,7 @@ def preview_for(args):
         p = q1(PL_SELECT + "WHERE p.id=:id", id=pid)
         if p:
             tr = json.loads(p.tracks or "[]")
-            cov = next((t.get("cover") for t in tr if str(t.get("cover", "")).startswith("https://")), "")
+            cov = next((c for c in (live_cover(t.get("cover")) for t in tr) if c), "")
             desc = (T("Playlist de {n} sons par @{pseudo}. Écoute-la sur TikWave.", n=len(tr), pseudo=p.username) if len(tr) != 1
                     else T("Playlist de 1 son par @{pseudo}. Écoute-la sur TikWave.", pseudo=p.username))
             return og_tags(f"{p.name} · TikWave", desc, cov, f"{base}/?pl={pid}")
@@ -1595,7 +1627,8 @@ def accueil():
     r.mimetype = "text/html"
     r.headers["Cache-Control"] = "no-cache"
     r.headers["Vary"] = "Accept-Language, Cookie"
-    return r
+    r.add_etag()
+    return r.make_conditional(request)
 
 # Le navigateur choisit la langue de l'appli installée (nom des raccourcis, description)
 MANIFEST_EN = {"lang": "en", "description": "Your TikTok sounds in playlists, without the video."}
@@ -1613,7 +1646,8 @@ def manifest():
     r.mimetype = "application/manifest+json"
     r.headers["Cache-Control"] = "no-cache"
     r.headers["Vary"] = "Accept-Language, Cookie"
-    return r
+    r.add_etag()
+    return r.make_conditional(request)
 
 @app.get("/api/health")
 def health():
@@ -1660,7 +1694,8 @@ def legal_page(name):
     r.mimetype = "text/html"
     r.headers["Cache-Control"] = "no-cache"
     r.headers["Vary"] = "Accept-Language, Cookie"
-    return r
+    r.add_etag()
+    return r.make_conditional(request)
 
 @app.get("/confidentialite")
 def confidentialite():
@@ -1777,6 +1812,8 @@ def media(key):
             a = int(rng.group(1) or 0) if rng else 0
             b = int(rng.group(2)) if rng and rng.group(2) else a + MEDIA_CHUNK - 1
         b = min(b, a + MEDIA_CHUNK - 1)
+        if b < a:
+            return "", 416
         data, total = r2_range(key, a, b)
     except KeyError:
         return "", 404
@@ -1811,6 +1848,8 @@ _OP = urllib.request.build_opener(_Stop)
 
 def suivre(url):
     for _ in range(6):
+        if not TT_RE.match(url):
+            return url                                   # jamais d'appel vers un autre site (adresse interne…)
         try:
             _OP.open(urllib.request.Request(url, headers={"User-Agent": UA}), timeout=10)
             return url
@@ -1827,10 +1866,10 @@ def suivre(url):
     return url
 
 def trouver_lien(texte):
-    m = re.search(r"https?://[^\s]*tiktok\.com[^\s]*", texte or "")
+    m = re.search(r"https?://(?:[a-z0-9-]+\.)*tiktok\.com/[^\s]*", texte or "", re.I)
     if not m: return None
     url = m.group(0).rstrip(".,)")
-    if re.search(r"//(vm|vt)\.tiktok\.com/|tiktok\.com/t/", url):
+    if re.match(r"https?://(?:(?:vm|vt)\.tiktok\.com/|(?:www\.)?tiktok\.com/t/)", url, re.I):
         url = suivre(url)
     v = re.search(r"tiktok\.com/v/(\d+)", url)
     if v: url = f"https://www.tiktok.com/@_/video/{v.group(1)}"
@@ -1928,6 +1967,12 @@ def _norm(t):
 def _tokens(t):
     return [w for w in _norm(t).split() if w not in STOP and len(w) > 1]
 
+def no_long_or_live(info, *, incomplete=False):
+    """Filtre yt-dlp (match_filter) : rien en direct ni de plus de 20 min n'est téléchargé, quelle que soit la source."""
+    if info.get("is_live") or info.get("live_status") == "is_live" or (info.get("duration") or 0) > FIND_MAX_DUR:
+        return "trop long ou en direct"
+    return None
+
 def search_candidates(prefix, query, n=6):
     """Résultats de recherche sans téléchargement. prefix : ytsearch (YouTube) ou scsearch (SoundCloud)."""
     if prefix == "ytsearch" and yt_blocked():
@@ -1948,6 +1993,8 @@ def search_candidates(prefix, query, n=6):
                 continue
             try: d = int(float(e.get("duration") or 0))
             except Exception: d = 0
+            if no_long_or_live(dict(e, duration=d)):
+                continue
             out.append({"url": u, "duration": d, "src": prefix, "title": str(e.get("title") or ""),
                         "chan": str(e.get("uploader") or e.get("channel") or "")})
         if not out:
@@ -2062,6 +2109,8 @@ def audio_from_search(opts, title, author, want):
                     info = y.extract_info(c["url"], download=True)
                 if info and info.get("entries"):
                     info = info["entries"][0]
+                if base and not os.path.exists(base + ".mp3"):
+                    raise RuntimeError("refusé par le filtre (trop long, en direct ou trop lourd)")
                 gap = abs(float(info.get("duration") or 0) - want) if want and info.get("duration") else 0
                 if gap > tol:
                     log.info("Spotify « %s » : %s a la mauvaise durée (écart %.0f s), on continue", query, c["url"], gap)
@@ -2113,6 +2162,8 @@ def soundcloud_twin(opts, title, author, want):
             o = dict(opts); o.update(_net_opts())
             with yt_dlp.YoutubeDL(o) as y:
                 info = y.extract_info(u, download=True)
+            if not os.path.exists(str(o.get("outtmpl", "")).replace("%(ext)s", "mp3")):
+                continue                                 # refusé par le filtre : pas de fichier
             log.info("YouTube indisponible : « %s » récupéré sur SoundCloud (%s)", title, u)
             return info
         except Exception as ex:
@@ -2123,7 +2174,7 @@ def soundcloud_twin(opts, title, author, want):
 # ── Recherche de sons : 5 résultats par plateforme, téléchargeables comme un lien TikTok ──
 SPOTIFY_ID = os.environ.get("SPOTIFY_CLIENT_ID", "")
 SPOTIFY_SECRET = os.environ.get("SPOTIFY_CLIENT_SECRET", "")
-FIND_N, FIND_MAX_DUR = 5, 1200
+FIND_N, FIND_MAX_DUR, FIND_TIMEOUT = 5, 1200, 25
 _find_cache, _sp_token = {}, {"t": "", "exp": 0}
 
 def _cover(e, src):
@@ -2222,17 +2273,23 @@ def find():
     if limited("find:" + ip(), 30, 600):
         return err("Trop de recherches d'un coup, patiente un peu", 429)
     from concurrent.futures import ThreadPoolExecutor
-    out = {}
-    with ThreadPoolExecutor(len(jobs)) as ex:
+    out, late = {}, False
+    ex = ThreadPoolExecutor(len(jobs))
+    try:
         futs = {k: ex.submit(f, q) for k, f in jobs.items()}
+        end = time.time() + FIND_TIMEOUT                 # un seul délai pour toutes les plateformes
         for k, f in futs.items():
             try:
-                out[k] = _rank(q, f.result(timeout=25))[:FIND_N]
+                out[k] = _rank(q, f.result(timeout=max(0, end - time.time())))[:FIND_N]
             except Exception as e:
+                late = late or not f.done()
                 log.warning("Recherche %s échouée pour « %s » : %s", k, q, str(e)[:200])
                 out[k] = []
+    finally:
+        ex.shutdown(wait=False, cancel_futures=True)     # une recherche bloquée finit en arrière-plan, la réponse part
+
     res = {"q": q, "sources": list(jobs), "results": out}
-    if any(out.values()):
+    if any(out.values()) and not late:                   # résultat partiel : pas gardé 15 min
         if len(_find_cache) > 300:
             _find_cache.clear()
         _find_cache[key] = (time.time(), res)
@@ -2255,15 +2312,18 @@ def extract():
         url = raw
     else:
         url = trouver_lien(raw)
-    if not url:
+    if not url or not (spotify or found or TT_RE.match(url)):
         return err("Lien TikTok invalide")
     # Gratuit (ou anonyme) quand l'abonnement est actif : stockage en ligne imposé, jamais de fichier local.
     forced = paywall_on() and not request_premium()
     online = R2_OK and (b.get("store") == "online" or forced)
-    key = hashlib.sha1(url.encode()).hexdigest()
+    # Spotify : le son vient du titre envoyé par l'appli, donc la clé en dépend (sinon le premier venu choisit le son de tous)
+    key = hashlib.sha1((f"{url}|{title_in}|{author_in}|{b.get('duration') or ''}" if spotify else url).encode()).hexdigest()
     if online:  # déjà converti par quelqu'un : on réutilise, sans retélécharger
         try:
             m = json.loads(s3().get_object(Bucket=os.environ["R2_BUCKET"], Key=f"meta/{key}.json")["Body"].read())
+            if found:
+                m.update(title=title_in or m.get("title", ""), author=author_in or m.get("author", ""))
             return jsonify(**m)
         except Exception:
             pass
@@ -2274,10 +2334,12 @@ def extract():
         "quiet": True,
         "noplaylist": True,
         "socket_timeout": 20,
+        "match_filter": no_long_or_live,
+        "max_filesize": 100_000_000,                     # 100 Mo : une vidéo TikTok de 20 min tient dedans
         "postprocessors": [{"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "128"}],
     }
     opts.update(_net_opts())
-    info = None
+    info, twin = None, False
     if spotify:
         try: want = int(float(b.get("duration") or 0))
         except Exception: want = 0
@@ -2301,6 +2363,9 @@ def extract():
             try: want = int(float(b.get("duration") or 0))
             except Exception: want = 0
             info = soundcloud_twin(opts, title_in, author_in, want)
+            if info:   # un autre son choisi d'après le titre envoyé : jamais rangé sous la clé partagée du lien
+                key = hashlib.sha1(f"twin|{url}|{title_in}|{author_in}".encode()).hexdigest()
+                twin = True
         if not info:
             if yt and yt_blocked():
                 return err("YouTube bloque le serveur en ce moment et ce son est introuvable sur SoundCloud. Essaie un résultat SoundCloud.", 502, retry=True)
@@ -2318,6 +2383,8 @@ def extract():
                 continue
         if not info:
             return err("Impossible de récupérer le son. Vérifie que le lien est public.", 500)
+    if not os.path.exists(f"audio/{uid}.mp3"):            # yt-dlp a sauté le téléchargement (filtre ci-dessus)
+        return err("Ce son est trop long (plus de 20 min) ou en direct.")
     cover = info.get("thumbnail", "") or ""
     try: duration = int(float(info.get("duration") or 0))
     except Exception: duration = 0
@@ -2330,7 +2397,11 @@ def extract():
             s3().upload_file(f"audio/{uid}.mp3", bucket, f"audio/{key}.mp3",
                              ExtraArgs={"ContentType": "audio/mpeg", "CacheControl": "public, max-age=31536000"})
             res.update(remote=True, audio_url=os.environ["R2_PUBLIC_URL"].rstrip("/") + f"/audio/{key}.mp3")
-            s3().put_object(Bucket=bucket, Key=f"meta/{key}.json", Body=json.dumps(res).encode(),
+            meta = res
+            if found and not twin:   # le cache partagé garde le vrai titre, pas celui envoyé par l'appli
+                meta = dict(res, title=str(info.get("title") or "")[:120] or titre(info),
+                            author=re.sub(r"\s*-\s*Topic$", "", info.get("uploader", "") or ""))
+            s3().put_object(Bucket=bucket, Key=f"meta/{key}.json", Body=json.dumps(meta).encode(),
                             ContentType="application/json")
             try: os.remove(f"audio/{uid}.mp3")
             except Exception: pass
@@ -2354,4 +2425,9 @@ def audio(f):
 @app.get("/<path:f>")
 def statique(f):
     if f not in STATIQUE: return "", 404
-    return send_from_directory(".", f, mimetype=STATIQUE[f], max_age=0)
+    # sw.js toujours revalidé ; un fichier versionné (?v=N) ne change jamais sous la même adresse ; le reste : 1 jour
+    ma = 0 if f == "sw.js" else 31536000 if request.args.get("v") else 86400
+    r = send_from_directory(".", f, mimetype=STATIQUE[f], max_age=ma)
+    if ma == 31536000:
+        r.cache_control.immutable = True
+    return r
