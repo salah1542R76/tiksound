@@ -277,6 +277,7 @@ section[data-v=playlists] .row.sel .rn::after{content:"✓";position:absolute;to
 .fdl{flex:none}.fdl.done{background:var(--ac);color:var(--on);border-color:transparent}
 .fnote{font-size:12.5px;margin:10px 4px 0}
 .fhint{display:inline-flex;align-items:center;gap:6px;margin:10px 2px 0;font-size:14px;color:var(--mut)}
+.hsrc{display:flex;flex-wrap:wrap;column-gap:18px}
 #selbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(96px + env(safe-area-inset-bottom,0px));z-index:29;display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:99px;box-shadow:0 12px 40px #0008;max-width:calc(100vw - 20px)}
 #selbar b{padding:0 6px;white-space:nowrap}
 @media(max-width:360px){#selbar{gap:2px;padding:6px}#selbar b{padding:0 4px}#selbar .chip,#selbar .btn{padding:8px 10px}#selbar .btn svg{display:none}#selbar .icon-btn{width:34px;height:34px}#selbar>*{flex:none}}
@@ -404,6 +405,18 @@ select.ib option{background:var(--cardS);color:var(--tx)}
 .steps .num{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:var(--ac);color:var(--on);font:800 16px var(--fd);margin-bottom:14px}
 .steps h3{font-size:21px;margin-bottom:6px}.steps p{color:var(--mut)}
 section.has .steps{display:none}
+.promo{display:flex;align-items:center;gap:18px;padding:16px;margin-top:40px}
+.promo .m{flex:1;min-width:0}.promo .m p{color:var(--mut);margin-top:4px}
+.promo video{flex:none;width:min(42%,180px);height:auto;border-radius:calc(var(--r)*.7);background:#000}
+section.has .promo{display:none}
+.feats{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(170px,1fr))}
+.feat{display:grid;grid-template-columns:auto 1fr;column-gap:10px;row-gap:2px;align-items:center;padding:12px 14px;text-align:left;color:var(--tx);transition:transform .2s,border-color .2s}
+.feat:hover{border-color:var(--br2)}.feat:active{transform:scale(.97)}
+.feat .fi{grid-row:span 2;width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:color-mix(in oklab,var(--ac) 22%,transparent);color:var(--act)}
+.feat .fn{font-weight:600;font-size:14px;display:flex;align-items:center;flex-wrap:wrap;gap:4px}
+.feat .fd{font-size:12.5px;color:var(--mut);line-height:1.35}.feat .fd::first-letter{text-transform:uppercase}
+.feat .pbadge{font-size:10px;padding:1px 6px;margin-left:2px}
+@media(max-width:400px){.feats{grid-template-columns:1fr 1fr}.feat{grid-template-columns:1fr}.feat .fi{grid-row:auto;margin-bottom:4px}}
 .resume{display:flex;align-items:center;gap:18px;padding:16px;margin-top:40px;cursor:pointer;transition:transform .2s,border-color .2s}
 .resume:hover{border-color:var(--br2)}
 .resume .cv{width:72px;height:72px}
@@ -890,18 +903,26 @@ button,a{-webkit-tap-highlight-color:transparent}
   <h1>Les sons TikTok, <span class="grad">sans la vidéo.</span></h1>
   <p class="lead">Colle un lien TikTok, garde uniquement le son, et écoute-le en playlist, écran éteint.</p>
   <div class="paste"><input id="u1" placeholder="https://vm.tiktok.com/…" inputmode="url" aria-label="Lien TikTok" onkeydown="if(event.key==='Enter')convert('u1',this.nextElementSibling)"><button class="btn" onclick="convert('u1',this)">Convertir en son</button></div>
-  <button class="lnk fhint" onclick="location.hash='ajouter';setTimeout(()=>{ const i=$('#fq'); if(i) i.focus(); },350)"><span data-i="search" data-s="15"></span>Ou cherche un son par son titre (YouTube, SoundCloud…)</button>
+  <div class="hsrc"><button class="lnk fhint" onclick="goAdd('fq')"><span data-i="search" data-s="15"></span>Ou cherche un son par son titre (YouTube, SoundCloud…)</button><button class="lnk fhint" onclick="goAdd('spurl')"><span data-i="music" data-s="15"></span>Ou importe une playlist Spotify</button></div>
   <div class="quick" id="quick"></div>
   <div class="steps">
     <div class="gcard"><div class="num">1</div><h3>Colle le lien</h3><p>Depuis TikTok, touche « Partager » puis « Copier le lien ».</p></div>
     <div class="gcard"><div class="num">2</div><h3>Garde le son</h3><p>Le site extrait l'audio et le garde pour toi, prêt à écouter.</p></div>
     <div class="gcard"><div class="num">3</div><h3>Écoute en playlist</h3><p>Range tes sons, publie tes playlists et découvre celles des autres.</p></div>
   </div>
+  <!-- promo : remplacer la vidéo = changer ?v= (cache d'un an sous la même adresse) -->
+  <div class="promo gcard" id="promo">
+    <div class="m"><span class="eyebrow">TikWave en vidéo</span><p>Regarde comment garder le son d'un TikTok et l'écouter en playlist.</p></div>
+    <video src="/promo.mp4?v=1" poster="/promo-poster.jpg?v=1" preload="none" playsinline controls width="720" height="1280" aria-label="Vidéo de présentation de TikWave" onplay="promoPlay(this)"></video>
+  </div>
   <div id="home-dyn"></div>
   <div class="faq"><h2>Questions fréquentes</h2>
     <details><summary>C'est gratuit ?</summary><p>Oui. La version gratuite permet d'ajouter et d'écouter tes sons en ligne, avec quelques publicités. Premium retire les pubs, garde les sons sur ton appareil pour l'écoute hors ligne et débloque des effets et des thèmes en plus.</p></details>
     <details><summary>Comment récupérer le son d'une vidéo TikTok ?</summary><p>Dans TikTok, touche « Partager » puis « Copier le lien », colle-le ici et touche « Convertir en son ». Tu peux coller jusqu'à 20 liens d'un coup.</p></details>
+    <details><summary>Ça marche avec YouTube et SoundCloud ?</summary><p>Oui. Dans « Ajouter », cherche un son par titre ou artiste : les résultats viennent de YouTube ou de SoundCloud. Tu peux aussi coller le lien d'une vidéo YouTube ou d'un titre SoundCloud, comme un lien TikTok. Les playlists YouTube et SoundCloud ne sont pas prises en charge.</p></details>
+    <details><summary>Comment importer ma playlist Spotify ?</summary><p>Dans Spotify, ouvre une playlist publique, un album ou un titre, touche « Partager » puis « Copier le lien ». Dans TikWave, va dans « Ajouter », colle le lien sous « Importer depuis Spotify » et touche « Importer ». Une playlist est créée avec tous les titres ; chaque son est cherché sur YouTube ou SoundCloud au moment où tu l'écoutes, donc la version peut parfois différer de celle de Spotify.</p></details>
     <details><summary>Ça marche écran éteint ?</summary><p>Oui : installe TikWave sur ton écran d'accueil, lance un son et verrouille ton téléphone, la lecture continue comme dans une appli de musique.</p></details>
+    <details><summary>Quelle différence avec Spotify ?</summary><p>Spotify a le catalogue officiel et permet d'écouter écran éteint, et hors ligne avec Spotify Premium. TikWave garde les versions exactes entendues sur TikTok, comme les sped up et les remix, qu'on ne trouve souvent pas sur Spotify. Tu peux aussi les transformer : slowed, sped up, bass boost, boucle A-B, minuterie de sommeil, mode voiture, et l'appli se personnalise à fond. Ces fonctions sont gratuites ; Premium ajoute la réverbe, « Slowed + reverb », plus de presets d'égaliseur, des thèmes en plus et l'écoute hors ligne, sans pub.</p></details>
     <details><summary>Mes playlists sont-elles publiques ?</summary><p>Non, elles sont privées par défaut. Tu choisis d'en rendre une publique pour la partager dans Explorer et sur ton profil.</p></details>
     <details><summary>Et les droits d'auteur ?</summary><p data-th>TikWave est fait pour un usage personnel. Les sons restent à leurs auteurs ; un ayant droit peut demander le retrait d'un contenu sur la page <a href="/signalement" target="_blank" rel="noopener">Signaler un contenu</a>.</p></details>
   </div>
@@ -1477,7 +1498,7 @@ function applyServerUI(d){
 }
 function toggleSyncUI(){ S.ui.syncUI=!syncOn(); save(); if(S.ui.syncUI&&ME){ S.uiVer=null; applyServerUI(ME); toast(_t("Apparence synchronisée avec ton compte"),{type:"ok"}); } renderCustom(); }
 function setUI(k,v,noRe){ if(premUI(k,v)&&!isPrem()){ premLock(); return; } S.ui[k]=v; if(k==="tbg") S.ui.theme="perso"; save(); if(k==="sfx"&&v) sfx("on"); applyUI(); if(!noRe) renderCustom(); if(["size","view"].includes(k)) render(); if(UI_SYNC.includes(k)) pushUI(); }
-const HOME_SECS=[["hello",_t("Salutation")],["hero",_t("Titre et explication")],["steps",_t("Les 3 étapes")],["pins",_t("Épinglés")],["day",_t("Son du jour")],["resume",_t("Reprendre l'écoute")],["recent",_t("Récemment ajoutés")],["top",_t("Tes plus écoutés")],["goal",_t("Objectif de la semaine")],["stats",_t("Chiffres")],["comm",_t("De la communauté")],["trend",_t("Tendances")],["tip",_t("Astuce du jour")],["faq",_t("Questions fréquentes")]];
+const HOME_SECS=[["hello",_t("Salutation")],["hero",_t("Titre et explication")],["steps",_t("Les 3 étapes")],["feats",_t("Effets et outils")],["pins",_t("Épinglés")],["day",_t("Son du jour")],["resume",_t("Reprendre l'écoute")],["recent",_t("Récemment ajoutés")],["top",_t("Tes plus écoutés")],["goal",_t("Objectif de la semaine")],["stats",_t("Chiffres")],["comm",_t("De la communauté")],["trend",_t("Tendances")],["tip",_t("Astuce du jour")],["faq",_t("Questions fréquentes")]];
 const hs=k=>!(S.ui.home&&S.ui.home[k]===false);
 function setHome(k,v){ S.ui.home=Object.assign({},S.ui.home,{[k]:!!v}); save(); renderHome(); renderCustom(); pushUI(); }
 // ═══════════════════════════════════════════════════════════════════════════
@@ -3053,6 +3074,34 @@ document.addEventListener("visibilitychange",()=>document.documentElement.classL
 function greet(){ const h=new Date().getHours(); return h<5?["",_t("Bonne nuit")]:h<12?["",_t("Bonjour")]:h<18?["",_t("Bon après-midi")]:["",_t("Bonsoir")]; }
 function playAll(r){ let ids=libList().filter(playable).map(t=>t.id); if(!ids.length) ids=S.tracks.filter(playable).map(t=>t.id); if(!ids.length) return toast(_t("Aucun son à lire")); const sh=S.player.shuffle; if(r){ ids=smartShuf(ids); S.player.shuffle=false; } play(ids,0); S.player.shuffle=sh; }
 function surprise(){ const l=S.tracks.filter(playable); if(!l.length) return toast(_t("Ajoute d'abord des sons")); play(smartShuf(l.map(t=>t.id)),0); toast(_t("Surprise !")); }
+// Accueil → champ de la page Ajouter (après le scrollTo(0,0) de route())
+function goAdd(id){ location.hash="ajouter"; setTimeout(()=>{ const i=$("#"+id); if(!i) return; i.scrollIntoView({block:"center",behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth"}); i.focus({preventScroll:true}); },350); }
+// Vitrine des effets : chaque carte ouvre l'outil qui existe déjà
+function featsHTML(){
+  // [clé, icône, nom, avantage, réservé Premium]  (Premium : voir setFxVal('rev') / PREMIUM.md)
+  const F=[["slowed","gauge","Slowed",_t("plus lent et plus grave")],
+    ["spedup","flame","Sped up",_t("plus rapide et plus aigu")],
+    ["rev","spark",_t("Réverbe"),_t("Comme dans une grande salle"),1],
+    ["eq","sliders",_t("Bass boost et égaliseur"),_t("Plus de basses, ou règle graves et aigus")],
+    ["loop","repeat",_t("Boucle A-B"),_t("Répète ton passage préféré en boucle")],
+    ["sleep","clock",_t("Minuterie de sommeil"),_t("La musique s'arrête toute seule")],
+    ["car","phone",_t("Mode voiture"),_t("Gros boutons, l'écran reste allumé")],
+    ["off","moon",_t("Écran éteint"),_t("La lecture continue téléphone verrouillé")]];
+  const lock=PAYWALL&&!prem();
+  return `<div class="sec-h"><h2>${_t("Effets et outils")}</h2></div><div class="feats">${F.map(([k,ic,n,d,p])=>`<button class="feat gcard" data-feat="${k}" onclick="featTap('${k}')"><span class="fi">${I(ic,18)}</span><span class="fn">${n}${p&&lock?pBadge():""}</span><span class="fd">${d}</span></button>`).join("")}</div>`;
+}
+function featTap(k){
+  if(k==="off") return toast(_t("Installe TikWave sur ton écran d'accueil, lance un son puis verrouille ton téléphone : la lecture continue."));
+  if(!curT()){ if(S.tracks.length) return toast(_t("Lance d'abord un son")); toast(_t("Ajoute d'abord des sons")); return $("#u1").focus(); }
+  if(k==="car") return carMode(true);
+  if(k==="sleep") return pickSleep();
+  if(k==="loop"){ openNP(); return toast(_t("Touche « Boucle » une fois pour le début, une deuxième fois pour la fin")); }
+  openFx();                       // slowed / spedup / rev / eq : le panneau Effets (verrous Premium déjà gérés dedans)
+}
+// Vidéo de présentation : jamais en même temps que la musique ou une pub
+function promoPlay(v){ if(AD.on) return v.pause(); if(!au.paused) au.pause(); }
+document.addEventListener("play",e=>{ const v=$("#promo video"); if(v&&e.target!==v) v.pause(); },true);
+addEventListener("hashchange",()=>{ const v=$("#promo video"); if(v) v.pause(); });
 
 function renderHome(){
   const [ico,g]=greet(), has=S.tracks.length, st=streak();
@@ -3078,6 +3127,7 @@ function renderHome(){
     h+=`<div class="goal gcard" onclick="openStats()"><div class="gring" style="--g:${Math.round(p*100)}"><b>${Math.round(p*100)}%</b></div><div><span class="eyebrow">${_t("Objectif de la semaine")}</span><div class="t" style="font-size:18px">${Math.floor(w/60)} / ${fmtLen(S.goal*60)}</div><div class="a">${p>=1?_t("Objectif atteint, bravo !"):_t("Encore {0} d'écoute",fmtLen(S.goal*60-w))}</div></div></div>`; }
   if(hs("stats")) h+=`<div class="stat-row" onclick="openStats()" style="cursor:pointer">${[[_t("sons"),S.tracks.length],["playlists",S.pls.length],[_t("écoutées"),null,fmtLen(S.stats.sec)],[_t("favoris"),favN]].map(([l,n,txt])=>`<div class="stat gcard"><b ${n!=null?`data-n="${n}"`:""}>${n!=null?n:txt}</b><span>${l===_t("écoutées")?_t("d'écoute"):l}</span></div>`).join("")}</div>`;
   }
+  if(hs("feats")) h+=featsHTML();
   const wait=FEED_WAIT&&!FEED&&!DOWN, ph=f=>Array.from({length:4},()=>f({id:"",name:"\u00a0",username:"·",count:0,likes:0,week:0,preview:[]}).replace('<button class="pc"','<button class="pc skel ph" disabled aria-hidden="true"')).join("");
   if(hs("trend")&&(wait||FEED&&FEED.trend&&FEED.trend.length)) h+=`<div class="sec-h"><h2>${_t("Tendances de la semaine")}</h2><a href="#decouvrir">${_t("Explorer →")}</a></div><div class="hs trend">${wait?ph(trendCard):FEED.trend.slice(0,8).map(trendCard).join("")}</div>`;
   if(hs("comm")&&(wait||FEED&&FEED.recent&&FEED.recent.length)) h+=`<div class="sec-h"><h2>${_t("De la communauté")}</h2><a href="#decouvrir">${_t("Explorer →")}</a></div><div class="hs">${wait?ph(pubCard):FEED.recent.slice(0,8).map(pubCard).join("")}</div>`;

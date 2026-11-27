@@ -540,6 +540,93 @@ def test_home_sections_can_be_hidden(live, mk):
     assert c.page.locator("#home-dyn .stat-row").count() == 0 and c.page.locator("#home-dyn .tip").count() == 0
     c.ev("setHome('tip',true)")
     assert c.page.locator("#home-dyn .tip").count() == 1
+    assert c.page.locator("#home-dyn .feat").count() == 8
+    c.ev("setHome('feats',false)")
+    assert c.page.locator("#home-dyn .feat").count() == 0
+
+
+def test_home_offers_spotify_import_and_search(live, mk):
+    c = opened(mk, tracks(1))
+    blk = c.page.locator("section[data-v=accueil] .hsrc")
+    assert blk.is_visible()
+    txt = blk.inner_text()
+    assert "Spotify" in txt and "SoundCloud" in txt
+    c.page.click(".hsrc button:has-text('Spotify')")
+    c.page.wait_for_function("location.hash==='#ajouter' && document.activeElement && document.activeElement.id==='spurl'")
+    c.ev("location.hash='accueil'")
+    c.page.wait_for_function("!document.querySelector('section[data-v=accueil]').hidden")
+    c.page.click(".hsrc button:has-text('SoundCloud')")
+    c.page.wait_for_function("location.hash==='#ajouter' && document.activeElement && document.activeElement.id==='fq'")
+
+
+def test_home_effects_showcase_lists_eight_tools_with_premium_tag(live, mk):
+    c = opened(mk, tracks(2))                       # compte gratuit, abonnement actif sur le serveur
+    assert c.page.locator("#home-dyn .feat").count() == 8
+    assert c.page.locator("#home-dyn .feat .pbadge").count() == 1
+    assert c.page.locator("#home-dyn [data-feat=rev] .pbadge").count() == 1
+    p = opened(mk, tracks(2), premium=True)
+    assert p.page.locator("#home-dyn .feat").count() == 8
+    assert p.page.locator("#home-dyn .feat .pbadge").count() == 0
+
+
+def test_effects_showcase_opens_the_right_player_tool(live, mk):
+    no_paywall(live)
+    c = opened(mk, tracks(2), paywall=False)
+    start(c, 1)
+    playing_src(c, 1)
+    c.page.click("#home-dyn [data-feat=slowed]")
+    c.page.wait_for_selector("#gen:not([hidden]) #genb .fx")
+    c.ev("closeSh('gen')")
+    c.page.wait_for_timeout(380)
+    c.page.click("#home-dyn [data-feat=sleep]")
+    c.page.wait_for_selector("#opt:not([hidden])")
+    assert "Minuterie" in c.page.inner_text("#optt")
+    c.ev("closeSh('opt')")
+    c.page.wait_for_timeout(380)
+    c.page.click("#home-dyn [data-feat=loop]")
+    c.page.wait_for_selector("#np:not([hidden])")
+
+
+def test_effects_showcase_without_a_sound_explains_instead(live, mk):
+    c = opened(mk, [])
+    c.page.click("#home-dyn [data-feat=eq]")
+    assert "Ajoute d'abord des sons" in toasts(c)
+    assert c.ev("document.activeElement.id") == "u1"
+    assert c.ev("$('#gen').hidden") is True
+    d = opened(mk, tracks(2))
+    d.page.click("#home-dyn [data-feat=car]")
+    assert "Lance d'abord un son" in toasts(d) and d.ev("$('#car').hidden") is True
+
+
+def test_promo_video_is_click_to_play_and_downloads_nothing_before(live, mk):
+    no_paywall(live)
+    c = mk()
+    hits = []
+    c.page.on("request", lambda r: "/promo.mp4" in r.url and hits.append(r.url))
+    c.open()
+    assert c.page.is_visible("#promo video")
+    v = c.ev("""(()=>{ const v=document.querySelector('#promo video');
+        return {pre:v.getAttribute('preload'), poster:v.getAttribute('poster'), inl:v.playsInline, ctl:v.controls,
+                w:v.getAttribute('width'), h:v.getAttribute('height'), auto:v.autoplay}; })()""")
+    assert v["pre"] == "none" and v["poster"].startswith("/promo-poster.jpg") and v["inl"] and v["ctl"] and not v["auto"]
+    assert v["w"] and v["h"]                       # taille réservée : pas de saut de mise en page
+    c.page.wait_for_timeout(400)
+    assert not hits                                # rien tant qu'on n'a pas lancé la vidéo
+
+
+def test_promo_video_hidden_once_library_has_sounds(live, mk):
+    no_paywall(live)
+    c = opened(mk, tracks(2), paywall=False)
+    assert c.page.locator("#promo").is_hidden()
+
+
+def test_promo_video_in_english(live, mk):
+    no_paywall(live)
+    c = mk(locale="en-US")
+    c.open()
+    assert "TikWave in a video" in c.page.text_content("#promo")   # text_content : l'étiquette est affichée en capitales
+    assert c.page.get_attribute("#promo video", "aria-label") == "TikWave intro video"
+    assert not leaks(c, "promo")
 
 
 def test_cover_colour_becomes_the_accent(live, mk):
@@ -839,6 +926,25 @@ def test_faq_on_home_can_be_hidden(live, mk):
     assert c.page.locator("section[data-v=accueil] .faq details").count() >= 4
     c.ev("setHome('faq',false)")
     assert c.page.locator("section[data-v=accueil] .faq").is_hidden()
+
+
+def test_faq_answers_spotify_youtube_and_comparison(live, mk):
+    no_paywall(live)
+    c = opened(mk, tracks(1), paywall=False)
+    sums = c.page.locator("section[data-v=accueil] .faq summary").all_inner_texts()
+    for q in ("Comment importer ma playlist Spotify ?", "Ça marche avec YouTube et SoundCloud ?", "Quelle différence avec Spotify ?"):
+        assert q in sums
+
+
+def test_faq_is_fully_translated_in_english(live, mk):
+    no_paywall(live)
+    c = mk(locale="en-US")
+    c.seed(en_tracks())
+    c.open()
+    c.ev("document.querySelectorAll('.faq details').forEach(d=>d.open=true)")
+    txt = c.page.inner_text("section[data-v=accueil] .faq")
+    assert "How is it different from Spotify?" in txt and "Import from Spotify" in txt and "Does it work with YouTube" in txt
+    assert not leaks(c, "faq")
 
 
 def test_profile_qr_and_playlist_qr_entries(live, mk):

@@ -15,6 +15,7 @@ Le propriétaire n'est pas développeur : il parle français, tutoie, et veut de
 | `index.html` | Toute l'appli front en un seul fichier (HTML + CSS + JS, ~380 Ko) |
 | `lang-en.js` | Traductions anglaises de l'appli (chargé seulement pour les visiteurs en anglais) |
 | `sw.js` | Service worker (cache `tk-vN` : augmenter N à chaque livraison d'`index.html` ou de `lang-en.js`, avec `?v=N` dans `index.html`, et mettre à jour `tests/test_icons.py`). Actuellement `tk-v11` |
+| `promo.mp4`, `promo-poster.jpg` | Vidéo de présentation de l'accueil (nouveaux visiteurs). Servie par `statique` (morceaux 206, cache long via `?v=N`), jamais gardée par le service worker. La remplacer = changer `?v=` dans `index.html` |
 | `manifest.webmanifest`, icônes, favicons | PWA installable (le serveur traduit le manifest en anglais) |
 | `conditions.html`, `confidentialite.html`, `signalement.html` + `*.en.html` | Pages légales en français et en anglais (à faire relire) |
 | `guide-premium.html`, `PREMIUM.md` | Guide de configuration Stripe / R2 / AdSense |

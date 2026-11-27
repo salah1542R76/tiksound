@@ -8,7 +8,7 @@ self.addEventListener("activate", e => e.waitUntil(
 ));
 self.addEventListener("fetch", e => {
   const r = e.request, u = new URL(r.url);
-  if (r.method !== "GET" || u.origin !== location.origin || u.pathname.startsWith("/api") || u.pathname.startsWith("/audio") || u.pathname.startsWith("/ads") || u.pathname.startsWith("/confidentialite") || u.pathname.startsWith("/conditions") || u.pathname.startsWith("/signalement")) return;
+  if (r.method !== "GET" || u.origin !== location.origin || u.pathname.startsWith("/api") || u.pathname.startsWith("/audio") || u.pathname.startsWith("/ads") || u.pathname.startsWith("/confidentialite") || u.pathname.startsWith("/conditions") || u.pathname.startsWith("/signalement") || u.pathname.startsWith("/promo")) return;   // /promo : vidéo lue par morceaux (206), jamais gardée
   const keep = res => { if (res.ok && res.headers.get("X-Tiksound")) { const cp = res.clone(); caches.open(C).then(c => c.put(r.mode === "navigate" ? "/" : r, cp)); } return res; };
   if (r.mode === "navigate") {
     // Réseau d'abord, 3 s au plus : au-delà (connexion bloquée), la copie gardée s'affiche et la version reçue ensuite sert au lancement suivant

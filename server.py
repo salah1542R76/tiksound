@@ -84,6 +84,8 @@ STATIQUE = {
     "favicon-32.png":       "image/png",
     "favicon.ico":          "image/x-icon",
     "favicon.svg":          "image/svg+xml",
+    "promo.mp4":            "video/mp4",    # vidéo de l'accueil : send_from_directory répond 206 aux demandes par morceaux (Range)
+    "promo-poster.jpg":     "image/jpeg",
 }
 COLORS = 10
 RESERVED = {"admin", "administrateur", "root", "support", "moderator", "moderateur", "modo", "tiksound", "tikwave", "tikwav",
