@@ -14,7 +14,7 @@ Le propriétaire n'est pas développeur : il parle français, tutoie, et veut de
 | `i18n_server.py` | Traductions anglaises du serveur (messages d'erreur, e-mails, aperçus de liens) et choix de la langue d'une requête |
 | `index.html` | Toute l'appli front en un seul fichier (HTML + CSS + JS, ~380 Ko) |
 | `lang-en.js` | Traductions anglaises de l'appli (chargé seulement pour les visiteurs en anglais) |
-| `sw.js` | Service worker (cache `tk-vN` : augmenter N à chaque livraison d'`index.html` ou de `lang-en.js`, avec `?v=N` dans `index.html`, et mettre à jour `tests/test_icons.py`). Actuellement `tk-v12`. Le `SHELL` (page, manifest, `lang-en.js?v=N`, icônes) est gardé dès l'installation : l'appli s'ouvre hors ligne après une seule visite |
+| `sw.js` | Service worker (cache `tk-vN` : augmenter N à chaque livraison d'`index.html` ou de `lang-en.js`, avec `?v=N` dans `index.html`, et mettre à jour `tests/test_icons.py`). Actuellement `tk-v13`. Le `SHELL` (page, manifest, `lang-en.js?v=N`, icônes) est gardé dès l'installation : l'appli s'ouvre hors ligne après une seule visite |
 | `promo.mp4`, `promo-poster.jpg` | Vidéo de présentation de l'accueil (nouveaux visiteurs). Servie par `statique` (morceaux 206, cache long via `?v=N`), jamais gardée par le service worker. La remplacer = changer `?v=` dans `index.html` |
 | `manifest.webmanifest`, icônes, favicons | PWA installable (le serveur traduit le manifest en anglais) |
 | `conditions.html`, `confidentialite.html`, `signalement.html` + `*.en.html` | Pages légales en français et en anglais (à faire relire) |
@@ -42,7 +42,7 @@ Lancer chaque groupe séparément (les tests Chrome dans leur propre processus) 
 ```
 python3 -m pytest tests -q --ignore=tests/e2e_front.py --ignore=tests/e2e_v2.py   # serveur (223)
 python3 -m pytest tests/e2e_front.py -q                                           # appli (53)
-python3 -m pytest tests/e2e_v2.py -q                                              # appli (248)
+python3 -m pytest tests/e2e_v2.py -q                                              # appli (252)
 ```
 
 Dépendances : `pip install -r requirements.txt pytest playwright pillow opencv-python-headless numpy` puis `playwright install chromium` (ou `CHROME_BIN` vers un Chrome installé). Sous Windows : `PYTHONUTF8=1`. `tests/_shims.py` simule sqlalchemy et yt_dlp s'ils manquent : aucun test ne touche Internet. Les navigateurs de test sont en `fr-FR` par défaut (`tests/e2e_front.py`). Méthode : test qui échoue d'abord, puis correction, puis les trois groupes au vert avant de livrer.
@@ -50,7 +50,7 @@ Dépendances : `pip install -r requirements.txt pytest playwright pillow opencv-
 ## Fonctionnement à connaître
 
 - **Audio** : deux lecteurs `<audio>`. `au1` est simple. `au2` passe par Web Audio (égaliseur, distorsion, réverbe, compresseur). `au` désigne celui en cours, `pickEl()` choisit, et `reroute()` change de lecteur en gardant la position et la vitesse.
-- **Écran éteint** (`visibilitychange`) : la lecture repasse sur `au1`, car iOS et Android coupent Web Audio en arrière-plan.
+- **Écran éteint** (`visibilitychange`) : les effets continuent sur `au2` (le moteur reste allumé). Si le système coupe le moteur (`statechange` hors `running`, iPhone surtout), `fxCut` repasse sur `au1` au même endroit et `fxBack` remet les effets au retour.
 - **Effets sur les sons en ligne** : si R2 refuse la lecture directe (CORS), le son passe par `GET /api/media/<clé>`. Les gardes `REROUTEN` / `LOADN` évitent que deux changements rapides se marchent dessus.
 - **Recherche** : `GET /api/find?q=` (YouTube + SoundCloud, Spotify si clés). Si YouTube bloque le serveur, le même son est cherché sur SoundCloud (`soundcloud_twin`).
 - **Explorer** : les sons publiés (`/api/posts`) sont relus à chaque visite ; `POSTS_GEN` jette les réponses arrivées après une remise à zéro ; « Voir » après une publication amène le son à l'écran (`POSTS_FOCUS`). Le flux des playlists est rafraîchi s'il a plus d'une minute.

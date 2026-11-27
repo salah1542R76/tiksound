@@ -1082,7 +1082,7 @@ button,a{-webkit-tap-highlight-color:transparent}
 
 <div id="toasts" role="status" aria-live="polite"></div>
 
-<script>if(LANG==="en")document.write('<script src="/lang-en.js?v=12"><\/script>')   /* les textes anglais, seulement pour qui en a besoin */</script>
+<script>if(LANG==="en")document.write('<script src="/lang-en.js?v=13"><\/script>')   /* les textes anglais, seulement pour qui en a besoin */</script>
 <script>
 // ═══ Français / English : la phrase française est la clé ; les traductions sont dans lang-en.js ═══
 // Nouveau texte : passe-le dans la fonction _t (cases {0}, {1} pour les valeurs), puis ajoute la traduction dans lang-en.js.
@@ -2610,6 +2610,7 @@ function fxBuild(){
     FX.src.connect(FX.lo); FX.lo.connect(FX.mid); FX.mid.connect(FX.hi); FX.hi.connect(FX.shaper); FX.shaper.connect(FX.sat); FX.sat.connect(FX.lp);
     FX.lp.connect(FX.dry); FX.lp.connect(FX.conv); FX.conv.connect(FX.wet);
     FX.dry.connect(FX.comp); FX.wet.connect(FX.comp); FX.comp.connect(FX.out); FX.out.connect(c.destination);
+    c.addEventListener("statechange",fxCut);
     return true;
   }catch(e){ FX.ctx=null; return false; }
 }
@@ -2643,7 +2644,8 @@ async function fxSrc(url){
   return m?"/api/media/"+m[1]:null;
 }
 async function pickEl(url){                                // → [lecteur, adresse à lui donner]
-  if(!fxOn()||document.hidden) return [au1,url];           // écran éteint / app en fond : lecteur normal, qui continue de jouer
+  if(!fxOn()) return [au1,url];
+  if(document.hidden&&!(FX.ctx&&FX.ctx.state==="running")) return [au1,url];   // écran éteint sans moteur d'effets actif : lecteur normal, qui continue de jouer
   const u=await fxSrc(url);
   if(u&&fxBuild()) return [au2,u];
   if(!fxWarned){ fxWarned=true; toast(_t("Les effets (égaliseur, distorted…) ne marchent pas sur ce son : la lecture continue sans effet.")); }
@@ -2679,8 +2681,10 @@ async function reroute(play){                   // effets changés en cours d'é
   fxSleep();
   if(was&&!offlineLocked()) el.play().catch(()=>{});
 }
-// Écran éteint : la musique passe sur le lecteur normal au même endroit (la vitesse est gardée), les effets reviennent au retour
+// Écran éteint : les effets continuent. Si le système coupe le moteur d'effets (iPhone), la musique passe sur le lecteur
+//  normal au même endroit (la vitesse est gardée) et les effets reviennent au retour
 let BGFX=false;
+function fxCut(){ if(document.hidden&&au===au2&&!AU2PAUSED&&!AD.on&&FX.ctx.state!=="running"&&au.getAttribute("src")){ BGFX=true; reroute(true); } }
 function fxBack(){
   if(!BGFX||document.hidden) return;
   const go=()=>{ if(!BGFX||document.hidden) return; BGFX=false; reroute(); };
@@ -2692,8 +2696,7 @@ function fxBack(){
 document.addEventListener("visibilitychange",()=>{
   if(document.hidden){
     sfxClose();
-    if(au===au2&&!AD.on&&au.getAttribute("src")){ BGFX=true; reroute(); }
-    else fxSleep();
+    if(au!==au2) fxSleep();
   } else fxBack();
 });
 try{ if(navigator.audioSession) navigator.audioSession.type="playback"; }catch(e){}     // iPhone (iOS 17+) : lecture comme une appli de musique

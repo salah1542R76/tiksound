@@ -1626,30 +1626,44 @@ def set_hidden(c, hidden):
          "document.dispatchEvent(new Event('visibilitychange'))")
 
 
-def test_screen_off_moves_effects_playback_to_the_plain_player_without_stopping(live, mk):
+def test_screen_off_keeps_the_effects_playing(live, mk):
+    no_paywall(live)
+    c = opened(mk, with_fx(local_tracks(2), eq="bass", rate="slowed"), paywall=False)
+    playing_blob(c)
+    c.page.wait_for_function("au===au2 && au.currentTime>0.3")
+    set_hidden(c, True)
+    c.page.wait_for_timeout(400)
+    assert c.ev("au===au2 && !au.paused") is True                           # bass boost toujours là, écran éteint
+    assert c.ev("FX.ctx.state") == "running"
+    assert abs(c.ev("au.playbackRate") - 0.85) < .01                        # slowed aussi
+    set_hidden(c, False)
+    assert c.ev("au===au2 && !au.paused") is True
+
+
+def test_screen_off_falls_back_to_the_plain_player_if_the_system_stops_the_effects(live, mk):
     no_paywall(live)
     c = opened(mk, with_fx(local_tracks(2), eq="bass", rate="slowed"), paywall=False)
     playing_blob(c)
     c.page.wait_for_function("au===au2 && au.currentTime>0.3")
     pos = c.ev("au.currentTime")
     set_hidden(c, True)
-    c.page.wait_for_function("au===au1 && !au.paused")
-    assert c.ev("au2.paused") is True and c.ev("!au2.getAttribute('src')") is True
-    assert c.ev("au.currentTime") >= pos - 0.3                              # même position
-    assert abs(c.ev("au.playbackRate") - 0.85) < .01                        # la vitesse est gardée
-    c.page.wait_for_function("FX.ctx.state==='suspended'")
+    c.ev("FX.ctx.suspend()")                                                # iPhone : moteur d'effets coupé en fond
+    c.page.wait_for_function("au===au1 && !au.paused")                     # la musique continue quand même
+    assert c.ev("au.currentTime") >= pos - 0.3
+    assert abs(c.ev("au.playbackRate") - 0.85) < .01
     set_hidden(c, False)
     c.page.wait_for_function("au===au2 && !au.paused")                     # les effets reviennent à l'écran rallumé
 
 
-def test_next_sound_started_while_screen_is_off_uses_the_plain_player(live, mk):
+def test_next_sound_started_while_screen_is_off_keeps_the_effects(live, mk):
     no_paywall(live)
     c = opened(mk, with_fx(local_tracks(2), eq="bass"), paywall=False)
     store_local_blob(c, "t2")
     playing_blob(c, "t1")
+    c.page.wait_for_function("au===au2 && !au.paused")
     set_hidden(c, True)
     c.ev("void play(['t2'],0)")
-    c.page.wait_for_function("curT().id==='t2' && au===au1 && !au.paused")
+    c.page.wait_for_function("curT().id==='t2' && au===au2 && !au.paused")
 
 
 def test_paused_effects_stay_paused_when_screen_goes_off(live, mk):
