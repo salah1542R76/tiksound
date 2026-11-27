@@ -1789,7 +1789,7 @@ def test_old_address_shows_how_to_move_and_new_address_does_not(live, mk):
 # ═══════════════════════════ Français / English ═══════════════════════════
 # Un mot français visible en mode anglais = traduction oubliée. Le contenu des sons de test est en anglais.
 FR_LEAK = re.compile(r"[éèêàçùîôûœÉÈÀÊ]|\b(ton|ta|tes|tu|pour|avec|sans|aucun|aucune|ajouter|ajoute|retirer|fermer|lire|partager|"
-                     r"les|des|une|mes|sons|mot de passe|connexion|accueil|profil|bonjour|bonsoir|choisis|touche|oui|non)\b", re.I)
+                     r"les|des|une|mes|sons|mot de passe|connexion|accueil|profil|bonjour|bonsoir|choisis|touche|oui|non|corbeille|copie|toi)\b", re.I)
 
 
 def en_tracks(n=4):
@@ -2580,3 +2580,236 @@ def test_home_feed_does_not_push_the_faq_down_when_it_arrives(live, mk):
     c.page.wait_for_selector("#home-dyn .trend .pc:not(.ph)")
     c.page.wait_for_timeout(100)
     assert abs(rect(c, ".faq")["top"] - before) < 40, (before, rect(c, ".faq")["top"])
+
+
+# ═══════════════════════════ Social, personnalisation, accessibilité (audit) ═══════════════════════════
+def test_space_flips_a_focused_switch_instead_of_toggling_play(live, mk):
+    no_paywall(live)
+    c = opened(mk, tracks(2), paywall=False, lastId="t1")
+    c.ev("window.PLAYS=0; window.togglePlay=()=>{ PLAYS++; }; openCustom('acces')")
+    c.page.wait_for_selector("#pzp .sw2")
+    before = c.ev("document.querySelector('#pzp .sw2').getAttribute('aria-checked')")
+    c.page.focus("#pzp .sw2 >> nth=0")
+    c.page.keyboard.press(" ")
+    c.page.wait_for_timeout(100)
+    assert c.ev("document.querySelector('#pzp .sw2').getAttribute('aria-checked')") != before
+    assert c.ev("PLAYS") == 0
+    c.ev("document.activeElement.blur()")
+    c.page.keyboard.press(" ")                                              # sans bouton visé : Espace reste lecture / pause
+    assert c.ev("PLAYS") == 1
+
+
+def test_every_customize_switch_and_slider_has_a_name(live, mk):
+    no_paywall(live)
+    c = opened(mk, tracks(1), paywall=False)
+    unnamed = []
+    for tab in c.ev("PZT.map(t=>t[0])"):
+        c.ev(f"openCustom('{tab}')")
+        unnamed += c.ev("""[...document.querySelectorAll('#pzp .sw2,#pzp input[type=range]')]
+            .filter(e=>!(e.getAttribute('aria-label')||'').trim()).map(e=>e.outerHTML.slice(0,80))""")
+    assert not unnamed, unnamed[:5]
+
+
+def test_batch_convert_stops_on_cancel_and_leaves_a_running_download_alone(live, mk):
+    c = opened(mk, [])
+    c.ev("""ONLINE=true; grab=async(url,id)=>{ if(url.endsWith('/1')) dlpCancel();
+        return {title:'OK '+url.slice(-1),author:'',url,remote:true,audio_url:'https://r2.example.test/a.mp3'}; }; 0""")
+    c.ev("document.getElementById('u2').value=[1,2,3].map(i=>'https://www.tiktok.com/@a/video/'+i).join(' ')")
+    c.ev("convert('u2', null)")
+    assert c.ev("S.tracks.length") == 1                                     # « Annuler » arrête après le son en cours
+    c.ev("dlpStart(5,'Téléchargement'); dlpCancel(); dlpDraw()")
+    assert c.ev("document.getElementById('dlpe').textContent") == "Arrêt après ce son…"
+    c.ev("DLP.stop=false")
+    c.ev("document.getElementById('u2').value='https://www.tiktok.com/@a/video/7 https://www.tiktok.com/@a/video/8'")
+    c.ev("convert('u2', null)")
+    assert c.ev("[DLP.on, document.getElementById('dlp').hidden, DLP.done, DLP.label]") == [True, False, 0, "Téléchargement"]
+
+
+def test_holding_the_drag_handle_does_not_start_selection(live, mk):
+    no_paywall(live)
+    c = opened(mk, tracks(4), paywall=False, pls=PLS)
+    c.ev("openPl='p1';location.hash='playlists';render()")
+    c.page.wait_for_selector("#plsv .drag")
+    h = c.page.locator("#plsv .drag").nth(0).bounding_box()
+    last = c.page.locator("#plsv .row").nth(2).bounding_box()
+    c.page.mouse.move(h["x"] + h["width"] / 2, h["y"] + h["height"] / 2)
+    c.page.mouse.down()
+    c.page.wait_for_timeout(700)
+    c.page.mouse.move(h["x"] + 5, last["y"] + last["height"] - 4, steps=8)
+    c.page.mouse.up()
+    assert c.ev("SEL") is None
+    assert c.ev("S.pls[0].ids") == ["t2", "t3", "t1"]
+
+
+def test_tag_with_an_apostrophe_filters_the_library(live, mk):
+    c = opened(mk, tracks(2, tags=["j'adore"]))
+    c.ev("location.hash='bibliotheque'")
+    c.page.locator("#filters .chip", has_text="#j'adore").click()
+    assert c.ev("S.ui.filter") == "tag:j'adore"
+
+
+def test_customize_cancel_only_undoes_this_visit_and_only_appearance(live, mk):
+    no_paywall(live)
+    c = opened(mk, tracks(1), paywall=False)
+    c.ev("openCustom('theme'); setUI('theme','foret')")
+    c.ev("history.back()")
+    c.page.wait_for_function("location.hash!=='#perso'")
+    c.ev("S.ui.view='list'; S.ui.storage='online'; save()")
+    c.ev("openCustom('theme')")
+    c.page.wait_for_selector("#pzcancel")
+    c.ev("setUI('blur',30)")
+    c.page.click("#pzcancel")
+    assert c.ev("[S.ui.theme,S.ui.blur,S.ui.view,S.ui.storage]") == ["foret", 18, "list", "online"]
+    c.ev("pzTab('profil')")
+    assert c.ev("document.getElementById('pzcancel').hidden") is True       # le profil est déjà enregistré sur le serveur
+
+
+def test_playing_published_sounds_does_not_fill_the_library(live, mk):
+    c = opened(mk, tracks(2), lastId="t1")
+    c.ev("window.loadCur=()=>{}; POSTS=[1,2,3].map(i=>({id:'p'+i,url:'https://www.tiktok.com/@x/video/9'+i,title:'Post '+i,author:'X'})); playPost(0)")
+    assert c.ev("S.tracks.length") == 5                                     # dans la file pour l'écoute…
+    assert c.ev("libList().length") == 2                                    # … mais pas dans « Mes sons »
+    assert c.ev("libSnap().tracks.filter(t=>t.url.includes('/video/9')).length") == 0
+    c.ev("toggleFav(S.tracks.find(t=>t.title==='Post 2').id)")              # un cœur = gardé pour de bon
+    assert c.ev("libList().length") == 3
+    c.page.reload()
+    c.booted()
+    assert sorted(c.ev("S.tracks.map(t=>t.title)")) == ["Post 2", "Son 1", "Son 2"]
+    c.ev("window.loadCur=()=>{}; PUBPL={id:'z',name:'Z',username:'u',tracks:[{url:'https://www.tiktok.com/@x/video/77',title:'Pub'}]}; playPublic(0)")
+    assert c.ev("libList().length") == 3
+    c.ev("importPublic()")                                                  # « Ajouter à mes playlists » : gardé
+    assert c.ev("libList().length") == 4
+
+
+def test_typing_a_bio_survives_a_track_change(live, mk):
+    no_paywall(live)
+    c = mk()
+    c.signup("b@example.com", "bobby")
+    c.seed(tracks(2)); c.open()
+    c.page.wait_for_function("!!ME")
+    c.ev("openCustom('profil')")
+    c.page.wait_for_selector("#bio")
+    c.page.focus("#bio")
+    c.ev("render()")
+    assert c.ev("document.activeElement.id") == "bio"
+
+
+def test_sheets_take_focus_keep_it_and_give_it_back(live, mk):
+    c = opened(mk, tracks(2))
+    c.ev("window.OPENER=document.querySelector('header nav a'); OPENER.focus(); libView()")
+    c.page.wait_for_function("document.activeElement && !!document.activeElement.closest('#opt')")
+    for _ in range(12):
+        c.page.keyboard.press("Tab")
+        assert c.ev("!!document.activeElement.closest('#opt')")
+    c.page.keyboard.press("Shift+Tab")
+    assert c.ev("!!document.activeElement.closest('#opt')")
+    c.page.keyboard.press("Escape")
+    c.page.wait_for_function("document.activeElement===OPENER")
+    assert c.ev("[...document.querySelectorAll('.ov2 .sheet')].every(s=>s.getAttribute('role')==='dialog'&&s.getAttribute('aria-modal')==='true')")
+    assert c.ev("document.getElementById('np').getAttribute('aria-modal')") == "true"
+    assert c.ev("document.getElementById('auth-box').getAttribute('role')") == "dialog"
+
+
+def test_light_theme_fields_have_visible_edges_and_names(live, mk):
+    no_paywall(live)
+    c = opened(mk, tracks(1), paywall=False)
+    c.ev("setUI('theme','clair'); location.hash='profil'")
+    c.page.wait_for_timeout(200)
+    cols = c.ev("""['#spurl','#langsel','#storsel'].flatMap(s=>{ const e=document.querySelector(s);
+        return [getComputedStyle(e).borderTopColor, getComputedStyle(e.closest('section > div')).borderTopColor]; })""")
+    assert not [w for w in cols if w.startswith("rgba(255, 255, 255")], cols
+    assert c.ev("document.getElementById('storsel').getAttribute('aria-labelledby')") == "stor-h"
+    assert c.ev("document.getElementById('stor-h').textContent").startswith("Stockage")
+
+
+def test_profile_podium_shows_the_ranks(live, mk):
+    c = opened(mk, [dict(t, plays=10 - i) for i, t in enumerate(tracks(3))])
+    c.ev("location.hash='profil'")
+    c.page.wait_for_selector("#profil-content .list .row")
+    assert c.ev("""[...[...document.querySelectorAll('#profil-content .box')].find(b=>b.textContent.includes('Ton podium'))
+        .querySelectorAll('.n')].map(n=>n.textContent.trim())""") == ["1", "2", "3"]
+
+
+def test_free_account_only_tries_cosmetics_when_the_server_has_no_paywall(live, mk):
+    no_paywall(live)
+    c = mk()
+    c.signup("f@example.com", "freddy")
+    c.seed(tracks(1)); c.open()
+    c.page.wait_for_function("PAYWALL===false && !!ME")
+    c.ev("openCustom('profil'); pickCos('banner','aurore')")
+    assert c.ev("[!!(ME.cos||{}).banner, PV.banner]") == [False, "aurore"]  # le serveur refuserait : essai dans l'aperçu
+
+
+def test_premium_lock_messages_are_whole_translated_sentences(live, mk):
+    c = opened(mk, tracks(1))
+    c.ev("setUI('trail','x'); openCustom('effets')")
+    c.page.locator("#pzp button.acc.custom").first.click()
+    c.page.wait_for_timeout(100)
+    assert "Les couleurs personnalisées font partie de Premium" in toasts(c)
+    e = mk(locale="en-US")
+    e.seed(tracks(1)); e.open(); e.page.wait_for_function("PAYWALL===true")
+    e.ev("openCustom('effets')")
+    e.page.locator("#pzp button.acc.custom").first.click()
+    e.page.wait_for_timeout(100)
+    t = toasts(e)
+    assert "part of Premium" in t and not FR_LEAK.search(t), t
+    e.ev("closeSh('gen'); navigator.clipboard.writeText=async()=>{}; showQR('https://tikwave.fr/x','QR')")
+    e.page.locator("#genb .btn").first.click()
+    e.page.wait_for_timeout(100)
+    assert "Link copied" in toasts(e)
+
+
+def test_pickers_highlight_what_is_really_shown_after_premium_ends(live, mk):
+    c = opened(mk, tracks(1), ui={"theme": "synth", "font": "pixel", "bg": "vagues"})
+    c.ev("openCustom('theme')")
+    assert "'dark'" in c.ev("document.querySelector('#pzp .th.on').getAttribute('onclick')")
+    assert "'dm'" in c.ev("document.querySelector('#pzp .fonts .on').getAttribute('onclick')")
+    c.ev("pzTab('fond')")
+    assert "aurora" in c.ev("document.querySelector('#pzp .seg .on').getAttribute('onclick')")
+
+
+def test_removing_your_published_sound_asks_first(live, mk):
+    c = opened(mk, tracks(1))
+    c.ev("window.DELS=0; const a=api; api=(u,o)=>{ if(o&&o.method==='DELETE'){ DELS++; return Promise.resolve({}); } return a(u,o); }; 0")
+    c.ev("POSTS=[{id:'a',mine:true,title:'A',url:'u1',likes:3},{id:'b',mine:true,title:'B',url:'u2',likes:0}]; window.P=deletePost(1); 0")
+    c.page.wait_for_selector("#cf:not([hidden])")
+    c.ev("cfAns(false)")
+    c.ev("P")
+    assert c.ev("[DELS, POSTS.length]") == [0, 2]
+    c.page.wait_for_timeout(300)
+    c.ev("window.P=deletePost(1); 0")
+    c.page.wait_for_selector("#cf:not([hidden])")
+    c.ev("POSTS.unshift({id:'n',title:'Nouveau',url:'u0',likes:0}); cfAns(true)")   # le fil a bougé pendant la question
+    c.ev("P")
+    assert c.ev("POSTS.map(p=>p.id)") == ["n", "a"]
+
+
+def test_french_and_english_numbers_and_plurals(live, mk):
+    c = opened(mk, tracks(1))
+    assert c.ev("plural(3,'playlist publique')") == "3 playlists publiques"
+    assert c.ev("plural(1,'playlist publique')") == "1 playlist publique"
+    assert c.ev("plural(2,'son')") == "2 sons"
+    assert c.ev("RATES['1.25'][2]") == "1,25×"
+    assert c.ev("[pS(0),pS(1),pS(2)]") == ["", "", "s"]
+    assert c.ev("document.querySelector('link[rel=manifest]').crossOrigin") == "use-credentials"
+    c.ev("S.pls=[{id:'g',name:'Gym',ids:[]}]; dupPl('g')")
+    assert c.ev("S.pls[1].name") == "Gym (copie)"
+    e = mk(locale="en-US")
+    e.seed(tracks(1)); e.open()
+    assert e.ev("plural(3,'playlist publique')") == "3 public playlists"
+    assert e.ev("[RATES['1.25'][2], RATES['0.75'][2]]") == ["1.25×", "0.75×"]
+    assert e.ev("[pS(0),pS(1),pS(2)]") == ["s", "", "s"]
+    e.ev("S.pls=[{id:'g',name:'Gym',ids:[]}]; dupPl('g')")
+    assert e.ev("S.pls[1].name") == "Gym (copy)"
+    e.ev("S.trash=[{kind:'t',at:1,t:{id:'z',title:'Old'}}]; location.hash='bibliotheque'; renderLib()")
+    assert e.ev("document.getElementById('trashl').textContent") == "Trash (1)"
+
+
+def test_trophies_and_best_streak_stay_earned(live, mk):
+    c = opened(mk, tracks(1))
+    c.ev("S.stats.days=[...Array(30)].map((_,i)=>dayKey(new Date(2024,0,1+i))); S.stats.best=0; markDay()")
+    c.ev("S.stats.days=S.stats.days.slice(-1)")                             # 120 jours d'écoute plus tard, la vieille série est sortie de la liste
+    assert c.ev("bestStreak()") >= 30
+    c.ev("S.goal=1; S.stats.byDay={[dayKey(new Date())]:120}; openStats()")
+    c.ev("closeSh('gen'); S.stats.byDay={}; openStats()")
+    assert c.ev("[...document.querySelectorAll('#genb .tro.on')].some(e=>e.textContent.includes('🎯'))")
