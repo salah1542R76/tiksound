@@ -257,6 +257,166 @@ def test_no_effect_still_one_audio_at_a_time_when_switching_fast(live, mk):
     assert c.ev("[...document.querySelectorAll('audio')].filter(a=>!a.paused).length") == 1
 
 
+# ═══════════════════════════ Lecteur : courses et cas limites ═══════════════════════════
+def test_custom_eq_slider_switches_to_the_effects_player(live, mk):
+    no_paywall(live)
+    c = opened(mk, local_tracks(2), paywall=False)
+    playing_blob(c)
+    c.ev("setEq('custom')")
+    assert c.ev("au.id") == "au"                                          # tout à 0 : pas d'effet
+    c.ev("setEqc('b',8)")
+    c.page.wait_for_function("au.id==='au2' && !au.paused")
+    assert c.ev("FX.lo.gain.value") == 8
+
+
+def test_fast_next_from_device_sound_to_online_sound_plays_the_online_one(live, mk):
+    no_paywall(live)
+    tr = local_tracks(1) + [tracks(2)[1]]
+    c = opened(mk, tr, paywall=False)
+    store_local_blob(c, "t1")
+    c.ev("q=['t1','t2']; qi=0; void loadCur(); qi=1; void loadCur()")      # deux « Suivant » rapides
+    c.page.wait_for_function("au.src.includes('n=2') && !au.paused")
+    time.sleep(0.6)
+    assert c.ev("au.src.includes('n=2')") is True
+    assert c.page.inner_text("#pt") == "Son 2"
+
+
+def test_reopening_the_player_right_after_closing_keeps_it_open(live, mk):
+    no_paywall(live)
+    c = opened(mk, tracks(2), paywall=False)
+    start(c, 1); playing_src(c, 1)
+    c.ev("openNP()")
+    c.page.wait_for_function("document.getElementById('np').classList.contains('on')")
+    c.ev("closeNP(); setTimeout(openNP,150)")
+    time.sleep(0.7)
+    assert c.ev("document.getElementById('np').hidden") is False
+
+
+def test_cancelling_the_sleep_timer_during_the_fade_stops_it(live, mk):
+    no_paywall(live)
+    c = opened(mk, tracks(2), paywall=False)
+    start(c, 1); playing_src(c, 1)
+    c.ev("S.player.sleepSoft=false; fadeOut()")
+    c.page.wait_for_function("SLEEPF<0.9")
+    c.ev("setSleep(30)")
+    assert c.ev("SLEEPF") == 1
+    time.sleep(0.6)
+    assert c.ev("[SLEEPF, !!sleepAt, au.paused]") == [1, True, False]
+
+
+def test_deleted_next_sound_is_skipped(live, mk):
+    no_paywall(live)
+    c = opened(mk, tracks(3), paywall=False)
+    c.ev("void play(['t1','t2','t3'],0)"); playing_src(c, 1)
+    c.ev("delTrack('t2')")
+    assert c.ev("q") == ["t1", "t3"]
+    c.ev("step(1)")
+    playing_src(c, 3)
+    c.ev("q=['t3','gone','t1']; qi=0; step(1)")
+    playing_src(c, 1)                                                     # un id disparu (synchro) est sauté
+
+
+def test_effects_player_falls_back_to_the_relay_when_the_direct_file_fails(live, mk):
+    no_paywall(live)
+    c = mk()
+    path = os.path.join(os.path.dirname(__file__), "media", "silence.wav")
+    sha = "a" * 40
+
+    def r2(r):                                   # HEAD autorisé (CORS), mais le fichier lui-même échoue
+        if r.request.resource_type == "fetch":
+            return r.fulfill(status=200, body="", headers={"Access-Control-Allow-Origin": "*"})
+        r.abort()
+    c.ctx.route(re.compile(r"https://r2\.example\.test/"), r2)
+    c.ctx.route(re.compile(r"/api/media/audio/"), lambda r: r.fulfill(status=200, path=path, content_type="audio/wav"))
+    tr = [dict(id="r1", title="Distant", author="A", duration=60, url="", local=False,
+               remote=f"https://r2.example.test/audio/{sha}.mp3", added=1)]
+    c.seed(with_fx(tr, eq="bass"), player={"shuffle": False, "repeat": "all", "rate": "1"})
+    c.open()
+    c.ev("void play(['r1'],0)")
+    c.page.wait_for_function("au.id==='au2' && au.src.includes('/api/media/audio/') && !au.paused", timeout=8000)
+
+
+def fake_hidden_and_wake_lock(c):
+    """document.hidden pilotable (HID) et un faux verrou d'écran qui compte les verrous encore actifs."""
+    c.ev("""window.WL={live:[]}; Object.defineProperty(navigator,'wakeLock',{configurable:true,value:{request:async()=>{
+      const s={release(){ WL.live=WL.live.filter(x=>x!==s); return Promise.resolve(); }}; WL.live.push(s); return s; }}});
+      window.HID=false; Object.defineProperty(document,'hidden',{configurable:true,get:()=>HID})""")
+
+
+def test_car_mode_wake_lock_is_not_leaked_and_comes_back(live, mk):
+    no_paywall(live)
+    c = opened(mk, tracks(2), paywall=False)
+    start(c, 1); playing_src(c, 1)
+    fake_hidden_and_wake_lock(c)
+    c.ev("carMode(true)"); c.page.wait_for_function("WL.live.length===1")
+    c.ev("carMode(true)"); time.sleep(0.2)
+    assert c.ev("WL.live.length") == 1                                    # deuxième ouverture : pas de verrou orphelin
+    c.ev("WL.live=[]; HID=true; document.dispatchEvent(new Event('visibilitychange'))")   # le navigateur libère en fond
+    c.ev("HID=false; document.dispatchEvent(new Event('visibilitychange'))")
+    c.page.wait_for_function("WL.live.length===1")                        # repris au retour
+    c.ev("carMode(false)")
+    c.page.wait_for_function("WL.live.length===0")
+
+
+def test_crossfade_starts_a_skipped_sound_silent(live, mk):
+    no_paywall(live)
+    c = opened(mk, tracks(2), paywall=False, player={"shuffle": False, "repeat": "all", "rate": "1", "fade": 4})
+    c.ev("void play(['t1','t2'],0)"); playing_src(c, 1)
+    c.ev("au.currentTime=30"); c.page.wait_for_function("FADE>0.99")
+    c.ev("window.V=null; au1.addEventListener('playing',()=>window.V=FADE,{once:true}); step(1)")
+    c.page.wait_for_function("window.V!==null")
+    assert c.ev("V") < 0.5
+
+
+def test_seek_bar_unfreezes_after_cancel_and_seeks_once_on_release(live, mk):
+    no_paywall(live)
+    c = opened(mk, tracks(2), paywall=False)
+    start(c, 1); playing_src(c, 1)
+    c.ev("const s=document.getElementById('npsk'); s.dispatchEvent(new PointerEvent('pointerdown')); s.dispatchEvent(new PointerEvent('pointercancel'))")
+    assert c.ev("seeking") is False
+    c.ev("au.currentTime=1; const s=document.getElementById('npsk'); s.dispatchEvent(new PointerEvent('pointerdown')); s.value=500; s.dispatchEvent(new Event('input'))")
+    assert c.ev("au.currentTime") < 5                                     # pendant le glissé : pas de saut réseau
+    c.ev("const s=document.getElementById('npsk'); s.dispatchEvent(new Event('change')); s.dispatchEvent(new PointerEvent('pointerup'))")
+    assert abs(c.ev("au.currentTime") - 30) < 2
+
+
+def test_effects_come_back_for_a_sound_started_screen_off(live, mk):
+    no_paywall(live)
+    c = opened(mk, with_fx(local_tracks(2), eq="bass"), paywall=False)
+    store_local_blob(c, "t1")
+    fake_hidden_and_wake_lock(c)
+    c.ev("HID=true; void play(['t1'],0)")
+    c.page.wait_for_function("au.src.startsWith('blob:') && !au.paused")
+    assert c.ev("au.id") == "au"                                          # écran éteint : lecteur normal
+    c.ev("HID=false; document.dispatchEvent(new Event('visibilitychange'))")
+    c.page.wait_for_function("au.id==='au2' && !au.paused")
+
+
+def test_previous_on_a_trimmed_sound_restarts_at_the_trim(live, mk):
+    no_paywall(live)
+    tr = tracks(2)
+    tr[1]["cut"] = {"a": 20, "b": 0}
+    c = opened(mk, tr, paywall=False)
+    c.ev("void play(['t1','t2'],1)"); playing_src(c, 2)
+    c.ev("au.currentTime=30; step(-1)")
+    assert abs(c.ev("au.currentTime") - 20) < 1
+    c.ev("au.currentTime=21; step(-1)")                                   # juste après le début rogné : son précédent
+    playing_src(c, 1)
+
+
+def test_reverb_impulse_is_only_built_when_reverb_is_used(live, mk):
+    no_paywall(live)
+    c = opened(mk, local_tracks(2), paywall=False)
+    playing_blob(c)
+    c.ev("setEq('bass')")
+    c.page.wait_for_function("au.id==='au2'")
+    assert c.ev("FX.conv.buffer===null") is True
+    c.ev("setFxVal('rev',40)")
+    assert c.ev("FX.conv.buffer!==null") is True
+    c.ev("setFxVal('rev',0)")
+    assert c.ev("FX.conv.buffer===null") is True
+
+
 # ═══════════════════════════ Minuterie, mode voiture ═══════════════════════════
 def test_car_mode_big_controls_and_escape(live, mk):
     no_paywall(live)

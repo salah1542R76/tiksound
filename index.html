@@ -2357,28 +2357,31 @@ async function loadCur(){
   if(AD.on) return;                          // une pub tourne : le son visé (q/qi) se chargera juste après
   if(offlineLocked()) return offlineNotice();
   let t=curT(); if(!t) return;
+  const my=++LOADN;                          // jeton pris AVANT toute attente : un son demandé ensuite l'emporte toujours
   fxLoad(t);                                 // les effets de CE son (ou aucun) : dès qu'on le vise, avant tout chargement
   if(adDue()){
     await runAd(adPick());
     if(AD.stop){ AD.stop=false; return; }    // minuterie de sommeil écoulée pendant la pub : on ne lance rien
+    if(my!==LOADN) return;
     t=curT(); if(!t) return;                 // relu : on a pu viser un autre son pendant la pub
     fxLoad(t);
   }
   if(!t.local&&!t.remote){
-    if(t.pending&&t.url){ toast(_t("Téléchargement de « {0} »…",t.title)); if(!await dl(t.id,true)) return; }
+    if(t.pending&&t.url){ toast(_t("Téléchargement de « {0} »…",t.title)); if(!await dl(t.id,true)||my!==LOADN) return; }
     else return toast(_t("Pas de fichier audio pour ce son"),{type:"err"});
   }
   let url=t.remote;
   if(!url){
-    const b=await dbop("get",t.id).catch(()=>null);
+    const b=await dbop("get",t.id).catch(()=>null); if(my!==LOADN) return;
     if(!b){ t.local=false; t.pending=!!t.url; save(); render(); return toast(_t("Fichier audio introuvable : retélécharge-le"),{type:"err"}); }
     url=URL.createObjectURL(b);
   }
   if(LOOP&&LOOP.id!==t.id) LOOP=null;
   applyRate();
-  const my=++LOADN; await setSrc(url); if(my!==LOADN) return;    // un autre son a été demandé entre-temps
+  await setSrc(url,my); if(my!==LOADN) return;    // un autre son a été demandé entre-temps
   const rs=S.player.resume!==false&&t.pos>5&&(!t.duration||t.pos<t.duration-8)?t.pos:0, st0=rs||(t.cut&&t.cut.a)||0;
   if(st0){ au.currentTime=st0; au.addEventListener("loadedmetadata",()=>{ if(au.currentTime<st0-1) au.currentTime=st0; },{once:true}); if(rs) toast(_t("Reprise à {0}",fm(rs))); }
+  if((+S.player.fade||0)>0&&!rs&&!LOOP){ FADE=0; volApply(); }   // fondu : le son démarre muet, la minuterie de 100 ms le fait monter
   applyRate(); lastTU=0;
   au.play().catch(()=>toast(_t("Lecture bloquée, touche ▶")));
   adTick();
@@ -2409,8 +2412,9 @@ function showPlayer(t){
 }
 function step(d){
   if(AD.on||!q.length) return;
-  if(d<0 && au.currentTime>3){ au.currentTime=0; return; }
-  qi=(qi+d+q.length)%q.length; loadCur();
+  if(d<0){ const t=curT(), a0=(t&&t.cut&&t.cut.a)||0; if(au.currentTime>a0+3){ au.currentTime=a0; return; } }
+  let n=q.length; do qi=(qi+d+q.length)%q.length; while(--n>0&&!S.tracks.some(x=>x.id===q[qi]));   // saute les sons supprimés entre-temps
+  loadCur();
 }
 function togglePlay(){ if(AD.on) return; if(!au.src){ const id=S.lastId&&S.tracks.find(t=>t.id===S.lastId&&playable(t))?S.lastId:null; if(id) play([id],0); return; } if(au.paused){ sfx("play"); resumeAudio(); } else { sfx("pause"); au.pause(); } }
 function seekBy(s){ if(AD.on) return; if(au.duration) au.currentTime=Math.max(0,Math.min(au.duration,au.currentTime+s)); }
@@ -2459,7 +2463,11 @@ for(const el of [au1,au2]){                     // les deux lecteurs : seul le l
   el.ontimeupdate=()=>{ if(el===au) onTime(); };
 }
 let seeking=false;
-for(const id of ["#sk","#npsk"]){ const el=$(id); el.addEventListener("pointerdown",()=>seeking=true); el.addEventListener("pointerup",()=>seeking=false); el.addEventListener("change",()=>seeking=false); el.oninput=e=>{ if(!AD.on&&au.duration) au.currentTime=e.target.value/1000*au.duration; }; }
+// Glissé au doigt ou à la souris : on n'affiche que l'heure et on ne saute qu'au lâcher (un seul chargement réseau). Clavier : saut immédiat.
+for(const id of ["#sk","#npsk"]){ const el=$(id), at=()=>el.value/1000*au.duration;
+  el.addEventListener("pointerdown",()=>seeking=true); el.addEventListener("pointerup",()=>seeking=false); el.addEventListener("pointercancel",()=>seeking=false);
+  el.addEventListener("change",()=>{ seeking=false; if(!AD.on&&au.duration) au.currentTime=at(); });
+  el.oninput=()=>{ if(AD.on||!au.duration) return; if(seeking) $("#tm1").textContent=$("#npt1").textContent=fm(at()); else au.currentTime=at(); }; }
 if("mediaSession" in navigator){
   const ms=navigator.mediaSession, H=(a,f)=>{ try{ ms.setActionHandler(a,f); }catch(e){} };
   H("play",()=>{ if(!AD.on) resumeAudio(); }); H("pause",()=>{ if(!AD.on) au.pause(); }); H("nexttrack",()=>step(1)); H("previoustrack",()=>step(-1));
@@ -2517,7 +2525,6 @@ function fxBuild(){
     const c=new C(), f=(type,fr,q)=>{ const n=c.createBiquadFilter(); n.type=type; n.frequency.value=fr; if(q) n.Q.value=q; return n; };
     Object.assign(FX,{ctx:c,src:c.createMediaElementSource(au2),lo:f("lowshelf",110),mid:f("peaking",1000,.9),hi:f("highshelf",7000),lp:f("lowpass",20000),shaper:c.createWaveShaper(),sat:c.createGain(),
       dry:c.createGain(),wet:c.createGain(),conv:c.createConvolver(),comp:c.createDynamicsCompressor(),out:c.createGain()});
-    FX.conv.buffer=impulse(c,2.6,2.4);
     FX.comp.threshold.value=-8; FX.comp.ratio.value=4;               // évite la saturation quand on pousse les basses
     FX.shaper.oversample="4x"; FX.dd=-1;
     FX.src.connect(FX.lo); FX.lo.connect(FX.mid); FX.mid.connect(FX.hi); FX.hi.connect(FX.shaper); FX.shaper.connect(FX.sat); FX.sat.connect(FX.lp);
@@ -2530,6 +2537,7 @@ function fxApply(){
   if(!FX.ctx) return; const e=eqNow();
   FX.lo.gain.value=e.b; FX.mid.gain.value=e.m; FX.hi.gain.value=e.t; FX.lp.frequency.value=e.lp||20000;
   FX.wet.gain.value=e.r/100*.9; FX.dry.gain.value=1-e.r/250;
+  if(!e.r!==!FX.conv.buffer) FX.conv.buffer=e.r?(FX.ir=FX.ir||impulse(FX.ctx,2.6,2.4)):null;   // réverbe à 0 : pas de convolution (calcul et batterie)
   if(FX.dd!==e.d){ FX.dd=e.d; FX.shaper.curve=e.d?distCurve(e.d):null; }
   FX.sat.gain.value=1-e.d*.004;                                    // compense le volume gagné par la saturation
 }
@@ -2567,13 +2575,14 @@ function swapTo(el){
   try{ old.pause(); }catch(e){} old.removeAttribute("src"); try{ old.load(); }catch(e){}
 }
 function usePlain(){ swapTo(au1); volApply(); }
-async function setSrc(url){
-  SRCURL=url;
+async function setSrc(url,my){
   const [el,u]=await pickEl(url);
-  swapTo(el);
+  if(my!==LOADN){ if(/^blob:/.test(url)&&url!==BLOB) URL.revokeObjectURL(url); return; }   // un autre son est passé devant
+  SRCURL=url; swapTo(el);
   if(BLOB&&BLOB!==url) URL.revokeObjectURL(BLOB);
   BLOB=/^blob:/.test(url)?url:null;
   au.src=u; volApply(); fxApply(); fxSleep();
+  if(document.hidden&&au===au1&&fxOn()) BGFX=true;            // lancé écran éteint : les effets reviendront au retour
 }
 // Le moteur d'effets ne tourne que s'il sert : sinon on le met en veille (batterie, et iPhone qui coupe le son en fond)
 function fxSleep(){ if(!FX.ctx) return; if(au===au2){ if(FX.ctx.state!=="running") FX.ctx.resume().catch(()=>{}); } else if(FX.ctx.state==="running") FX.ctx.suspend().catch(()=>{}); }
@@ -2582,11 +2591,11 @@ async function reroute(play){                   // effets changés en cours d'é
   if(AD.on||!au.src||!curT()) return;
   const my=++REROUTEN, ld=LOADN, url=SRCURL||au.src, [el,u]=await pickEl(url);
   if(my!==REROUTEN||ld!==LOADN) return;                    // un réglage plus récent (ou un autre son) est passé entre-temps
-  if(el===au){ volApply(); return; }
+  if(el===au&&new URL(u,location.href).href===au.src){ volApply(); return; }   // même lecteur, même adresse : rien à recharger
   const pos=au.currentTime, was=play||!au.paused, old=au;
   au=el; el.src=u; applyRate(); volApply(); fxApply();
   el.currentTime=pos; el.addEventListener("loadedmetadata",()=>{ if(Math.abs(el.currentTime-pos)>1) el.currentTime=pos; },{once:true});
-  try{ old.pause(); }catch(e){} old.removeAttribute("src"); try{ old.load(); }catch(e){}
+  if(old!==el){ try{ old.pause(); }catch(e){} old.removeAttribute("src"); try{ old.load(); }catch(e){} }
   fxSleep();
   if(was&&!offlineLocked()) el.play().catch(()=>{});
 }
@@ -2594,8 +2603,9 @@ async function reroute(play){                   // effets changés en cours d'é
 let BGFX=false;
 function fxBack(){
   if(!BGFX||document.hidden) return;
-  const go=()=>{ if(!BGFX||document.hidden) return; BGFX=false; reroute(); }, c=FX.ctx;
-  if(!c) return go();
+  const go=()=>{ if(!BGFX||document.hidden) return; BGFX=false; reroute(); };
+  if(!fxBuild()) return;
+  const c=FX.ctx;                                              // moteur créé sans geste : on attend qu'il tourne avant d'y passer
   const later=()=>addEventListener("pointerdown",()=>{ c.resume().then(go).catch(()=>{}); },{once:true,capture:true});
   c.resume().then(()=>{ c.state==="running"?go():later(); }).catch(later);
 }
@@ -2629,7 +2639,7 @@ function setEq(k){
   S.player.eq=k; fxStore(); reroute(); fxRefresh();
 }
 function setFxVal(k,v){ if(k==="rev"&&!prem()) return premLock(_t("La réverbe")); S.player[k]=v; if(k==="fade") save(); else fxStore(); if(k==="rev"||k==="dist") reroute(); }
-function setEqc(band,v){ S.player.eqc=Object.assign({b:0,m:0,t:0},S.player.eqc,{[band]:v}); fxStore(); fxApply(); }
+function setEqc(band,v){ S.player.eqc=Object.assign({b:0,m:0,t:0},S.player.eqc,{[band]:v}); fxStore(); reroute(); }
 function setRate(k){ if(PREM_RATES.has(k)&&!prem()) return premLock("« "+RATES[k][2]+" »"); S.player.rate=k; fxStore(); applyRate(); reroute(); fxRefresh(); }
 function fxRefresh(){ if(!$("#gen").hidden&&$("#genb .fx")) $("#genb").innerHTML=fxHTML(), $$("#genb input[type=range]").forEach(paintRange); renderNP(); }
 function fxHTML(){
@@ -2706,12 +2716,16 @@ function welcome(i){ try{ localStorage.setItem("tkwel","1"); }catch(e){} const [
     <div class="nw">${i<WEL.length-1?`<button class="btn alt" onclick="closeSh('gen')">${_t("Passer")}</button><button class="btn" style="flex:1" onclick="welcome(${i+1})">${_t("Suivant")}</button>`:`<button class="btn" style="flex:1" onclick="closeSh('gen');location.hash='ajouter'">${_t("Commencer")}</button>`}</div></div>`); }
 // Mode voiture : très gros boutons, l'écran reste allumé
 let wakeL=null;
-async function carMode(on){
+function carMode(on){
   const el=$("#car"); if(on&&!curT()) return toast(_t("Lance d'abord un son"));
+  if(on&&!el.hidden) return carSync();                       // déjà ouvert : on garde le verrou actuel
   el.hidden=!on; document.body.classList.toggle("noscroll",!!on);
-  if(on){ carSync(); try{ wakeL=await navigator.wakeLock.request("screen"); }catch(e){} }
-  else { try{ wakeL&&wakeL.release(); }catch(e){} wakeL=null; }
+  if(on){ carSync(); carWake(); } else { try{ wakeL&&wakeL.release(); }catch(e){} wakeL=null; }
 }
+// Le navigateur relâche le verrou quand l'appli passe en fond : on le reprend au retour
+function carWake(){ if(!navigator.wakeLock||document.hidden||$("#car").hidden) return; try{ wakeL&&wakeL.release(); }catch(e){} wakeL=null;
+  navigator.wakeLock.request("screen").then(l=>{ if($("#car").hidden||wakeL) l.release(); else wakeL=l; }).catch(()=>{}); }
+document.addEventListener("visibilitychange",carWake);
 function carSync(){ const t=curT(); if(!t||$("#car").hidden) return; $("#cart").textContent=t.title; $("#cara").textContent=t.author||_t("Son TikTok"); $("#carf").classList.toggle("on",!!t.fav); }
 
 // Volume
@@ -2724,8 +2738,8 @@ function carSync(){ const t=curT(); if(!t||$("#car").hidden) return; $("#cart").
   window.toggleMute=()=>{ MUTED=!MUTED; volApply(); ico(); toast(MUTED?_t("Son coupé"):_t("Son rétabli")); };
 })();
 // Minuterie
-let sleepT=null, sleepEnd=false, sleepAt=0;
-function clearSleep(){ clearTimeout(sleepT); sleepT=null; sleepAt=0; sleepEnd=false; }
+let sleepT=null, sleepEnd=false, sleepAt=0, sleepFade=null;
+function clearSleep(){ clearTimeout(sleepT); clearInterval(sleepFade); sleepT=sleepFade=null; sleepAt=0; sleepEnd=false; if(SLEEPF!==1){ SLEEPF=1; volApply(); } }
 function setSleep(min){
   clearSleep();
   if(min==="end"){ sleepEnd=true; toast(_t("Arrêt à la fin du son")); }
@@ -2734,7 +2748,7 @@ function setSleep(min){
   else toast(_t("Minuterie désactivée"));
   renderNP();
 }
-function fadeOut(){ if(AD.on){ AD.stop=true; endAd(false); clearSleep(); renderNP(); toast(_t("Bonne nuit")); return; } let k=0; const n=S.player.sleepSoft===false?20:100; const it=setInterval(()=>{ k++; SLEEPF=Math.max(0,1-k/n); volApply(); if(k>=n){ clearInterval(it); au.pause(); SLEEPF=1; volApply(); clearSleep(); renderNP(); toast(_t("Bonne nuit")); } },200); }
+function fadeOut(){ if(AD.on){ AD.stop=true; endAd(false); clearSleep(); renderNP(); toast(_t("Bonne nuit")); return; } let k=0; const n=S.player.sleepSoft===false?20:100; clearInterval(sleepFade); sleepFade=setInterval(()=>{ k++; SLEEPF=Math.max(0,1-k/n); volApply(); if(k>=n){ au.pause(); clearSleep(); renderNP(); toast(_t("Bonne nuit")); } },200); }
 function sleepLabel(){ if(sleepEnd==="queue") return _t("Fin de la file"); if(sleepEnd) return _t("Fin du son"); if(sleepAt){ const m=Math.max(1,Math.ceil((sleepAt-Date.now())/60000)); return _t("{0} min",m); } return _t("Minuterie"); }
 function pickSleep(){ const on=sleepAt||sleepEnd; showOptions(_t("Minuterie de sommeil"),[
   ...[5,10,15,30,45,60,90].map(m=>({l:m<60?m+" minutes":m===60?_t("1 heure"):"1 h 30",i:"clock",fn:()=>setSleep(m)})),
@@ -2745,8 +2759,9 @@ function pickRate(){ showOptions(_t("Vitesse & effets"),Object.entries(RATES).ma
 setInterval(()=>{ if(sleepAt&&!$("#np").hidden) $("#npsl").innerHTML=I("clock",16)+`<span>${sleepLabel()}</span>`; },30000);
 
 // Lecteur plein écran
-function openNP(){ if(!curT()) return; renderNP(); const n=$("#np"); n.hidden=false; requestAnimationFrame(()=>requestAnimationFrame(()=>n.classList.add("on"))); document.body.classList.add("noscroll"); }
-function closeNP(){ const n=$("#np"); n.classList.remove("on"); setTimeout(()=>{ n.hidden=true; n.querySelector(".np-in").style.transform=""; },350); document.body.classList.remove("noscroll"); }
+let NPT=0;
+function openNP(){ if(!curT()) return; clearTimeout(NPT); renderNP(); const n=$("#np"); n.hidden=false; requestAnimationFrame(()=>requestAnimationFrame(()=>n.classList.add("on"))); document.body.classList.add("noscroll"); }
+function closeNP(){ const n=$("#np"); n.classList.remove("on"); clearTimeout(NPT); NPT=setTimeout(()=>{ n.hidden=true; n.querySelector(".np-in").style.transform=""; },350); document.body.classList.remove("noscroll"); }
 function renderNP(){
   const t=curT(); if(!t) return; const src=cvSrc(t);
   const nb=S.ui.npbg||"cover"; $("#npbg").style.backgroundImage=nb==="plain"?"none":(src&&nb==="cover")?`url("${src.replace(/"/g,"%22")}")`:`radial-gradient(circle at 30% 20%,var(--ac),transparent 65%)`;
@@ -2803,6 +2818,8 @@ function trashTrack(id){
   const t=S.tracks.find(x=>x.id===id); if(!t) return null;
   const idx=S.tracks.indexOf(t), mem=S.pls.map(p=>[p.id,p.ids.indexOf(id)]).filter(a=>a[1]>=0);
   S.tracks.splice(idx,1); S.pls.forEach(p=>p.ids=p.ids.filter(i=>i!==id)); S.pins=S.pins.filter(k=>k!==id);
+  for(let k=q.length-1;k>=0;k--) if(q[k]===id&&k!==qi){ q.splice(k,1); if(k<qi) qi--; }   // hors de la file aussi (le son en cours y reste)
+  if(!$("#npq").hidden) renderQueue();
   const e={kind:"t",at:Date.now(),t,mem,idx}; S.trash.unshift(e); return e;
 }
 function delTrack(id,quiet){
